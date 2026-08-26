@@ -43,7 +43,7 @@
         
         <button onclick="{% if app.repo %}alert('Yeniden yükleme işlevi yakında eklenecek: ' + '{{ app.repo }}'){% else %}alert('Bu uygulamanın github repo kaynağı girilmediği için otomatik güncellenemez.'){% endif %}" class="btn btn-sm btn-icon {% if not app.repo %}btn-disabled{% endif %}" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
         
-        <button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="btn btn-sm btn-icon btn-danger" title="Uygulamayı panodan sil">🗑 Sil</button>
+        {% if app.id == "tinc-hub" %}<button onclick="alert('Tinc Hub ana sistem bilesenidir, silinemez.')" class="btn btn-sm btn-icon btn-disabled">🗑 Sil</button>{% else %}<button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="btn btn-sm btn-icon btn-danger" title="Uygulamayı panodan sil">🗑 Sil</button>{% endif %}
     </div>
 </div>
 {% endmacro %}
@@ -52,7 +52,7 @@
 <div class="section-header" style="margin-bottom: 20px;">
     <h2>Tinc Hub - Sistem Merkezi</h2>
     <div class="actions">
-        <button onclick="openStoreModal()" class="btn" title="Uygulama Mağazası" style="background-color: var(--secondary-color); color: white;">🛒 App Store</button>
+        <button onclick="openStoreModal()" class="btn" title="Uygulama Mağazası" style="background-color: #8b5cf6; color: white;">🛒 App Store</button>
         <button onclick="openAddModal()" class="btn btn-primary" title="Yeni uygulama, docker container veya sistem servisi ekle">+ Yeni Ekle</button>
     </div>
 </div>

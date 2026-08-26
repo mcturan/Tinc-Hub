@@ -203,6 +203,9 @@ def index():
         display_apps = []
         pinned = [a for a in enriched if a.get("pinned")]
         unpinned = [a for a in enriched if not a.get("pinned")]
+        display_apps.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
+        pinned.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
+        unpinned.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
         
     disc = _get_discovery()
     docker = disc.get("docker", [])
