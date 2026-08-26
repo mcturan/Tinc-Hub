@@ -54,7 +54,7 @@ apps:
   - id: aprs-beacon
     name: APRS Beacon
     description: Telsiz konum beacon servisi
-    service: aprs-beacon@default
+    service: aprs-beacon@ta1xba
     is_user_service: true
     category: Telsiz
     icon: "📡"

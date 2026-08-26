@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Tinc Hub
+Comment=Tinc Hub System Tray
+Exec=/usr/bin/python3 /opt/tinc-hub/tray/tinc-hub-tray.py
+Icon=utilities-system-monitor
+Terminal=false
+Type=Application
+Categories=System;
+X-GNOME-Autostart-enabled=true

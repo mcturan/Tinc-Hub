@@ -87,3 +87,17 @@ if systemctl is-active --quiet "${SERVICE}"; then
 else
     error "Servis başlatılamadı. Log: journalctl -u ${SERVICE} -n 20"
 fi
+
+# Tray uygulamasını kopyala
+if [ -d "$SCRIPT_DIR/../tray" ]; then
+    mkdir -p /opt/tinc-hub/tray
+    cp "$SCRIPT_DIR/../tray/"* /opt/tinc-hub/tray/
+    
+    # Mevcut kullanıcı için autostart ekle
+    if [ -n "$SUDO_USER" ]; then
+        USER_HOME=$(getent passwd $SUDO_USER | cut -d: -f6)
+        mkdir -p $USER_HOME/.config/autostart
+        cp "$SCRIPT_DIR/../tray/tinc-hub.desktop" $USER_HOME/.config/autostart/
+        chown -R $SUDO_USER:$SUDO_USER $USER_HOME/.config/autostart
+    fi
+fi

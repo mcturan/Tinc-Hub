@@ -684,3 +684,9 @@ footer {
   .app-grid { grid-template-columns: 1fr; }
   nav a { padding: 6px 8px; font-size: 0.8rem; }
 }
+
+.btn-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    filter: grayscale(100%);
+}
