@@ -41,7 +41,7 @@
         
         <button onclick="editApp('{{ app.id }}')" class="btn btn-sm btn-icon" title="Uygulama ayarlarını düzenle">✏️ Düzenle</button>
         
-        <button onclick="{% if app.repo %}alert('Yeniden yükleme işlevi yakında eklenecek: ' + '{{ app.repo }}'){% else %}alert('Bu uygulamanın github repo kaynağı girilmediği için otomatik güncellenemez.'){% endif %}" class="btn btn-sm btn-icon {% if not app.repo %}btn-disabled{% endif %}" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
+        <button onclick="{% if app.repo %}updateApp('{{ app.id }}', '{{ app.name }}'){% else %}alert('Bu uygulamanın github repo kaynağı girilmediği için otomatik güncellenemez.'){% endif %}" class="btn btn-sm btn-icon {% if not app.repo %}btn-disabled{% endif %}" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
         
         {% if app.id == "tinc-hub" %}<button onclick="alert('Tinc Hub ana sistem bilesenidir, silinemez.')" class="btn btn-sm btn-icon btn-disabled">🗑 Sil</button>{% else %}<button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="btn btn-sm btn-icon btn-danger" title="Uygulamayı panodan sil">🗑 Sil</button>{% endif %}
     </div>
@@ -356,10 +356,50 @@ function closeStoreModal() {
     document.getElementById('storeModal').classList.add('hidden');
 }
 
-function installFromStore(appId, appName, repo) {
-    if(confirm(`${appName} uygulamasını kurmak istiyor musunuz?\n\nBu işlem arka planda indirme yapacak ve panoya ekleyecektir.`)) {
-        alert("Kurulum sistemi (App Store aracı) yakında tam sürüme geçecektir!\nŞu anki altyapımızda sadece panoya kayıt oluşturabiliriz.");
-        // İleride buraya /api/store/install backend çağrısı gelir.
+async function installFromStore(appId, appName, repo) {
+    if(!confirm(`${appName} uygulamasını kurmak istiyor musunuz?\n\nBu işlem github reposunu (${repo}) çekecek ve arka planda kurulum (install.sh) yapacaktır. 1-2 dakika sürebilir.`)) return;
+    
+    document.getElementById('store-loading').innerHTML = '<div class="info-box" style="background:#3b82f6; color:white;">⏳ Kuruluyor... Lütfen bekleyin, sayfayı kapatmayın.</div>';
+    document.getElementById('store-loading').style.display = 'block';
+    document.getElementById('store-grid').style.display = 'none';
+    
+    try {
+        const r = await fetch('/api/store/install', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: appId})
+        });
+        const res = await r.json();
+        if(r.ok) {
+            alert("✅ " + res.message);
+            location.reload();
+        } else {
+            alert("❌ Kurulum Hatası: \n" + res.error);
+            closeStoreModal();
+        }
+    } catch (e) {
+        alert("Bağlantı Hatası: " + e);
+        closeStoreModal();
+    }
+}
+
+async function updateApp(appId, appName) {
+    if(!confirm(`${appName} uygulamasını GÜNCELLEMEK istiyor musunuz?\n\n- Github'dan son sürüm çekilecek (git pull)\n- Varsa install.sh çalıştırılarak servis yenilenecek.\n- Bu işlem biraz sürebilir, bekleyin.`)) return;
+    
+    try {
+        // Show some loading indicator if possible, or just alert
+        const r = await fetch(`/api/settings/apps/${appId}/update`, {
+            method: 'POST'
+        });
+        const res = await r.json();
+        if(r.ok) {
+            alert("✅ " + res.message);
+            location.reload();
+        } else {
+            alert("❌ Güncelleme Hatası: \n" + res.error);
+        }
+    } catch(e) {
+        alert("Bağlantı Hatası: " + e);
     }
 }
 

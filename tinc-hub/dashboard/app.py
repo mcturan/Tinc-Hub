@@ -402,6 +402,25 @@ def api_get_store():
     except Exception as e:
         return jsonify([])
 
+@app.route("/api/store/install", methods=["POST"])
+@auth_required
+def api_store_install():
+    data = request.get_json()
+    store_app_id = data.get("id")
+    if not store_app_id:
+        return jsonify({"ok": False, "error": "App ID gerekli."}), 400
+        
+    from installer import install_app_from_store
+    res = install_app_from_store(store_app_id)
+    return jsonify(res), (200 if res.get("ok") else 500)
+
+@app.route("/api/settings/apps/<app_id>/update", methods=["POST"])
+@auth_required
+def api_update_app(app_id):
+    from installer import update_app_local
+    res = update_app_local(app_id)
+    return jsonify(res), (200 if res.get("ok") else 500)
+
 @app.route("/api/settings/apps/<app_id>/pin", methods=["POST"])
 @auth_required
 def api_pin_app(app_id):
