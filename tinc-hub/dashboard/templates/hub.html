@@ -105,6 +105,250 @@
     </div>
 </div>
 
+
+
+<!-- Kategori Filtreleri -->
+<div class="cat-filters" style="margin: 20px 0;">
+    <a href="/" class="cat-chip {% if not selected_cat %}active{% endif %}">Tümü</a>
+    {% for c in categories %}
+    <a href="/?cat={{ c }}" class="cat-chip {% if selected_cat == c %}active{% endif %}">{{ c }}</a>
+    {% endfor %}
+</div>
+
+{% if not selected_cat %}
+<div class="section">
+    <h2>Öne Çıkanlar</h2>
+    <div class="app-grid">
+        {% for app in pinned %}
+            {{ render_app_card(app) }}
+        {% else %}
+            <div class="empty-state">Öne çıkan uygulama yok.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="section">
+    <h2>{% if selected_cat %}{{ selected_cat }} Uygulamaları{% else %}Diğer Uygulamalar{% endif %}</h2>
+    <div class="app-grid">
+        {% set display_list = apps if selected_cat else unpinned %}
+        {% for app in display_list %}
+            {{ render_app_card(app) }}
+        {% else %}
+            <div class="empty-state">Bu kategoride uygulama yok.</div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if not selected_cat %}
+<!-- Docker Containerları -->
+<div class="section" style="margin-top: 40px;">
+    <h2>Keşfedilen Docker Container'ları</h2>
+    {% if docker %}
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>ID</th><th>İsim</th><th>Image</th><th>Durum</th><th>Portlar</th><th>İşlemler</th></tr></thead>
+            <tbody>
+                {% for c in docker %}
+                <tr>
+                    <td><code>{{ c.id[:8] }}</code></td>
+                    <td><strong>{{ c.name }}</strong></td>
+                    <td>{{ c.image }}</td>
+                    <td><span class="badge {% if c.running %}status-badge healthy{% else %}status-badge dead{% endif %}">{{ c.state_str }}</span></td>
+                    <td>{{ c.ports|join(', ') }}</td>
+                    <td>
+                        <button onclick="openAddModal('{{ c.name }}')" class="btn btn-sm" title="Hub Panosuna Ekle">➕ Ekle</button>
+                        <button onclick="deleteDocker('{{ c.id }}', '{{ c.name }}')" class="btn btn-sm btn-danger" title="Sistemden SİL">🗑 Sil</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="info-box">Çalışan Docker container bulunamadı.</div>
+    {% endif %}
+
+    <!-- Keşfedilen Systemd Servisleri -->
+    <h2 style="margin-top: 30px;">Keşfedilen Systemd (User) Servisleri</h2>
+    {% if system_services %}
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Servis Adı</th><th>İşlemler</th></tr></thead>
+            <tbody>
+                {% for srv in system_services %}
+                <tr>
+                    <td><strong>{{ srv }}</strong></td>
+                    <td>
+                        <button onclick="openAddModal('{{ srv }}')" class="btn btn-sm" title="Hub Panosuna Ekle">➕ Panoya Ekle</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="info-box">Panoya ekli olmayan çalışan user servisi bulunamadı.</div>
+    {% endif %}
+</div>
+
+<!-- Keşfedilen Diğer Servisler -->
+<div class="section" style="margin-top: 40px;">
+    <h2>Keşfedilen Diğer Servisler</h2>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Servis Adı</th><th>Durum</th><th>Eylem</th></tr></thead>
+            <tbody>
+                {% for s in unknown_services %}
+                <tr>
+                    <td>{{ s.name }}</td>
+                    <td><span class="badge {% if s.running %}status-badge healthy{% else %}status-badge dead{% endif %}">{{ s.sub }}</span></td>
+                    <td><button onclick="openAddModal('{{ s.name }}')" class="btn btn-sm" title="Bu servisi üstteki uygulama listesine ekle">+ Hub'a Ekle</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add/Edit Modal -->
+<div id="addModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="modalTitle">Yeni Uygulama Ekle</div>
+            <button class="modal-close" onclick="closeAddModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-id">
+            <div class="form-row">
+                <div class="form-group"><label>Uygulama Adı</label><input type="text" id="edit-name" required></div>
+                <div class="form-group"><label>Kategori</label><input type="text" id="edit-cat" placeholder="İş, Medya, Sistem..."></div>
+            </div>
+            <div class="form-group"><label>Açıklama</label><input type="text" id="edit-desc"></div>
+            <div class="form-group"><label>Github Repo / Kaynak</label><input type="text" id="edit-repo" placeholder="github.com/mcturan/..."></div>
+            <div class="form-row">
+                <div class="form-group"><label>Systemd Servis / Container Adı</label><input type="text" id="edit-service"></div>
+                <div class="form-group"><label>Port</label><input type="number" id="edit-port"></div>
+            </div>
+            <div class="form-group"><label>Harici URL</label><input type="text" id="edit-url" placeholder="https://..."></div>
+            <div class="form-row">
+                <div class="form-group"><label>İkon (Emoji)</label><input type="text" id="edit-icon" value="📦"></div>
+                <div class="form-group">
+                    <label>Sağlık Kontrol Tipi</label>
+                    <select id="edit-health">
+                        <option value="systemd">Systemd Durumu</option>
+                        <option value="http">HTTP İsteği</option>
+                        <option value="port">TCP Portu</option>
+                        <option value="none">Kapalı</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" id="edit-pinned" checked>
+                <label for="edit-pinned">Ana sayfada öne çıkar (Sabitle)</label>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" id="edit-is-user">
+                <label for="edit-is-user">Bu bir kullanıcı servisidir (--user)</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeAddModal()">İptal</button>
+            <button class="btn btn-primary" onclick="submitAddModal()">Kaydet</button>
+        </div>
+    </div>
+</div>
+<!-- Store Modal -->
+<div id="storeModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 800px; width: 90%;">
+        <div class="modal-header">
+            <div class="modal-title">🛒 Tinc App Store</div>
+            <button class="modal-close" onclick="closeStoreModal()">&times;</button>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <p>Resmi depomuzdaki uygulamaları tek tıkla sisteminize kurabilirsiniz.</p>
+            <div id="store-loading">Yükleniyor...</div>
+            <div id="store-grid" class="app-grid" style="grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); margin-top: 15px;">
+                <!-- JS ile dolacak -->
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">⚙️ Tinc Hub - Ayarlar</div>
+            <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <h3>📱 Mobil Uygulama Eşleştirme</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p>Mobil uygulamayı indirdikten sonra aşağıdaki bilgileri kullanarak bu Tinc Hub cihazını yönetebilirsiniz:</p>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Hub ID:</label>
+                    <input type="text" value="{{ hub_id }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">API Token:</label>
+                    <input type="text" value="{{ api_token }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+                    <a href="/static/Tinc-Hub-Manager.apk" class="btn btn-primary" style="text-decoration:none; display:inline-block;">📱 Mobil Uygulamayı (APK) İndir</a>
+                </div>
+            </div>
+
+            <h3>🔔 Telegram Bildirimleri (Kapanan Servisler İçin)</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p>Kapanan veya yanıt vermeyen servisler anında Telegram hesabınıza düşer.</p>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Bot Token:</label>
+                    <input type="text" id="tg_token" value="{{ tg_token }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="BotFather'dan alınan token">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Chat ID:</label>
+                    <input type="text" id="tg_chat" value="{{ tg_chat }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="Sizin veya grubun Chat ID'si">
+                </div>
+                <button onclick="saveTelegram()" class="btn btn-primary" style="margin-top: 10px;">💾 Telegram Ayarlarını Kaydet</button>
+            </div>
+
+            <h3>📦 Sistem Yedeği (Snapshot)</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px;">
+                <p>Tinc Hub konfigürasyonunu ve uygulama kayıtlarını (registry) yedekleyin.</p>
+                <button onclick="takeBackup()" class="btn btn-primary" style="margin-top: 10px;">💾 Şimdi Yedek Al</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
+function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
+async function takeBackup() {
+    try {
+        const r = await fetch('/api/settings/backup', {method: 'POST'});
+        const res = await r.json();
+        if(r.ok) alert("✅ Yedek başarıyla alındı!
+Dosya: " + res.file);
+        else alert("❌ Hata: " + res.error);
+    } catch(e) { alert("Bağlantı Hatası: " + e); }
+}
+async function saveTelegram() {
+    const token = document.getElementById('tg_token').value.trim();
+    const chat = document.getElementById('tg_chat').value.trim();
+    try {
+        const r = await fetch('/api/settings/telegram', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token: token, chat: chat})
+        });
+        const res = await r.json();
+        alert(res.ok ? "✅ " + res.message : "❌ Hata: " + res.error);
+    } catch(e) { alert("Bağlantı Hatası: " + e); }
+}
 </script>
 
 {% endblock %}
@@ -365,6 +609,80 @@ setInterval(async () => {
         }
     } catch(e){}
 }, 30000);
+</script>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">⚙️ Tinc Hub - Ayarlar</div>
+            <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <h3>📱 Mobil Uygulama Eşleştirme</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p>Mobil uygulamayı indirdikten sonra aşağıdaki bilgileri kullanarak bu Tinc Hub cihazını yönetebilirsiniz:</p>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Hub ID:</label>
+                    <input type="text" value="{{ hub_id }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">API Token:</label>
+                    <input type="text" value="{{ api_token }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+                    <a href="/static/Tinc-Hub-Manager.apk" class="btn btn-primary" style="text-decoration:none; display:inline-block;">📱 Mobil Uygulamayı (APK) İndir</a>
+                </div>
+            </div>
+
+            <h3>🔔 Telegram Bildirimleri (Kapanan Servisler İçin)</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p>Kapanan veya yanıt vermeyen servisler anında Telegram hesabınıza düşer.</p>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Bot Token:</label>
+                    <input type="text" id="tg_token" value="{{ tg_token }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="BotFather'dan alınan token">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Chat ID:</label>
+                    <input type="text" id="tg_chat" value="{{ tg_chat }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="Sizin veya grubun Chat ID'si">
+                </div>
+                <button onclick="saveTelegram()" class="btn btn-primary" style="margin-top: 10px;">💾 Telegram Ayarlarını Kaydet</button>
+            </div>
+
+            <h3>📦 Sistem Yedeği (Snapshot)</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px;">
+                <p>Tinc Hub konfigürasyonunu ve uygulama kayıtlarını (registry) yedekleyin.</p>
+                <button onclick="takeBackup()" class="btn btn-primary" style="margin-top: 10px;">💾 Şimdi Yedek Al</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
+function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
+async function takeBackup() {
+    try {
+        const r = await fetch('/api/settings/backup', {method: 'POST'});
+        const res = await r.json();
+        if(r.ok) alert("✅ Yedek başarıyla alındı!
+Dosya: " + res.file);
+        else alert("❌ Hata: " + res.error);
+    } catch(e) { alert("Bağlantı Hatası: " + e); }
+}
+async function saveTelegram() {
+    const token = document.getElementById('tg_token').value.trim();
+    const chat = document.getElementById('tg_chat').value.trim();
+    try {
+        const r = await fetch('/api/settings/telegram', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token: token, chat: chat})
+        });
+        const res = await r.json();
+        alert(res.ok ? "✅ " + res.message : "❌ Hata: " + res.error);
+    } catch(e) { alert("Bağlantı Hatası: " + e); }
+}
 </script>
 
 {% endblock %}
