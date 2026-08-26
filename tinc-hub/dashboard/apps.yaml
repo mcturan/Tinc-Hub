@@ -7,9 +7,9 @@ apps:
     name: Docker
     description: Container yönetimi
     service: docker
-    category: Sistem
+  category: Sistem
     icon: "🐳"
-    health_check: systemd
+  health_check: systemd
     pinned: false
 
   - id: nginx
@@ -17,9 +17,9 @@ apps:
     description: Web sunucu ve ters proxy
     service: nginx
     port: 80
-    category: Sistem
+  category: Sistem
     icon: "⚡"
-    health_check: systemd
+  health_check: systemd
     pinned: false
 
   - id: firinna-pos
@@ -34,7 +34,7 @@ apps:
     category: İş
     icon: "🍞"
     health_check: http
-    pinned: true
+  pinned: true
     parent: nginx
 
   - id: firinna-web
@@ -48,7 +48,7 @@ apps:
     category: İş
     icon: "🌐"
     health_check: http
-    pinned: true
+  pinned: true
     parent: nginx
 
   - id: aprs-beacon
@@ -58,8 +58,8 @@ apps:
     is_user_service: true
     category: Telsiz
     icon: "📡"
-    health_check: systemd
-    pinned: true
+  health_check: systemd
+  pinned: true
 
   - id: plex
     name: Plex Media Server
@@ -90,7 +90,7 @@ apps:
     service: anydesk
     category: Araç
     icon: "🖥️"
-    health_check: systemd
+  health_check: systemd
     pinned: false
 
   - id: samba
@@ -98,9 +98,9 @@ apps:
     description: Ağ dosya paylaşımı (SMB/CIFS)
     service: smbd
     port: 445
-    category: Sistem
+  category: Sistem
     icon: "📁"
-    health_check: systemd
+  health_check: systemd
     pinned: false
 
   - id: cctv
@@ -117,22 +117,22 @@ apps:
     service: rclone
     category: Araç
     icon: "☁️"
-    health_check: systemd
+  health_check: systemd
     pinned: false
 
   - id: docker
     name: Docker
     description: Container yönetimi
     service: docker
-    category: Sistem
+  category: Sistem
     icon: "🐳"
-    health_check: systemd
+  health_check: systemd
     pinned: false
-  - id: tinc-hub
-    name: Tinc Hub Manager
-    description: Sistemin kalbi, bu dashboard.
-    service: tinc-hub
-    category: Sistem
-    icon: "⚙️"
-    health_check: systemd
-    pinned: true
+- id: tinc-hub
+  name: Tinc Hub Manager
+  description: Sistemin kalbi, bu dashboard.
+  service: tinc-hub
+  category: Sistem
+  icon: "⚙️"
+  health_check: systemd
+  pinned: true
