@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Name=Tinc Hub
+Comment=Tinc Hub - Sistem Kontrol Merkezi
+Exec=xdg-open http://127.0.0.1:9010
+Icon=/opt/tinc-hub/dashboard/static/icon.jpg
+Terminal=false
+Type=Application
+Categories=System;Utility;Network;
+Keywords=tinc;hub;system;dashboard;
