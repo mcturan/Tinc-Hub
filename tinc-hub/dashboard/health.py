@@ -7,9 +7,24 @@ Her uygulama için HTTP ping veya systemd durumunu kontrol eder.
 
 import subprocess
 import requests
+
+import os
 import threading
 import time
 from datetime import datetime
+
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT = os.environ.get("TELEGRAM_CHAT_ID")
+
+def send_telegram_alert(msg: str):
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT:
+        return
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    try:
+        requests.post(url, json={"chat_id": TELEGRAM_CHAT, "text": f"🚨 [TINC HUB ALERT]
+{msg}"}, timeout=5)
+    except:
+        pass
 
 # Son sağlık durumları cache (thread-safe)
 _health_cache: dict = {}
@@ -139,14 +154,26 @@ def start_background_checker(get_apps_fn, interval: int = CHECK_INTERVAL):
     get_apps_fn: registry'den app listesi dönen fonksiyon
     """
     def _loop():
+        # Onceki durumlari tut
+        prev_state = {}
         while True:
             try:
                 apps = get_apps_fn()
                 for app in apps:
                     if app.get("health_check", "systemd") == "none":
                         continue
+                    app_id = app["id"]
                     result = check_app(app)
-                    update_cache(app["id"], result)
+                    
+                    # Telegram uyarisi (Cokme)
+                    if app_id in prev_state:
+                        if prev_state[app_id] is True and result["ok"] is False:
+                            send_telegram_alert(f"{app.get('name', app_id)} servisi kapandi veya yanit vermiyor!")
+                        elif prev_state[app_id] is False and result["ok"] is True:
+                            send_telegram_alert(f"✅ {app.get('name', app_id)} servisi tekrar aktif oldu.")
+                            
+                    prev_state[app_id] = result["ok"]
+                    update_cache(app_id, result)
             except Exception:
                 pass
             time.sleep(interval)
