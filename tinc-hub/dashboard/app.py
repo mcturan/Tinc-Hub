@@ -105,6 +105,18 @@ def _enrich_apps(apps: list[dict]) -> list[dict]:
         # Sağlık
         cached = get_cached_health(app["id"])
         app["health"] = cached or {"ok": None, "checked_at": None}
+        
+        # Replace {{host}} in URLs
+        try:
+            from flask import request
+            host_ip = request.host.split(':')[0]
+            if app.get("url") and "{{host}}" in app["url"]:
+                app["url"] = app["url"].replace("{{host}}", host_ip)
+            if app.get("internal_url") and "{{host}}" in app["internal_url"]:
+                app["internal_url"] = app["internal_url"].replace("{{host}}", host_ip)
+        except Exception:
+            pass
+
 
         # systemd detay
         svc = app.get("service")
@@ -313,8 +325,13 @@ def api_action(app_id):
 
     unit = service if service.endswith(".service") else f"{service}.service"
     try:
+        if app_data.get("is_user_service"):
+            cmd = ["sudo", "-u", "turan", "XDG_RUNTIME_DIR=/run/user/1000", "systemctl", "--user", action, unit]
+        else:
+            cmd = ["systemctl", action, unit]
+            
         r = subprocess.run(
-            ["systemctl", action, unit],
+            cmd,
             capture_output=True, text=True, timeout=15
         )
         ok = r.returncode == 0
@@ -373,6 +390,16 @@ def api_delete_app(app_id):
                     subprocess.run(["sudo", "systemctl", "disable", service], timeout=5)
             except Exception as e:
                 return jsonify({"ok": False, "error": f"Servis durdurulamadı: {str(e)}"}), 500
+                
+            # Çalıştırma scripti
+            repo = app_data.get("repo")
+            if repo:
+                app_name_slug = repo.rstrip('/').split('/')[-1]
+                target_dir = f"/home/turan/101/{app_name_slug}"
+                uninstall_script = f"{target_dir}/uninstall.sh"
+                if os.path.exists(uninstall_script):
+                    import subprocess
+                    subprocess.run(["sudo", "bash", uninstall_script], check=False)
                 
     ok = delete_app(app_id)
     return jsonify({"ok": ok})
@@ -514,10 +541,18 @@ def stream_logs(service_name):
 
     lines = int(request.args.get("lines", 100))
     unit  = service_name if service_name.endswith(".service") else f"{service_name}.service"
+    
+    app_data = next((a for a in load_apps() if a.get("service") == service_name or a.get("service") == unit), None)
+    is_user = app_data.get("is_user_service", False) if app_data else False
+    
+    if is_user:
+        cmd = ["sudo", "-u", "turan", "XDG_RUNTIME_DIR=/run/user/1000", "journalctl", "--user", "-u", unit, "-f", f"-n{lines}", "--no-pager", "--output=short-iso"]
+    else:
+        cmd = ["journalctl", "-u", unit, "-f", f"-n{lines}", "--no-pager", "--output=short-iso"]
 
     def generate():
         proc = subprocess.Popen(
-            ["journalctl", "-u", unit, "-f", f"-n{lines}", "--no-pager", "--output=short-iso"],
+            cmd,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1
         )
@@ -555,8 +590,17 @@ def log_lines(service_name):
         return jsonify({"error": "Geçersiz servis adı"}), 400
     lines = int(request.args.get("n", 200))
     unit  = service_name if service_name.endswith(".service") else f"{service_name}.service"
+    
+    app_data = next((a for a in load_apps() if a.get("service") == service_name or a.get("service") == unit), None)
+    is_user = app_data.get("is_user_service", False) if app_data else False
+    
+    if is_user:
+        cmd = ["sudo", "-u", "turan", "XDG_RUNTIME_DIR=/run/user/1000", "journalctl", "--user", "-u", unit, f"-n{lines}", "--no-pager", "--output=short-iso"]
+    else:
+        cmd = ["journalctl", "-u", unit, f"-n{lines}", "--no-pager", "--output=short-iso"]
+        
     r = subprocess.run(
-        ["journalctl", "-u", unit, f"-n{lines}", "--no-pager", "--output=short-iso"],
+        cmd,
         capture_output=True, text=True, timeout=10
     )
     return jsonify({"lines": r.stdout.splitlines(), "service": service_name})
