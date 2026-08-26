@@ -24,9 +24,9 @@ WantedBy=default.target
 SRV
 
 echo "[INFO] Systemd servisi başlatılıyor..."
-systemctl --user daemon-reload
-systemctl --user enable tinc-terminal.service
-systemctl --user restart tinc-terminal.service
+sudo -u turan XDG_RUNTIME_DIR=/run/user/1000 systemctl --user daemon-reload
+sudo -u turan XDG_RUNTIME_DIR=/run/user/1000 systemctl --user enable tinc-terminal.service
+sudo -u turan XDG_RUNTIME_DIR=/run/user/1000 systemctl --user restart tinc-terminal.service
 loginctl enable-linger turan
 
 echo "[INFO] Terminal 9012 portunda başarıyla başlatıldı!"
