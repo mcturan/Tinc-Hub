@@ -39,7 +39,7 @@ info "Python paketleri yükleniyor..."
 
 # 4. Shared modülü kopyala
 mkdir -p /opt/kole/shared
-cp "$SCRIPT_DIR/../../shared/db.py" /opt/kole/shared/
+cp "$SCRIPT_DIR/../shared/db.py" /opt/kole/shared/
 info "Shared DB modülü kopyalandı"
 
 # 5. Dashboard dosyalarını kopyala
@@ -52,7 +52,7 @@ info "Dashboard dosyaları kopyalandı"
 # 6. Config dosyası
 if [[ ! -f /etc/kole/config.env ]]; then
     mkdir -p /etc/kole
-    cp "$SCRIPT_DIR/../../shared/config.env.template" /etc/kole/config.env
+    cp "$SCRIPT_DIR/../shared/config.env.template" /etc/kole/config.env
     warn "Config dosyası oluşturuldu: /etc/kole/config.env"
     warn "Lütfen ROUTER_PASS ve diğer değerleri düzenleyin!"
 fi
