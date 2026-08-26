@@ -398,7 +398,17 @@ def api_get_store():
     store_file = os.path.join(os.path.dirname(__file__), "store.json")
     try:
         with open(store_file, "r") as f:
-            return jsonify(json.load(f))
+            store_apps = json.load(f)
+            
+        # Check which apps are installed
+        from registry import load_apps
+        installed_apps = load_apps()
+        installed_ids = [a.get("id") for a in installed_apps]
+        
+        for app in store_apps:
+            app["is_installed"] = app["id"] in installed_ids
+            
+        return jsonify(store_apps)
     except Exception as e:
         return jsonify([])
 

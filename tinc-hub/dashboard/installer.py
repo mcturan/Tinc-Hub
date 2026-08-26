@@ -59,9 +59,19 @@ def install_app_from_store(store_app_id: str) -> dict:
             "repo": repo_url,
             "pinned": True
         }
-        # Servis adı genelde repo adıyla aynı olur, veya store'dan gelebilir
+        # Ekstra alanları da kopyala
         if "service" in app_meta:
             new_app["service"] = app_meta["service"]
+        if "url" in app_meta:
+            new_app["url"] = app_meta["url"]
+        if "internal_url" in app_meta:
+            new_app["internal_url"] = app_meta["internal_url"]
+        if "is_user_service" in app_meta:
+            new_app["is_user_service"] = app_meta["is_user_service"]
+        if "health_check" in app_meta:
+            new_app["health_check"] = app_meta["health_check"]
+        else:
+            new_app["health_check"] = "systemd" if "service" in app_meta else "none"
         apps.append(new_app)
         save_apps(apps)
         

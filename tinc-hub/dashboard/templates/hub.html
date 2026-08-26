@@ -340,8 +340,14 @@ async function openStoreModal() {
                 <div class="app-desc" style="margin-top: 10px; font-size: 0.9rem;">
                     ${app.description || ''}
                 </div>
-                <div class="card-actions" style="margin-top: 15px;">
-                    <button class="btn btn-primary btn-sm" style="width: 100%;" onclick="installFromStore('${app.id}', '${app.name}', '${app.repo}')">⬇️ Kur / Yükle</button>
+                <div class="card-actions" style="margin-top: 15px; display: flex; gap: 5px;">
+                    ${app.is_installed ? 
+                        `<div style="width:100%; text-align:center; padding: 5px; background: var(--border); border-radius: 4px; font-size: 0.9rem;">✅ Yüklü</div>
+                         <button class="btn btn-sm" onclick="installFromStore('${app.id}', '${app.name}', '${app.repo}')" title="Yeniden Yükle/Güncelle">⟳</button>
+                         <button class="btn btn-sm btn-danger" onclick="deleteApp('${app.id}', '${app.name}')" title="Sil">🗑</button>`
+                        : 
+                        `<button class="btn btn-primary btn-sm" style="width: 100%;" onclick="installFromStore('${app.id}', '${app.name}', '${app.repo}')">⬇️ Kur / Yükle</button>`
+                    }
                 </div>
             </div>
             `;

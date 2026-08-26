@@ -7,6 +7,7 @@
         "description": "Tarayıcı üzerinden doğrudan makinenin konsoluna erişim.",
         "repo": "file:///home/turan/101/tinc-terminal-source",
         "service": "tinc-terminal.service",
+        "is_user_service": true,
         "url": "http://{{host}}:9012",
         "internal_url": "http://127.0.0.1:9012"
     },
@@ -18,6 +19,7 @@
         "description": "T\u00fcm sunucu dosyalar\u0131n\u0131za taray\u0131c\u0131 \u00fczerinden eri\u015fin, y\u00fckleyin ve y\u00f6netin. (FileBrowser tabanl\u0131)",
         "repo": "file:///home/turan/101/tinc-filebrowser-source",
         "service": "tinc-filebrowser.service",
+        "is_user_service": true,
         "url": "http://{{host}}:9011",
         "internal_url": "http://127.0.0.1:9011"
     },
