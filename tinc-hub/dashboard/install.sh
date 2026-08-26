@@ -44,6 +44,7 @@ info "Shared DB modülü kopyalandı"
 
 # 5. Dashboard dosyalarını kopyala
 cp "$SCRIPT_DIR/"*.py "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/"*.json "$INSTALL_DIR/" 2>/dev/null || true
 cp -r "$SCRIPT_DIR/templates/"* "$INSTALL_DIR/templates/"
 cp -r "$SCRIPT_DIR/static/"* "$INSTALL_DIR/static/" 2>/dev/null || true
 chmod +x "$INSTALL_DIR/"*.py
