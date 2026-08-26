@@ -40,6 +40,9 @@
         <button onclick="serviceAction('{{ app.id }}', 'restart')" class="btn btn-sm btn-icon" title="Servisi yeniden başlat">⟳ Yeniden Başlat</button>
         <a href="/logs?service={{ app.service }}" class="btn btn-sm btn-icon" title="Canlı logları görüntüle">📜 Log</a>
         {% endif %}
+        
+        <button onclick="editApp('{{ app.id }}')" class="btn btn-sm btn-icon" title="Uygulama ayarlarını düzenle">✏️ Düzenle</button>
+        
         {% if app.repo %}
         <button onclick="alert('Yeniden yükleme işlevi yakında eklenecek: ' + '{{ app.repo }}')" class="btn btn-sm btn-icon" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
         <button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="btn btn-sm btn-icon btn-danger" title="Uygulamayı ve ayarlarını tamamen sil">🗑 Sil</button>
@@ -49,6 +52,11 @@
 {% endmacro %}
 
 {% block content %}
+<div class="section-header" style="margin-bottom: 20px;">
+    <h2>Tinc Hub - Sistem Merkezi</h2>
+    <button onclick="openAddModal()" class="btn btn-primary" title="Yeni uygulama, docker container veya sistem servisi ekle">+ Yeni Ekle</button>
+</div>
+
 <!-- Sistem Bar -->
 <div class="sysbar">
     <div class="sysbar-item">
@@ -68,6 +76,15 @@
     </div>
 </div>
 
+<!-- Kategori Filtreleri -->
+<div class="cat-filters" style="margin: 20px 0;">
+    <a href="/" class="cat-chip {% if not selected_cat %}active{% endif %}">Tümü</a>
+    {% for c in categories %}
+    <a href="/?cat={{ c }}" class="cat-chip {% if selected_cat == c %}active{% endif %}">{{ c }}</a>
+    {% endfor %}
+</div>
+
+{% if not selected_cat %}
 <div class="section">
     <h2>Öne Çıkanlar</h2>
     <div class="app-grid">
@@ -78,21 +95,186 @@
         {% endfor %}
     </div>
 </div>
+{% endif %}
 
 <div class="section">
-    <h2>Diğer Uygulamalar</h2>
+    <h2>{% if selected_cat %}{{ selected_cat }} Uygulamaları{% else %}Diğer Uygulamalar{% endif %}</h2>
     <div class="app-grid">
-        {% for app in unpinned %}
+        {% set display_list = apps if selected_cat else unpinned %}
+        {% for app in display_list %}
             {{ render_app_card(app) }}
         {% else %}
-            <div class="empty-state">Kayıtlı başka uygulama yok.</div>
+            <div class="empty-state">Bu kategoride uygulama yok.</div>
         {% endfor %}
+    </div>
+</div>
+
+{% if not selected_cat %}
+<!-- Docker Containerları -->
+<div class="section" style="margin-top: 40px;">
+    <h2>Keşfedilen Docker Container'ları</h2>
+    {% if docker %}
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>ID</th><th>İsim</th><th>Image</th><th>Durum</th><th>Portlar</th></tr></thead>
+            <tbody>
+                {% for c in docker %}
+                <tr>
+                    <td><code>{{ c.id[:8] }}</code></td>
+                    <td><strong>{{ c.name }}</strong></td>
+                    <td>{{ c.image }}</td>
+                    <td><span class="badge {% if c.running %}status-badge healthy{% else %}status-badge dead{% endif %}">{{ c.state_str }}</span></td>
+                    <td>{{ c.ports|join(', ') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="info-box">Çalışan Docker container bulunamadı.</div>
+    {% endif %}
+</div>
+
+<!-- Keşfedilen Diğer Servisler -->
+<div class="section" style="margin-top: 40px;">
+    <h2>Keşfedilen Diğer Servisler</h2>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Servis Adı</th><th>Durum</th><th>Eylem</th></tr></thead>
+            <tbody>
+                {% for s in unknown_services %}
+                <tr>
+                    <td>{{ s.name }}</td>
+                    <td><span class="badge {% if s.running %}status-badge healthy{% else %}status-badge dead{% endif %}">{{ s.sub }}</span></td>
+                    <td><button onclick="openAddModal('{{ s.name }}')" class="btn btn-sm" title="Bu servisi üstteki uygulama listesine ekle">+ Hub'a Ekle</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add/Edit Modal -->
+<div id="addModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="modalTitle">Yeni Uygulama Ekle</div>
+            <button class="modal-close" onclick="closeAddModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-id">
+            <div class="form-row">
+                <div class="form-group"><label>Uygulama Adı</label><input type="text" id="edit-name" required></div>
+                <div class="form-group"><label>Kategori</label><input type="text" id="edit-cat" placeholder="İş, Medya, Sistem..."></div>
+            </div>
+            <div class="form-group"><label>Açıklama</label><input type="text" id="edit-desc"></div>
+            <div class="form-group"><label>Github Repo / Kaynak</label><input type="text" id="edit-repo" placeholder="github.com/mcturan/..."></div>
+            <div class="form-row">
+                <div class="form-group"><label>Systemd Servis / Container Adı</label><input type="text" id="edit-service"></div>
+                <div class="form-group"><label>Port</label><input type="number" id="edit-port"></div>
+            </div>
+            <div class="form-group"><label>Harici URL</label><input type="text" id="edit-url" placeholder="https://..."></div>
+            <div class="form-row">
+                <div class="form-group"><label>İkon (Emoji)</label><input type="text" id="edit-icon" value="📦"></div>
+                <div class="form-group">
+                    <label>Sağlık Kontrol Tipi</label>
+                    <select id="edit-health">
+                        <option value="systemd">Systemd Durumu</option>
+                        <option value="http">HTTP İsteği</option>
+                        <option value="port">TCP Portu</option>
+                        <option value="none">Kapalı</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" id="edit-pinned" checked>
+                <label for="edit-pinned">Ana sayfada öne çıkar (Sabitle)</label>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" id="edit-is-user">
+                <label for="edit-is-user">Bu bir kullanıcı servisidir (--user)</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeAddModal()">İptal</button>
+            <button class="btn btn-primary" onclick="submitAddModal()">Kaydet</button>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+function openAddModal(serviceName='') {
+    document.getElementById('modalTitle').textContent = 'Yeni Uygulama Ekle';
+    document.getElementById('edit-id').value = '';
+    ['name','cat','desc','repo','service','port','url','icon'].forEach(id => document.getElementById('edit-'+id).value = '');
+    document.getElementById('edit-service').value = serviceName;
+    if(serviceName) {
+        document.getElementById('edit-name').value = serviceName;
+    }
+    document.getElementById('edit-health').value = 'systemd';
+    document.getElementById('edit-pinned').checked = true;
+    document.getElementById('edit-is-user').checked = false;
+    document.getElementById('addModal').classList.remove('hidden');
+}
+
+async function editApp(appId) {
+    try {
+        const r = await fetch(`/api/app/${appId}`);
+        const data = await r.json();
+        document.getElementById('modalTitle').textContent = 'Uygulama Düzenle';
+        document.getElementById('edit-id').value = data.id || '';
+        document.getElementById('edit-name').value = data.name || '';
+        document.getElementById('edit-cat').value = data.category || '';
+        document.getElementById('edit-desc').value = data.description || '';
+        document.getElementById('edit-repo').value = data.repo || '';
+        document.getElementById('edit-service').value = data.service || '';
+        document.getElementById('edit-port').value = data.port || '';
+        document.getElementById('edit-url').value = data.url || '';
+        document.getElementById('edit-icon').value = data.icon || '📦';
+        document.getElementById('edit-health').value = data.health_check || 'systemd';
+        document.getElementById('edit-pinned').checked = !!data.pinned;
+        document.getElementById('edit-is-user').checked = !!data.is_user_service;
+        document.getElementById('addModal').classList.remove('hidden');
+    } catch(e) { alert("Bilgiler alınamadı: "+e); }
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').classList.add('hidden');
+}
+
+async function submitAddModal() {
+    const id = document.getElementById('edit-id').value;
+    const data = {
+        name: document.getElementById('edit-name').value,
+        category: document.getElementById('edit-cat').value,
+        description: document.getElementById('edit-desc').value,
+        repo: document.getElementById('edit-repo').value,
+        service: document.getElementById('edit-service').value,
+        port: document.getElementById('edit-port').value ? parseInt(document.getElementById('edit-port').value) : null,
+        url: document.getElementById('edit-url').value,
+        icon: document.getElementById('edit-icon').value,
+        health_check: document.getElementById('edit-health').value,
+        pinned: document.getElementById('edit-pinned').checked,
+        is_user_service: document.getElementById('edit-is-user').checked
+    };
+    if(!data.name) return alert("Uygulama adı gerekli");
+    
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/settings/apps/${id}` : `/api/settings/apps/add`;
+    
+    try {
+        const r = await fetch(url, {
+            method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if(r.ok) location.reload();
+        else alert("Hata oluştu");
+    } catch(e) { alert("Hata: "+e); }
+}
 async function togglePin(appId, currentPinned) {
     event.stopPropagation();
     try {

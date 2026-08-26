@@ -181,44 +181,48 @@ def _format_uptime(since_str: str) -> str:
     except Exception:
         return since_str[:16]
 
+def _now():
+    return datetime.now().strftime("%H:%M:%S")
 
 # ── HTML Sayfalar ─────────────────────────────────────────────────────────────
 
 @app.route("/")
 @auth_required
-def hub():
-    apps = _enrich_apps(load_apps())
-    pinned   = [a for a in apps if a.get("pinned")]
-    unpinned = [a for a in apps if not a.get("pinned")]
-
-    disc = _get_discovery()
-    # Sistem özet
-    system = _system_summary()
-    return render_template("hub.html",
-        pinned=pinned, unpinned=unpinned,
-        system=system, now=_now(),
-        format_uptime=_format_uptime,
-        has_auth=bool(PASSWORD))
-
-
-@app.route("/apps")
-@auth_required
-def apps_page():
+def index():
+    all_apps = load_apps()
+    enriched = _enrich_apps(all_apps)
+    
     cat_filter = request.args.get("cat", "")
-    apps = _enrich_apps(load_apps())
     categories = get_categories()
+    
     if cat_filter:
-        apps = [a for a in apps if a.get("category") == cat_filter]
+        display_apps = [a for a in enriched if a.get("category") == cat_filter]
+        pinned = []
+        unpinned = []
+    else:
+        display_apps = []
+        pinned = [a for a in enriched if a.get("pinned")]
+        unpinned = [a for a in enriched if not a.get("pinned")]
+        
     disc = _get_discovery()
     docker = disc.get("docker", [])
-    # Keşfedilen ama apps.yaml'da olmayan servisler
-    known_services = {a.get("service") for a in load_apps() if a.get("service")}
-    unknown_services = [s for s in disc.get("services", [])
-                        if s["name"] not in known_services]
-    return render_template("apps.html",
-        apps=apps, categories=categories, selected_cat=cat_filter,
-        docker=docker, unknown_services=unknown_services,
-        now=_now(), format_uptime=_format_uptime)
+    known_services = {a.get("service") for a in all_apps if a.get("service")}
+    unknown_services = [s for s in disc.get("services", []) if s["name"] not in known_services]
+    
+    system = _system_summary()
+    
+    return render_template("hub.html",
+        apps=display_apps,
+        pinned=pinned, 
+        unpinned=unpinned,
+        categories=categories,
+        selected_cat=cat_filter,
+        docker=docker,
+        unknown_services=unknown_services,
+        system=system, 
+        now=_now(),
+        format_uptime=_format_uptime,
+        has_auth=bool(PASSWORD))
 
 
 @app.route("/app/<app_id>")

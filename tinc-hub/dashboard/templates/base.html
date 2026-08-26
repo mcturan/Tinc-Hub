@@ -19,7 +19,6 @@
             </a>
             <nav>
                 <a href="/" class="{% if request.path == '/' %}active{% endif %}">Hub</a>
-                <a href="/apps" class="{% if request.path.startswith('/apps') %}active{% endif %}">Uygulamalar</a>
                 <a href="/logs" class="{% if request.path.startswith('/logs') %}active{% endif %}">Loglar</a>
                 <a href="/settings" class="{% if request.path.startswith('/settings') %}active{% endif %}">Ayarlar</a>
             </nav>
