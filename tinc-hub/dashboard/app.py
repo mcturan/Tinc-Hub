@@ -120,6 +120,10 @@ def _enrich_apps(apps: list[dict]) -> list[dict]:
             pass
 
 
+        app["cpu_percent"] = None
+        app["ram_mb"] = None
+        app["metrics_history"] = {}
+
         # systemd detay
         svc = app.get("service")
         if svc:
