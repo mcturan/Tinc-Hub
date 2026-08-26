@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tinc Hub Hub — Otomatik Servis Keşif Motoru
+Tinc Hub — Otomatik Servis Keşif Motoru
 
 systemd servisleri, açık portları ve Docker container'larını otomatik tarar.
 """

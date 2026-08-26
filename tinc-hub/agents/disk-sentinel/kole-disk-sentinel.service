@@ -1,6 +1,6 @@
 [Unit]
 Description=Tinc Hub — Disk Sentinel
-Documentation=https://github.com/tinc/kole
+Documentation=https://github.com/tinc/tinc-hub
 After=network.target tinc-hub-db.service
 Wants=tinc-hub-db.service
 

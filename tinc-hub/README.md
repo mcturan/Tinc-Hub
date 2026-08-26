@@ -7,7 +7,7 @@ Tek komutla kurulur, systemd ile çalışır, bağımsız olarak taşınabilir.
 
 ```bash
 git clone https://github.com/mcturan/101.git
-cd 101/kole
+cd 101/tinc-hub
 
 # Config'i düzenle
 sudo cp shared/config.env.template /etc/tinc-hub/config.env
@@ -41,7 +41,7 @@ Dashboard'a eriş: **http://SUNUCU-IP:9010**
 ## 📁 Yapı
 
 ```
-kole/
+tinc-hub/
 ├── install.sh              ← Hepsini kur
 ├── uninstall.sh            ← Hepsini kaldır
 ├── shared/
@@ -102,7 +102,7 @@ journalctl -u tinc-hub-router-guardian -f
 ls /var/log/tinc-hub/
 
 # Veri tabanı
-sqlite3 /var/lib/tinc-hub/kole.db ".tables"
+sqlite3 /var/lib/tinc-hub/tinc-hub.db ".tables"
 ```
 
 ---
@@ -111,7 +111,7 @@ sqlite3 /var/lib/tinc-hub/kole.db ".tables"
 
 ```bash
 git clone https://github.com/mcturan/101.git
-cd 101/kole
+cd 101/tinc-hub
 sudo bash install.sh
 ```
 
@@ -130,7 +130,7 @@ sudo bash uninstall.sh --only=disk-sentinel  # Sadece birini
 
 ## 📊 Veri
 
-Tüm agent'lar `/var/lib/tinc-hub/kole.db` SQLite veritabanına yazar:
+Tüm agent'lar `/var/lib/tinc-hub/tinc-hub.db` SQLite veritabanına yazar:
 
 - `agents` — Kayıtlı agent'lar ve durumları
 - `events` — Log olayları (INFO/WARN/ERROR/CRITICAL)

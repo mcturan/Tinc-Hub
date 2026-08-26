@@ -19,4 +19,4 @@ rm -rf "/opt/tinc-hub/agents/$AGENT_ID"
 
 echo "🗑️  $AGENT_ID agent kaldırıldı"
 echo "ℹ️  Log dosyası korundu: /var/log/tinc-hub/$AGENT_ID.log"
-echo "ℹ️  DB kayıtları korundu: /var/lib/tinc-hub/kole.db"
+echo "ℹ️  DB kayıtları korundu: /var/lib/tinc-hub/tinc-hub.db"

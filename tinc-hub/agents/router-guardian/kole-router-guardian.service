@@ -1,6 +1,6 @@
 [Unit]
 Description=Tinc Hub — Router Guardian
-Documentation=https://github.com/tinc-kole
+Documentation=https://github.com/tinc-tinc-hub
 After=network-online.target
 Wants=network-online.target
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tinc Hub Hub — App Registry
+Tinc Hub — App Registry
 
 apps.yaml dosyasını okur/yazar. Elle tanımlı + keşfedilen uygulamaları yönetir.
 """
@@ -19,7 +19,7 @@ _lock = threading.Lock()
 # ─── Default apps.yaml içeriği ───────────────────────────────────────────────
 
 DEFAULT_YAML = """\
-# Tinc Hub Hub — Uygulama Kayıt Defteri
+# Tinc Hub — Uygulama Kayıt Defteri
 # Uygulamaları buraya ekle veya web arayüzünden düzenle.
 #
 # health_check seçenekleri: http | systemd | port | none
@@ -160,7 +160,7 @@ def save_apps(apps: list[dict]):
         if Path(APPS_YAML).exists():
             backup.write_text(Path(APPS_YAML).read_text())
         with open(APPS_YAML, "w", encoding="utf-8") as f:
-            f.write("# Tinc Hub Hub — Uygulama Kayıt Defteri\n")
+            f.write("# Tinc Hub — Uygulama Kayıt Defteri\n")
             f.write(f"# Son güncelleme: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             yaml.dump({"apps": apps}, f, allow_unicode=True,
                       default_flow_style=False, sort_keys=False)

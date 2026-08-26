@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tinc Hub Hub — Ana Uygulama
+Tinc Hub — Ana Uygulama
 Tüm servislerin merkezi kontrol paneli. Port 9010.
 """
 
@@ -497,7 +497,7 @@ def _now() -> str:
 # ── Başlatma ─────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    log.info(f"Tinc Hub Hub başlatılıyor → http://{HOST}:{PORT}")
+    log.info(f"Tinc Hub başlatılıyor → http://{HOST}:{PORT}")
     log.info(f"Kimlik doğrulama: {'AÇIK' if PASSWORD else 'KAPALI (şifresiz)'}")
 
     # Arka plan health checker başlat

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tinc Hub Hub — Sağlık Kontrol Motoru
+Tinc Hub — Sağlık Kontrol Motoru
 
 Her uygulama için HTTP ping veya systemd durumunu kontrol eder.
 """
