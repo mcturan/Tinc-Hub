@@ -270,7 +270,7 @@ def index():
         format_uptime=_format_uptime,
         has_auth=bool(PASSWORD),
         hub_id=hub_id,
-        api_token=api_token)
+        api_token=api_token, tg_token=os.environ.get("TELEGRAM_BOT_TOKEN", ""), tg_chat=os.environ.get("TELEGRAM_CHAT_ID", ""))
 
 
 @app.route("/app/<app_id>")
@@ -687,4 +687,30 @@ def api_mobile_info():
         "version": "1.0.0",
         "system": _system_summary()
     })
+
+
+
+@app.route("/api/settings/telegram", methods=["POST"])
+@auth_required
+def api_save_telegram():
+    data = request.json
+    t_token = data.get("token", "")
+    t_chat = data.get("chat", "")
+    
+    # Read config.env and replace
+    import os
+    env_file = "/etc/tinc-hub/config.env"
+    with open(env_file, "r") as f:
+        lines = f.readlines()
+        
+    with open(env_file, "w") as f:
+        for line in lines:
+            if line.startswith("TELEGRAM_BOT_TOKEN="):
+                f.write(f"TELEGRAM_BOT_TOKEN={t_token}\n")
+            elif line.startswith("TELEGRAM_CHAT_ID="):
+                f.write(f"TELEGRAM_CHAT_ID={t_chat}\n")
+            else:
+                f.write(line)
+                
+    return jsonify({"ok": True, "message": "Telegram ayarlari kaydedildi. Aktif olmasi için Tinc Hub'i yeniden başlatin (Sistem Servislerinden)."})
 

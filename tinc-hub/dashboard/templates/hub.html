@@ -291,6 +291,81 @@
     </div>
 </div>
 
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">⚙️ Tinc Hub - Ayarlar</div>
+            <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <h3>📱 Mobil Uygulama Eşleştirme</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p>Mobil uygulamayı indirdikten sonra aşağıdaki bilgileri kullanarak bu Tinc Hub cihazını yönetebilirsiniz:</p>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Hub ID:</label>
+                    <input type="text" value="{{ hub_id }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">API Token:</label>
+                    <input type="text" value="{{ api_token }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+                    <a href="/static/Tinc-Hub-Manager.apk" class="btn btn-primary" style="text-decoration:none; display:inline-block;">📱 Mobil Uygulamayı (APK) İndir</a>
+                </div>
+            </div>
+
+            <h3>🔔 Telegram Bildirimleri (Kapanan Servisler İçin)</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p>Kapanan veya yanıt vermeyen servisler anında Telegram hesabınıza düşer.</p>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Bot Token:</label>
+                    <input type="text" id="tg_token" value="{{ tg_token }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="BotFather'dan alınan token">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Chat ID:</label>
+                    <input type="text" id="tg_chat" value="{{ tg_chat }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="Sizin veya grubun Chat ID'si">
+                </div>
+                <button onclick="saveTelegram()" class="btn btn-primary" style="margin-top: 10px;">💾 Telegram Ayarlarını Kaydet</button>
+            </div>
+
+            <h3>📦 Sistem Yedeği (Snapshot)</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px;">
+                <p>Tinc Hub konfigürasyonunu ve uygulama kayıtlarını (registry) yedekleyin.</p>
+                <button onclick="takeBackup()" class="btn btn-primary" style="margin-top: 10px;">💾 Şimdi Yedek Al</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
+function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
+async function takeBackup() {
+    try {
+        const r = await fetch('/api/settings/backup', {method: 'POST'});
+        const res = await r.json();
+        if(r.ok) alert("✅ Yedek başarıyla alındı!
+Dosya: " + res.file);
+        else alert("❌ Hata: " + res.error);
+    } catch(e) { alert("Bağlantı Hatası: " + e); }
+}
+async function saveTelegram() {
+    const token = document.getElementById('tg_token').value.trim();
+    const chat = document.getElementById('tg_chat').value.trim();
+    try {
+        const r = await fetch('/api/settings/telegram', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token: token, chat: chat})
+        });
+        const res = await r.json();
+        alert(res.ok ? "✅ " + res.message : "❌ Hata: " + res.error);
+    } catch(e) { alert("Bağlantı Hatası: " + e); }
+}
+</script>
+
 {% endblock %}
 
 {% block scripts %}
@@ -550,4 +625,79 @@ setInterval(async () => {
     } catch(e){}
 }, 30000);
 </script>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">⚙️ Tinc Hub - Ayarlar</div>
+            <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <h3>📱 Mobil Uygulama Eşleştirme</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p>Mobil uygulamayı indirdikten sonra aşağıdaki bilgileri kullanarak bu Tinc Hub cihazını yönetebilirsiniz:</p>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Hub ID:</label>
+                    <input type="text" value="{{ hub_id }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">API Token:</label>
+                    <input type="text" value="{{ api_token }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
+                </div>
+                <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
+                    <a href="/static/Tinc-Hub-Manager.apk" class="btn btn-primary" style="text-decoration:none; display:inline-block;">📱 Mobil Uygulamayı (APK) İndir</a>
+                </div>
+            </div>
+
+            <h3>🔔 Telegram Bildirimleri (Kapanan Servisler İçin)</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p>Kapanan veya yanıt vermeyen servisler anında Telegram hesabınıza düşer.</p>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Bot Token:</label>
+                    <input type="text" id="tg_token" value="{{ tg_token }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="BotFather'dan alınan token">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Chat ID:</label>
+                    <input type="text" id="tg_chat" value="{{ tg_chat }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="Sizin veya grubun Chat ID'si">
+                </div>
+                <button onclick="saveTelegram()" class="btn btn-primary" style="margin-top: 10px;">💾 Telegram Ayarlarını Kaydet</button>
+            </div>
+
+            <h3>📦 Sistem Yedeği (Snapshot)</h3>
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px;">
+                <p>Tinc Hub konfigürasyonunu ve uygulama kayıtlarını (registry) yedekleyin.</p>
+                <button onclick="takeBackup()" class="btn btn-primary" style="margin-top: 10px;">💾 Şimdi Yedek Al</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
+function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
+async function takeBackup() {
+    try {
+        const r = await fetch('/api/settings/backup', {method: 'POST'});
+        const res = await r.json();
+        if(r.ok) alert("✅ Yedek başarıyla alındı!
+Dosya: " + res.file);
+        else alert("❌ Hata: " + res.error);
+    } catch(e) { alert("Bağlantı Hatası: " + e); }
+}
+async function saveTelegram() {
+    const token = document.getElementById('tg_token').value.trim();
+    const chat = document.getElementById('tg_chat').value.trim();
+    try {
+        const r = await fetch('/api/settings/telegram', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token: token, chat: chat})
+        });
+        const res = await r.json();
+        alert(res.ok ? "✅ " + res.message : "❌ Hata: " + res.error);
+    } catch(e) { alert("Bağlantı Hatası: " + e); }
+}
+</script>
+
 {% endblock %}
