@@ -16,7 +16,7 @@ echo "🔧 ${AGENT_ID} agent kuruluyor..."
 echo "📦 Python bağımlılıkları kontrol ediliyor..."
 python3 -c "import requests, urllib3, dotenv" 2>/dev/null || {
     echo "   Eksik paketler kuruluyor..."
-    pip3 install --quiet requests urllib3 python-dotenv
+    pip3 install --quiet --break-system-packages requests urllib3 python-dotenv
 }
 
 # ── 1. Dizinleri oluştur ────────────────────────────────────
