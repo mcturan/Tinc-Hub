@@ -26,6 +26,10 @@ except Exception:
 
 from discovery import discover_all, get_service_detail
 from health import check_app, get_cached_health, start_background_checker
+from users import init_users, load_users, verify_user
+
+# Initialize users if they don't exist
+init_users(PASSWORD)
 from registry import (load_apps, save_apps, get_app, add_app,
                        update_app, delete_app, get_categories)
 
@@ -77,11 +81,21 @@ def login():
         return redirect("/")
     error = None
     if request.method == "POST":
-        if request.form.get("password") == PASSWORD:
+        username = request.form.get("username", "admin")
+        password = request.form.get("password", "")
+        
+        user_data = verify_user(username, password)
+        # Fallback to config PASSWORD for admin if users.json corrupted
+        if username == "admin" and password == PASSWORD:
+            user_data = {"role": "admin"}
+            
+        if user_data:
             session["authenticated"] = True
+            session["username"] = username
+            session["role"] = user_data.get("role", "viewer")
             session.permanent = True
             return redirect(request.args.get("next") or "/")
-        error = "Hatalı şifre"
+        error = "Hatalı kullanıcı adı veya şifre"
     return render_template("login.html", error=error)
 
 
