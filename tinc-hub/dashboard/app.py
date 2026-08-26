@@ -233,6 +233,15 @@ def _format_uptime(since_str: str) -> str:
 def _now():
     return datetime.now().strftime("%H:%M:%S")
 
+MOBILE_REQUIRED_VERSION = "1.0.0"
+
+def _ver_to_int(ver: str) -> int:
+    try:
+        parts = ver.replace("v", "").split(".")
+        return int("".join([p.zfill(3) for p in parts]))
+    except:
+        return 0
+
 # ── HTML Sayfalar ─────────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -711,20 +720,35 @@ def api_save_telegram():
     t_token = data.get("token", "")
     t_chat = data.get("chat", "")
     
-    # Read config.env and replace
     import os
     env_file = "/etc/tinc-hub/config.env"
-    with open(env_file, "r") as f:
-        lines = f.readlines()
-        
+    lines = []
+    if os.path.exists(env_file):
+        with open(env_file, "r") as f:
+            lines = f.readlines()
+            
+    found_token = False
+    found_chat = False
+    
     with open(env_file, "w") as f:
         for line in lines:
             if line.startswith("TELEGRAM_BOT_TOKEN="):
-                f.write(f"TELEGRAM_BOT_TOKEN={t_token}\n")
+                f.write(f"TELEGRAM_BOT_TOKEN={t_token}
+")
+                found_token = True
             elif line.startswith("TELEGRAM_CHAT_ID="):
-                f.write(f"TELEGRAM_CHAT_ID={t_chat}\n")
+                f.write(f"TELEGRAM_CHAT_ID={t_chat}
+")
+                found_chat = True
             else:
                 f.write(line)
                 
-    return jsonify({"ok": True, "message": "Telegram ayarlari kaydedildi. Aktif olmasi için Tinc Hub'i yeniden başlatin (Sistem Servislerinden)."})
+        if not found_token:
+            f.write(f"TELEGRAM_BOT_TOKEN={t_token}
+")
+        if not found_chat:
+            f.write(f"TELEGRAM_CHAT_ID={t_chat}
+")
+                
+    return jsonify({"ok": True, "message": "Telegram ayarlari kaydedildi. Aktif olmasi için Tinc Hub'i yeniden başlatin."})
 
