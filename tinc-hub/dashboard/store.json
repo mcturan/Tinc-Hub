@@ -1,5 +1,16 @@
 [
     {
+        "id": "tinc-terminal",
+        "name": "Terminal (ttyd)",
+        "category": "Sistem",
+        "icon": "🖥️",
+        "description": "Tarayıcı üzerinden doğrudan makinenin konsoluna erişim.",
+        "repo": "file:///home/turan/101/tinc-terminal-source",
+        "service": "tinc-terminal.service",
+        "url": "http://{{host}}:9012",
+        "internal_url": "http://127.0.0.1:9012"
+    },
+    {
         "id": "tinc-filebrowser",
         "name": "Dosya Y\u00f6neticisi",
         "category": "Ara\u00e7",

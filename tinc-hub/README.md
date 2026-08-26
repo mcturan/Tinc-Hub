@@ -6,8 +6,8 @@ Tek komutla kurulur, systemd ile çalışır, bağımsız olarak taşınabilir.
 ## 🚀 Hızlı Başlangıç
 
 ```bash
-git clone https://github.com/mcturan/101.git
-cd 101/tinc-hub
+git clone https://github.com/mcturan/tinc-hub.git
+cd tinc-hub
 
 # Config'i düzenle
 sudo cp shared/config.env.template /etc/tinc-hub/config.env
@@ -110,8 +110,8 @@ sqlite3 /var/lib/tinc-hub/tinc-hub.db ".tables"
 ## 📦 Başka Bir PC'ye Kurulum
 
 ```bash
-git clone https://github.com/mcturan/101.git
-cd 101/tinc-hub
+git clone https://github.com/mcturan/tinc-hub.git
+cd tinc-hub
 sudo bash install.sh
 ```
 
