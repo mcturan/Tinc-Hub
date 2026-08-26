@@ -416,7 +416,7 @@ def api_store_install():
 
 @app.route("/api/settings/apps/<app_id>/update", methods=["POST"])
 @auth_required
-def api_update_app(app_id):
+def api_pull_update_app(app_id):
     from installer import update_app_local
     res = update_app_local(app_id)
     return jsonify(res), (200 if res.get("ok") else 500)

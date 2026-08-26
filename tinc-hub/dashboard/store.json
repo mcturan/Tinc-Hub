@@ -6,7 +6,9 @@
         "icon": "\ud83d\udcc1",
         "description": "T\u00fcm sunucu dosyalar\u0131n\u0131za taray\u0131c\u0131 \u00fczerinden eri\u015fin, y\u00fckleyin ve y\u00f6netin. (FileBrowser tabanl\u0131)",
         "repo": "file:///home/turan/101/tinc-filebrowser-source",
-        "service": "tinc-filebrowser.service"
+        "service": "tinc-filebrowser.service",
+        "url": "http://{{host}}:9011",
+        "internal_url": "http://127.0.0.1:9011"
     },
     {
         "id": "aprs-beacon",
