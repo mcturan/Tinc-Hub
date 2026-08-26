@@ -35,7 +35,7 @@ fi
 # 3. Gereksinimleri yükle
 info "Python paketleri yükleniyor..."
 /opt/kole/venv/bin/pip install --quiet --upgrade pip
-/opt/kole/venv/bin/pip install --quiet flask python-dotenv requests psutil
+/opt/kole/venv/bin/pip install --quiet flask python-dotenv requests psutil PyYAML
 
 # 4. Shared modülü kopyala
 mkdir -p /opt/kole/shared
