@@ -733,22 +733,17 @@ def api_save_telegram():
     with open(env_file, "w") as f:
         for line in lines:
             if line.startswith("TELEGRAM_BOT_TOKEN="):
-                f.write(f"TELEGRAM_BOT_TOKEN={t_token}
-")
+                f.write(f"TELEGRAM_BOT_TOKEN={t_token}\n")
                 found_token = True
             elif line.startswith("TELEGRAM_CHAT_ID="):
-                f.write(f"TELEGRAM_CHAT_ID={t_chat}
-")
+                f.write(f"TELEGRAM_CHAT_ID={t_chat}\n")
                 found_chat = True
             else:
                 f.write(line)
                 
         if not found_token:
-            f.write(f"TELEGRAM_BOT_TOKEN={t_token}
-")
+                f.write(f"TELEGRAM_BOT_TOKEN={t_token}\n")
         if not found_chat:
-            f.write(f"TELEGRAM_CHAT_ID={t_chat}
-")
+                f.write(f"TELEGRAM_CHAT_ID={t_chat}\n")
                 
     return jsonify({"ok": True, "message": "Telegram ayarlari kaydedildi. Aktif olmasi için Tinc Hub'i yeniden başlatin."})
-
