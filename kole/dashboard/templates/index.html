@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="30">
+    <title>TINC Köle</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">⚙</span>
+                <span class="logo-text">TINC <strong>Köle</strong></span>
+            </div>
+            <nav>
+                <a href="/" class="active">Panel</a>
+                <a href="/events">Olaylar</a>
+            </nav>
+            <div class="header-time">{{ now }}</div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Özet Kartları -->
+        <section class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-label">Agent'lar</div>
+                <div class="summary-value">{{ total }}</div>
+                <div class="summary-sub">
+                    <span class="dot green"></span> {{ healthy }} sağlıklı
+                    {% if warning %}<span class="dot yellow"></span> {{ warning }} uyarı{% endif %}
+                    {% if dead %}<span class="dot red"></span> {{ dead }} ölü{% endif %}
+                </div>
+            </div>
+
+            <div class="summary-card {% if disk_metric and disk_metric.value > 90 %}card-critical{% elif disk_metric and disk_metric.value > 80 %}card-warn{% endif %}">
+                <div class="summary-label">Disk</div>
+                <div class="summary-value">
+                    {% if disk_metric %}{{ "%.1f"|format(disk_metric.value) }}%{% else %}—{% endif %}
+                </div>
+                {% if disk_metric %}
+                <div class="progress-bar">
+                    <div class="progress-fill {% if disk_metric.value > 90 %}fill-red{% elif disk_metric.value > 80 %}fill-yellow{% else %}fill-green{% endif %}"
+                         style="width: {{ disk_metric.value }}%"></div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="summary-card {% if ram_metric and ram_metric.value > 90 %}card-critical{% elif ram_metric and ram_metric.value > 85 %}card-warn{% endif %}">
+                <div class="summary-label">RAM</div>
+                <div class="summary-value">
+                    {% if ram_metric %}{{ "%.1f"|format(ram_metric.value) }}%{% else %}—{% endif %}
+                </div>
+                {% if ram_metric %}
+                <div class="progress-bar">
+                    <div class="progress-fill {% if ram_metric.value > 90 %}fill-red{% elif ram_metric.value > 85 %}fill-yellow{% else %}fill-green{% endif %}"
+                         style="width: {{ ram_metric.value }}%"></div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="summary-card {% if swap_metric and swap_metric.value > 70 %}card-warn{% endif %}">
+                <div class="summary-label">Swap</div>
+                <div class="summary-value">
+                    {% if swap_metric %}{{ "%.1f"|format(swap_metric.value) }}%{% else %}—{% endif %}
+                </div>
+                {% if swap_metric %}
+                <div class="progress-bar">
+                    <div class="progress-fill {% if swap_metric.value > 70 %}fill-yellow{% else %}fill-green{% endif %}"
+                         style="width: {{ swap_metric.value }}%"></div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-label">WAN IP</div>
+                <div class="summary-value wan-ip">
+                    {{ wan_metric.value_str if wan_metric else '—' }}
+                </div>
+                {% if wan_history|length > 1 %}
+                <div class="summary-sub">Son değişim: {{ wan_history[1].detected_at[:16] }}</div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Agent Kartları -->
+        <section class="section">
+            <h2>Agent'lar</h2>
+            <div class="agents-grid">
+                {% for agent in agents %}
+                <a href="/agent/{{ agent.id }}" class="agent-card health-{{ agent.health }}">
+                    <div class="agent-header">
+                        <span class="agent-status-dot"></span>
+                        <span class="agent-name">{{ agent.name }}</span>
+                        <span class="agent-badge health-badge-{{ agent.health }}">
+                            {% if agent.health == 'healthy' %}● Çalışıyor
+                            {% elif agent.health == 'warning' %}⚠ Uyarı
+                            {% elif agent.health == 'dead' %}✕ Durdu
+                            {% else %}? Bilinmiyor{% endif %}
+                        </span>
+                    </div>
+                    <div class="agent-desc">{{ agent.description or '' }}</div>
+                    <div class="agent-meta">
+                        <span>v{{ agent.version }}</span>
+                        <span>Son görülme: {{ agent.last_seen[:16] if agent.last_seen else 'hiç' }}</span>
+                    </div>
+                </a>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">🤖</div>
+                    <div>Henüz kayıtlı agent yok.</div>
+                    <div class="empty-sub">Agent'ları kurmak için <code>bash install.sh</code> komutunu çalıştır.</div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Son Olaylar -->
+        <section class="section">
+            <div class="section-header">
+                <h2>Son Olaylar <span class="badge">Son 6 saat</span></h2>
+                <a href="/events" class="btn-link">Tümünü gör →</a>
+            </div>
+            <div class="events-list">
+                {% for ev in recent_events %}
+                <div class="event-row level-{{ ev.level.lower() }}">
+                    <span class="event-level">{{ ev.level }}</span>
+                    <span class="event-agent">{{ ev.agent_name or ev.agent_id }}</span>
+                    <span class="event-msg">{{ ev.message }}</span>
+                    <span class="event-time">{{ ev.created_at[11:16] }}</span>
+                </div>
+                {% else %}
+                <div class="empty-events">Son 6 saatte olay yok ✓</div>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <span>TINC Köle · Agent İzleme Sistemi</span>
+        <span>Otomatik yenileme: 30s</span>
+    </footer>
+</body>
+</html>

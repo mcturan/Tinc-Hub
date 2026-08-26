@@ -1,0 +1,16 @@
+[Unit]
+Description=TINC Köle — Service Watchdog
+After=network.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/etc/kole/config.env
+ExecStart=/opt/kole/agents/service-watchdog/agent.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/var/log/kole/service-watchdog.log
+StandardError=append:/var/log/kole/service-watchdog.log
+
+[Install]
+WantedBy=multi-user.target

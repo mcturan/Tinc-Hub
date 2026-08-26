@@ -1,0 +1,27 @@
+[Unit]
+Description=TINC Köle — Disk Sentinel
+Documentation=https://github.com/tinc/kole
+After=network.target kole-db.service
+Wants=kole-db.service
+
+[Service]
+Type=simple
+# /tmp temizliği ve SMART erişimi için root gerekli
+User=root
+Group=root
+EnvironmentFile=/etc/kole/config.env
+ExecStart=/opt/kole/agents/disk-sentinel/agent.py
+Restart=always
+RestartSec=30
+# Loglar doğrudan dosyaya yönlendiriliyor
+StandardOutput=append:/var/log/kole/disk-sentinel.log
+StandardError=append:/var/log/kole/disk-sentinel.log
+# Servis çöktüğünde watchdog
+TimeoutStartSec=30
+TimeoutStopSec=15
+# Süreç önceliği — disk I/O yoğun işlemler için nice ayarı
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

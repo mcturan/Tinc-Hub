@@ -1,0 +1,17 @@
+[Unit]
+Description=TINC Köle — WAN Tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/etc/kole/config.env
+ExecStart=/opt/kole/agents/wan-tracker/agent.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/var/log/kole/wan-tracker.log
+StandardError=append:/var/log/kole/wan-tracker.log
+
+[Install]
+WantedBy=multi-user.target
