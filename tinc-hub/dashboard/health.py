@@ -48,7 +48,7 @@ def systemd_check(service_name: str, is_user: bool = False) -> dict:
         cmd = ["systemctl", "is-active", unit]
         if is_user:
             # sudo -u turan XDG_RUNTIME_DIR=/run/user/1000 systemctl --user is-active
-            cmd = ["sudo", "-u", "turan", "XDG_RUNTIME_DIR=/run/user/1000", "systemctl", "--user", "is-active", unit]
+            cmd = ["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "is-active", unit]
             
         r = subprocess.run(
             cmd,

@@ -14,6 +14,6 @@
 
 ## 3. Kurallar (Yeni Bir Şey Eklerken)
 1. **Kurulum Mantığı:** `dashboard/templates`, `dashboard/static` veya `dashboard/*.py` dosyalarında değişiklik yaptığında mutlaka `sudo bash /home/turan/101/tinc-hub/dashboard/install.sh --only=dashboard` komutunu çalıştır ve `sudo systemctl restart tinc-hub` ile servisi yeniden başlat. Aksi halde değişiklikler yayına alınmaz. (Ek olarak tarayıcıda Ctrl+F5 ile cache temizliği istenmelidir.)
-2. **Uygulama Butonları:** UI tarafındaki Butonlar dinamik olarak DOM'dan kaldırılmamalı (örn. URL'si yoksa "Aç" butonu silinmesin). Bunun yerine koşullara göre `.btn-disabled` sınıfı eklenmeli ve tıklanınca `alert` göstermelidir. Standart UI görünümü korunmalıdır.
+2. **Uygulama Butonları:** UI tarafındaki Butonlar dinamik olarak DOM.dan kaldırılmamalı (örn. "Sil" butonu her zaman aktif olmalı, URL.si yoksa "Aç" butonu soluk olmalı) (örn. URL'si yoksa "Aç" butonu silinmesin). Bunun yerine koşullara göre `.btn-disabled` sınıfı eklenmeli ve tıklanınca `alert` göstermelidir. Standart UI görünümü korunmalıdır.
 3. **Loglar:** SSE log akışı `app.py` üzerinde aktiftir ve `proxy_buffering off;` Nginx ayarı sayesinde gecikmesiz gelir.
 4. **Agent/Sub-process Eklentileri:** `tinc-hub/agents` dizini altında eklenebilir. Tinc Hub veritabanına log ve metrik basmak için `shared/db.py` import edilmelidir.

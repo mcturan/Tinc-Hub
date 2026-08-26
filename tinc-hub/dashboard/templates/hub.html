@@ -33,17 +33,17 @@
     </div>
 
     <div class="card-actions">
-        <a {% if app.url %}href="{{ app.url }}" target="_blank"{% else %}href="#" onclick="alert('Bu uygulamanın web arayüzü yok.'); return false;"{% endif %} class="btn btn-sm btn-icon {% if not app.url %}btn-disabled{% endif %}" title="Uygulamayı tarayıcıda aç">↗ Aç</a>
+        <a {% if app.url %}href="{{ app.url }}" target="_blank"{% else %}href="#" onclick="alert('Bu uygulamanın web arayüzü (URL) yapılandırılmamış.'); return false;"{% endif %} class="btn btn-sm btn-icon {% if not app.url %}btn-disabled{% endif %}" title="Uygulamayı tarayıcıda aç">↗ Aç</a>
         
-        <button onclick="{% if app.service %}serviceAction('{{ app.id }}', 'restart'){% else %}alert('Bu bir systemd servisi değil, yeniden başlatılamaz.'){% endif %}" class="btn btn-sm btn-icon {% if not app.service %}btn-disabled{% endif %}" title="Servisi yeniden başlat">⟳ Yeniden Başlat</button>
+        <button onclick="{% if app.service %}serviceAction('{{ app.id }}', 'restart'){% else %}alert('Bu uygulama bir systemd servisiyle ilişkilendirilmemiş.');{% endif %}" class="btn btn-sm btn-icon {% if not app.service %}btn-disabled{% endif %}" title="Servisi yeniden başlat">⟳ Yeniden Başlat</button>
         
-        <a {% if app.service %}href="/logs?service={{ app.service }}"{% else %}href="#" onclick="alert('Log dosyası bulunamadı.'); return false;"{% endif %} class="btn btn-sm btn-icon {% if not app.service %}btn-disabled{% endif %}" title="Canlı logları görüntüle">📜 Log</a>
+        <a {% if app.service %}href="/logs?service={{ app.service }}"{% else %}href="#" onclick="alert('Bu uygulama için log dosyası bağlantısı yok.'); return false;"{% endif %} class="btn btn-sm btn-icon {% if not app.service %}btn-disabled{% endif %}" title="Canlı logları görüntüle">📜 Log</a>
         
         <button onclick="editApp('{{ app.id }}')" class="btn btn-sm btn-icon" title="Uygulama ayarlarını düzenle">✏️ Düzenle</button>
         
-        <button onclick="{% if app.repo %}alert('Yeniden yükleme işlevi yakında eklenecek: ' + '{{ app.repo }}'){% else %}alert('Bu sistem bileşenidir, güncellenemez.'){% endif %}" class="btn btn-sm btn-icon {% if not app.repo %}btn-disabled{% endif %}" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
+        <button onclick="{% if app.repo %}alert('Yeniden yükleme işlevi yakında eklenecek: ' + '{{ app.repo }}'){% else %}alert('Bu uygulamanın github repo kaynağı girilmediği için otomatik güncellenemez.'){% endif %}" class="btn btn-sm btn-icon {% if not app.repo %}btn-disabled{% endif %}" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
         
-        <button onclick="{% if app.repo %}deleteApp('{{ app.id }}', '{{ app.name }}'){% else %}alert('Bu bir sistem bileşenidir ve kaldırılamaz.'){% endif %}" class="btn btn-sm btn-icon btn-danger {% if not app.repo %}btn-disabled{% endif %}" title="Uygulamayı ve ayarlarını tamamen sil">🗑 Sil</button>
+        <button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="btn btn-sm btn-icon btn-danger" title="Uygulamayı panodan sil">🗑 Sil</button>
     </div>
 </div>
 {% endmacro %}
