@@ -77,24 +77,34 @@ def install_app_from_store(store_app_id: str) -> dict:
         
     return {"ok": True, "message": "Başarıyla kuruldu ve panoya eklendi."}
 
-def update_app_local(app_id: str) -> dict:
+def update_app_local(app_id: str, new_repo: str = None) -> dict:
     """Yüklü bir uygulamayı günceller."""
     apps = load_apps()
     app_data = next((a for a in apps if a.get("id") == app_id), None)
     
-    if not app_data or not app_data.get("repo"):
-        return {"ok": False, "error": "Uygulama bulunamadı veya repo adresi yok."}
+    if not app_data:
+        return {"ok": False, "error": "Uygulama bulunamadı."}
+        
+    if new_repo:
+        app_data["repo"] = new_repo
+        save_apps(apps)
+        
+    if not app_data.get("repo"):
+        return {"ok": False, "error": "Repo adresi yok."}
         
     repo_url = app_data["repo"]
     app_name_slug = repo_url.rstrip('/').split('/')[-1]
     target_dir = f"/home/turan/101/{app_name_slug}"
     
+    # Repoyu klonla eğer yoksa, varsa pull yap
     if not os.path.exists(target_dir):
-        return {"ok": False, "error": f"{target_dir} dizini bulunamadı. Lütfen mağazadan tekrar kurun."}
-        
-    r = subprocess.run(["git", "-C", target_dir, "pull"], capture_output=True, text=True)
-    if r.returncode != 0:
-        return {"ok": False, "error": f"Güncelleme (pull) hatası: {r.stderr}"}
+        r = subprocess.run(["git", "clone", repo_url, target_dir], capture_output=True, text=True)
+        if r.returncode != 0:
+            return {"ok": False, "error": f"Git clone hatası: {r.stderr}"}
+    else:
+        r = subprocess.run(["git", "-C", target_dir, "pull"], capture_output=True, text=True)
+        if r.returncode != 0:
+            return {"ok": False, "error": f"Güncelleme (pull) hatası: {r.stderr}"}
         
     install_script = os.path.join(target_dir, "install.sh")
     if os.path.exists(install_script):

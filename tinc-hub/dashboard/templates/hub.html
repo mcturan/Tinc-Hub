@@ -30,6 +30,18 @@
         <div>Kategori: <strong>{{ app.category or 'Uygulama' }}</strong></div>
         {% if app.port %}<div>Port: <strong>{{ app.port }}</strong></div>{% endif %}
         {% if app.since %}<div>Uptime: <strong>{{ format_uptime(app.since) }}</strong></div>{% endif %}
+        {% if app.cpu_percent is not none %}
+        <div style="margin-top: 4px; font-size: 0.75rem;">
+            CPU: <strong>{{ app.cpu_percent }}%</strong> 
+            <span style="color:var(--muted)">(Min: {{ app.metrics_history.cpu_min or 0 }}% / Max: {{ app.metrics_history.cpu_max or 0 }}%)</span>
+        </div>
+        {% endif %}
+        {% if app.ram_mb is not none %}
+        <div style="font-size: 0.75rem;">
+            RAM: <strong>{{ app.ram_mb }} MB</strong> 
+            <span style="color:var(--muted)">(Min: {{ app.metrics_history.ram_min or 0 }} MB / Max: {{ app.metrics_history.ram_max or 0 }} MB)</span>
+        </div>
+        {% endif %}
     </div>
 
     <div class="card-actions">
@@ -41,7 +53,7 @@
         
         <button onclick="editApp('{{ app.id }}')" class="btn btn-sm btn-icon" title="Uygulama ayarlarını düzenle">✏️ Düzenle</button>
         
-        <button onclick="{% if app.repo %}updateApp('{{ app.id }}', '{{ app.name }}'){% else %}alert('Bu uygulamanın github repo kaynağı girilmediği için otomatik güncellenemez.'){% endif %}" class="btn btn-sm btn-icon {% if not app.repo %}btn-disabled{% endif %}" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
+        <button onclick="updateApp('{{ app.id }}', '{{ app.name }}', '{{ app.repo or '' }}')" class="btn btn-sm btn-icon" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
         
         {% if app.id == "tinc-hub" %}<button onclick="alert('Tinc Hub ana sistem bilesenidir, silinemez.')" class="btn btn-sm btn-icon btn-disabled">🗑 Sil</button>{% else %}<button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="btn btn-sm btn-icon btn-danger" title="Uygulamayı panodan sil">🗑 Sil</button>{% endif %}
     </div>
@@ -390,13 +402,20 @@ async function installFromStore(appId, appName, repo) {
     }
 }
 
-async function updateApp(appId, appName) {
-    if(!confirm(`${appName} uygulamasını GÜNCELLEMEK istiyor musunuz?\n\n- Github'dan son sürüm çekilecek (git pull)\n- Varsa install.sh çalıştırılarak servis yenilenecek.\n- Bu işlem biraz sürebilir, bekleyin.`)) return;
+async function updateApp(appId, appName, currentRepo) {
+    let repoToUpdate = currentRepo;
+    if(!repoToUpdate) {
+        repoToUpdate = prompt(`${appName} uygulamasının kaynak deposu bilinmiyor.\nGüncelleme yapabilmek için lütfen Github repo URL'sini girin (ör: https://github.com/...):`);
+        if(!repoToUpdate) return;
+    } else {
+        if(!confirm(`${appName} uygulamasını GÜNCELLEMEK istiyor musunuz?\n\n- Github'dan son sürüm çekilecek (git pull)\n- Varsa install.sh çalıştırılarak servis yenilenecek.\n- Bu işlem biraz sürebilir, bekleyin.`)) return;
+    }
     
     try {
-        // Show some loading indicator if possible, or just alert
         const r = await fetch(`/api/settings/apps/${appId}/update`, {
-            method: 'POST'
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({repo: repoToUpdate})
         });
         const res = await r.json();
         if(r.ok) {

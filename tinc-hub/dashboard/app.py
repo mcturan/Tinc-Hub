@@ -93,6 +93,8 @@ def logout():
 
 # ── Yardımcılar ───────────────────────────────────────────────────────────────
 
+_metrics_history = {}
+
 def _enrich_apps(apps: list[dict]) -> list[dict]:
     """App listesine sağlık + discovery verisi ekler."""
     disc = _get_discovery()
@@ -126,8 +128,25 @@ def _enrich_apps(apps: list[dict]) -> list[dict]:
                 app["running"]     = svc_data.get("running", False)
                 app["cpu_percent"] = svc_data.get("cpu_percent")
                 app["ram_mb"]      = svc_data.get("ram_mb")
-                app["since"]       = svc_data.get("since", "")
-            else:
+                
+                # Min/Max Tracking
+                app_id = app["id"]
+                if app_id not in _metrics_history:
+                    _metrics_history[app_id] = {"cpu_min": app["cpu_percent"], "cpu_max": app["cpu_percent"], "ram_min": app["ram_mb"], "ram_max": app["ram_mb"]}
+                else:
+                    hist = _metrics_history[app_id]
+                    if app["cpu_percent"] is not None:
+                        if hist["cpu_min"] is None or app["cpu_percent"] < hist["cpu_min"]: hist["cpu_min"] = app["cpu_percent"]
+                        if hist["cpu_max"] is None or app["cpu_percent"] > hist["cpu_max"]: hist["cpu_max"] = app["cpu_percent"]
+                    if app["ram_mb"] is not None:
+                        if hist["ram_min"] is None or app["ram_mb"] < hist["ram_min"]: hist["ram_min"] = app["ram_mb"]
+                        if hist["ram_max"] is None or app["ram_mb"] > hist["ram_max"]: hist["ram_max"] = app["ram_mb"]
+                app["metrics_history"] = _metrics_history[app_id]
+
+            app["since"] = svc_data.get("since") if svc_data else None
+            app["pid"]   = svc_data.get("pid") if svc_data else None
+            
+            if not svc_data:
                 # systemctl ile anlık sorgula
                 det = get_service_detail(svc)
                 app["running"] = det.get("active_state") == "active"
@@ -455,7 +474,9 @@ def api_store_install():
 @auth_required
 def api_pull_update_app(app_id):
     from installer import update_app_local
-    res = update_app_local(app_id)
+    data = request.get_json() or {}
+    new_repo = data.get("repo")
+    res = update_app_local(app_id, new_repo)
     return jsonify(res), (200 if res.get("ok") else 500)
 
 @app.route("/api/settings/apps/<app_id>/pin", methods=["POST"])
