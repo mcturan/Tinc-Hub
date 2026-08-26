@@ -1,0 +1,29 @@
+[
+    {
+        "id": "aprs-beacon",
+        "name": "APRS Beacon",
+        "category": "Telsiz",
+        "icon": "📡",
+        "description": "Telsiz konum beacon servisi. Arka planda lokasyon verisi gönderir.",
+        "repo": "https://github.com/mcturan/aprs-beacon",
+        "install_script": "https://raw.githubusercontent.com/mcturan/aprs-beacon/main/install.sh"
+    },
+    {
+        "id": "firinna-pos",
+        "name": "Fırınna POS",
+        "category": "İş",
+        "icon": "🍞",
+        "description": "Fırın otomasyon ve satış noktası uygulaması.",
+        "repo": "https://github.com/mcturan/firinna-pos",
+        "install_script": "https://raw.githubusercontent.com/mcturan/firinna-pos/main/install.sh"
+    },
+    {
+        "id": "cctv-viewer",
+        "name": "CCTV Viewer",
+        "category": "Güvenlik",
+        "icon": "📹",
+        "description": "Kamera izleme uygulaması.",
+        "repo": "https://github.com/mcturan/cctv-viewer",
+        "install_script": "https://raw.githubusercontent.com/mcturan/cctv-viewer/main/install.sh"
+    }
+]

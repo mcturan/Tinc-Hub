@@ -40,42 +40,87 @@
     </footer>
 
     {% block scripts %}{% endblock %}
+    <!-- Delete Modal -->
+    <div id="deleteModal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-title">Uygulamayı Sil</div>
+                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteModalText">Bu uygulamayı silmek istiyorsunuz. Lütfen bir seçenek belirleyin:</p>
+                <div id="deleteModalWarning" class="info-box warn hidden" style="margin-top:10px;"></div>
+                <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
+                    <button class="btn btn-danger" onclick="executeDelete(true)" style="width:100%">🗑️ Sistemden Tamamen Kaldır (Durdur & Sil)</button>
+                    <button class="btn" onclick="executeDelete(false)" style="width:100%">👁️ Sadece Hub Panosundan Gizle / Sil</button>
+                    <button class="btn" onclick="closeDeleteModal()" style="width:100%">❌ İptal</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <script>
+    let currentDeleteId = null;
+    let currentDeleteType = null; // 'app' or 'docker'
+
     async function deleteApp(appId, appName) {
+        currentDeleteId = appId;
+        currentDeleteType = 'app';
+        document.getElementById('deleteModalText').textContent = `'${appName}' uygulamasını silmek üzeresiniz.`;
+        
         try {
             const rApps = await fetch('/api/settings/apps');
             const apps = await rApps.json();
             const children = apps.filter(a => a.parent === appId || (a.parent && a.parent === apps.find(x => x.id === appId)?.service));
+            const warnBox = document.getElementById('deleteModalWarning');
             if (children.length > 0) {
                 const childNames = children.map(c => c.name).join(', ');
-                if (!confirm(`DİKKAT: '${appName}' uygulamasını siliyorsunuz, ancak şu uygulamalar ona bağlı: ${childNames}\n\nYine de silmek istiyor musunuz?`)) {
-                    return;
-                }
-            }
-            
-            // Tamamen kaldırma sorusu
-            let fullUninstall = false;
-            if(confirm(`'${appName}' uygulamasını sistemden tamamen kaldırmak (uninstall/stop/disable) istiyor musunuz?\n\n- İptal derseniz sadece Hub panosundan silinir, arka planda çalışmaya devam eder.\n- Tamam derseniz sistemden sökülür.`)) {
-                fullUninstall = true;
+                warnBox.textContent = `DİKKAT: Şu uygulamalar ona bağlı: ${childNames}`;
+                warnBox.classList.remove('hidden');
             } else {
-                if(!confirm(`Sadece Hub panosundan silinecek. Emin misiniz?`)) return;
+                warnBox.classList.add('hidden');
             }
-            
-            const r = await fetch(`/api/settings/apps/${appId}?uninstall=${fullUninstall}`, {method: 'DELETE'});
-            if(r.ok) location.reload();
-            else {
-                const res = await r.json();
-                alert(`Hata: ${res.error || 'Silinemedi!'}`);
-            }
+            document.getElementById('deleteModal').classList.remove('hidden');
         } catch(e) { alert("Hata: "+e); }
     }
     
-    async function deleteDocker(containerId, containerName) {
-        if(!confirm(`'${containerName}' Docker container'ını sistemden tamamen SİLMEK istediğinize emin misiniz?`)) return;
+    function deleteDocker(containerId, containerName) {
+        currentDeleteId = containerId;
+        currentDeleteType = 'docker';
+        document.getElementById('deleteModalText').textContent = `'${containerName}' (Docker Container) silmek üzeresiniz.`;
+        document.getElementById('deleteModalWarning').classList.add('hidden');
+        document.getElementById('deleteModal').classList.remove('hidden');
+    }
+
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').classList.add('hidden');
+        currentDeleteId = null;
+    }
+
+    async function executeDelete(fullUninstall) {
+        if (!currentDeleteId) return;
+        
+        const id = currentDeleteId;
+        const type = currentDeleteType;
+        closeDeleteModal();
+
         try {
-            const r = await fetch(`/api/docker/${containerId}`, {method: 'DELETE'});
-            if(r.ok) location.reload();
-            else alert("Silinemedi!");
+            if (type === 'app') {
+                const r = await fetch(`/api/settings/apps/${id}?uninstall=${fullUninstall}`, {method: 'DELETE'});
+                if(r.ok) location.reload();
+                else {
+                    const res = await r.json();
+                    alert(`Hata: ${res.error || 'Silinemedi!'}`);
+                }
+            } else if (type === 'docker') {
+                if (fullUninstall) {
+                    const r = await fetch(`/api/docker/${id}`, {method: 'DELETE'});
+                    if(r.ok) location.reload();
+                    else alert("Silinemedi!");
+                } else {
+                    alert("Docker container'ları Hub panosunda otomatik keşfedilir. Sadece sistemden kaldırma işlemi yapılabilir.");
+                }
+            }
         } catch(e) { alert("Hata: "+e); }
     }
     </script>

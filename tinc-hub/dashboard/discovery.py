@@ -238,3 +238,19 @@ def discover_all() -> dict:
         "docker": docker,
         "discovered_at": datetime.now().isoformat(),
     }
+
+def discover_user_services():
+    try:
+        cmd = ["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "list-units", "--type=service", "--state=running", "--no-pager", "--no-legend"]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        services = []
+        for line in r.stdout.strip().split('\n'):
+            if line.strip():
+                parts = line.split()
+                if len(parts) > 0:
+                    srv = parts[0]
+                    if srv.endswith(".service"):
+                        services.append(srv)
+        return services
+    except Exception:
+        return []

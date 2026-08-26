@@ -387,6 +387,18 @@ def api_delete_docker(container_id):
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/store", methods=["GET"])
+@auth_required
+def api_get_store():
+    import json
+    import os
+    store_file = os.path.join(os.path.dirname(__file__), "store.json")
+    try:
+        with open(store_file, "r") as f:
+            return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify([])
+
 @app.route("/api/settings/apps/<app_id>/pin", methods=["POST"])
 @auth_required
 def api_pin_app(app_id):

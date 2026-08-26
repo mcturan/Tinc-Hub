@@ -128,3 +128,11 @@ apps:
     icon: "🐳"
     health_check: systemd
     pinned: false
+  - id: tinc-hub
+    name: Tinc Hub Manager
+    description: Sistemin kalbi, bu dashboard.
+    service: tinc-hub
+    category: Sistem
+    icon: "⚙️"
+    health_check: systemd
+    pinned: true
