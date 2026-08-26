@@ -3,8 +3,8 @@
         "id": "tinc-terminal",
         "name": "Terminal (ttyd)",
         "category": "Sistem",
-        "icon": "🖥️",
-        "description": "Tarayıcı üzerinden doğrudan makinenin konsoluna erişim.",
+        "icon": "\ud83d\udda5\ufe0f",
+        "description": "Taray\u0131c\u0131 \u00fczerinden do\u011frudan makinenin konsoluna eri\u015fim.",
         "repo": "file:///home/turan/101/tinc-terminal-source",
         "service": "tinc-terminal.service",
         "is_user_service": true,
@@ -22,6 +22,28 @@
         "is_user_service": true,
         "url": "http://{{host}}:9011",
         "internal_url": "http://127.0.0.1:9011"
+    },
+    {
+        "id": "tinc-firewall",
+        "name": "Firewall (UFW)",
+        "category": "G\u00fcvenlik",
+        "icon": "\ud83d\udee1\ufe0f",
+        "description": "Sistemin a\u011f g\u00fcvenli\u011fini y\u00f6netin. Portlar\u0131 a\u00e7\u0131n veya kapat\u0131n.",
+        "repo": "file:///home/turan/101/tinc-firewall-source",
+        "service": "tinc-firewall.service",
+        "url": "http://{{host}}:9013",
+        "internal_url": "http://127.0.0.1:9013",
+        "health_check": "http"
+    },
+    {
+        "id": "tinc-ssl",
+        "name": "HTTPS/SSL Mod\u00fcl\u00fc",
+        "category": "G\u00fcvenlik",
+        "icon": "\ud83d\udd12",
+        "description": "Nginx Reverse Proxy kurarak sistemi d\u0131\u015f a\u011fa a\u00e7\u0131labilir hale getirir.",
+        "repo": "file:///home/turan/101/tinc-ssl-source",
+        "health_check": "systemd",
+        "service": "nginx"
     },
     {
         "id": "aprs-beacon",

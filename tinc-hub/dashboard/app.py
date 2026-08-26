@@ -249,6 +249,9 @@ def index():
     
     system = _system_summary()
     
+    hub_id = os.environ.get("HUB_ID", "UNKNOWN")
+    api_token = os.environ.get("API_TOKEN", "")
+
     return render_template("hub.html",
         apps=display_apps,
         pinned=pinned, 
@@ -260,7 +263,9 @@ def index():
         system=system, 
         now=_now(),
         format_uptime=_format_uptime,
-        has_auth=bool(PASSWORD))
+        has_auth=bool(PASSWORD),
+        hub_id=hub_id,
+        api_token=api_token)
 
 
 @app.route("/app/<app_id>")
@@ -647,3 +652,34 @@ if __name__ == "__main__":
     start_background_checker(load_apps, interval=30)
 
     app.run(host=HOST, port=PORT, debug=False, threaded=True)
+
+
+@app.route("/api/settings/backup", methods=["POST"])
+@auth_required
+def api_backup():
+    import subprocess
+    import datetime
+    try:
+        ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"/var/log/tinc-hub/tinc_hub_backup_{ts}.tar.gz"
+        # /etc/tinc-hub ve /opt/tinc-hub klasorlerini yedekle
+        subprocess.run(["sudo", "tar", "-czf", filename, "/etc/tinc-hub", "/opt/tinc-hub"], check=True)
+        return jsonify({"ok": True, "file": filename})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+
+@app.route("/api/mobile/info", methods=["GET"])
+def api_mobile_info():
+    token = request.headers.get("X-Tinc-Token") or request.args.get("token")
+    if token != os.environ.get("API_TOKEN"):
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+        
+    return jsonify({
+        "ok": True,
+        "hub_id": os.environ.get("HUB_ID"),
+        "version": "1.0.0",
+        "system": _system_summary()
+    })
+
