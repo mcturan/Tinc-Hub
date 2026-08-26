@@ -28,8 +28,6 @@ from discovery import discover_all, get_service_detail
 from health import check_app, get_cached_health, start_background_checker
 from users import init_users, load_users, verify_user
 
-# Initialize users if they don't exist
-init_users(PASSWORD)
 from registry import (load_apps, save_apps, get_app, add_app,
                        update_app, delete_app, get_categories)
 
@@ -42,6 +40,8 @@ HOST     = config.get("DASHBOARD_HOST", "0.0.0.0")
 SECRET   = config.get("DASHBOARD_SECRET_KEY", "tinc-hub-tinc-secret-2025")
 PASSWORD = config.get("TINC_HUB_PASSWORD", "").strip()   # boşsa auth yok
 
+# Initialize users if they don't exist
+init_users(PASSWORD)
 # ── Logging ──────────────────────────────────────────────────────────────────
 os.makedirs("/var/log/tinc-hub", exist_ok=True)
 logging.basicConfig(
