@@ -1,28 +1,37 @@
 [
     {
+        "id": "tinc-filebrowser",
+        "name": "Dosya Y\u00f6neticisi",
+        "category": "Ara\u00e7",
+        "icon": "\ud83d\udcc1",
+        "description": "T\u00fcm sunucu dosyalar\u0131n\u0131za taray\u0131c\u0131 \u00fczerinden eri\u015fin, y\u00fckleyin ve y\u00f6netin. (FileBrowser tabanl\u0131)",
+        "repo": "file:///home/turan/101/tinc-filebrowser-source",
+        "service": "tinc-filebrowser.service"
+    },
+    {
         "id": "aprs-beacon",
         "name": "APRS Beacon",
         "category": "Telsiz",
-        "icon": "📡",
-        "description": "Telsiz konum beacon servisi. Arka planda lokasyon verisi gönderir.",
+        "icon": "\ud83d\udce1",
+        "description": "Telsiz konum beacon servisi. Arka planda lokasyon verisi g\u00f6nderir.",
         "repo": "https://github.com/mcturan/aprs-beacon",
         "install_script": "https://raw.githubusercontent.com/mcturan/aprs-beacon/main/install.sh"
     },
     {
         "id": "firinna-pos",
-        "name": "Fırınna POS",
-        "category": "İş",
-        "icon": "🍞",
-        "description": "Fırın otomasyon ve satış noktası uygulaması.",
+        "name": "F\u0131r\u0131nna POS",
+        "category": "\u0130\u015f",
+        "icon": "\ud83c\udf5e",
+        "description": "F\u0131r\u0131n otomasyon ve sat\u0131\u015f noktas\u0131 uygulamas\u0131.",
         "repo": "https://github.com/mcturan/firinna-pos",
         "install_script": "https://raw.githubusercontent.com/mcturan/firinna-pos/main/install.sh"
     },
     {
         "id": "cctv-viewer",
         "name": "CCTV Viewer",
-        "category": "Güvenlik",
-        "icon": "📹",
-        "description": "Kamera izleme uygulaması.",
+        "category": "G\u00fcvenlik",
+        "icon": "\ud83d\udcf9",
+        "description": "Kamera izleme uygulamas\u0131.",
         "repo": "https://github.com/mcturan/cctv-viewer",
         "install_script": "https://raw.githubusercontent.com/mcturan/cctv-viewer/main/install.sh"
     }
