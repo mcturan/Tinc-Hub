@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Güncelleme Gerekli</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 40px 20px; background: #f1f5f9; color: #333; margin: 0; }
+        .box { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+        h1 { color: #dc2626; margin-top: 0; }
+        .btn { display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 20px; }
+        .ver { color: #64748b; font-size: 0.9em; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h1>⚠️ Güncelleme Gerekli</h1>
+        <p>Tinc Hub yöneticisi uygulamasının yeni bir sürümü yayınlandı. Mevcut sürüm (v{{ current }}) artık desteklenmiyor.</p>
+        <p>Lütfen güncel sürümü indirin ve yükleyin.</p>
+        <a href="/static/Tinc-Hub-Manager.apk" class="btn">⬇️ Yeni Sürümü İndir (v{{ required }})</a>
+        <div class="ver">Mevcut: v{{ current }} | Gerekli: v{{ required }}</div>
+    </div>
+</body>
+</html>

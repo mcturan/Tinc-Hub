@@ -224,6 +224,11 @@ def _now():
 @app.route("/")
 @auth_required
 def index():
+    # Mobil uygulama versiyon kontrolü
+    app_ver = request.args.get("app_version")
+    if app_ver and _ver_to_int(app_ver) < _ver_to_int(MOBILE_REQUIRED_VERSION):
+        return render_template("mobile_update.html", required=MOBILE_REQUIRED_VERSION, current=app_ver)
+
     all_apps = load_apps()
     enriched = _enrich_apps(all_apps)
     
