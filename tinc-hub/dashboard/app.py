@@ -19,10 +19,10 @@ from dotenv import dotenv_values
 # ── Shared modüller ──────────────────────────────────────────────────────────
 sys.path.insert(0, "/opt/tinc-hub/shared")
 try:
-    import db as tinc-hub.db
-    tinc-hub.db.init_db()
+    import db as tinchub_db
+    tinchub_db.init_db()
 except Exception:
-    tinc-hub.db = None
+    tinchub_db = None
 
 from discovery import discover_all, get_service_detail
 from health import check_app, get_cached_health, start_background_checker
@@ -413,9 +413,9 @@ def api_system():
 @app.route("/api/wan")
 @auth_required
 def api_wan():
-    if tinc-hub.db:
-        history = tinc-hub.db.get_wan_history(limit=5)
-        latest  = tinc-hub.db.get_latest_metric("wan-tracker", "wan_ip")
+    if tinchub_db:
+        history = tinchub_db.get_wan_history(limit=5)
+        latest  = tinchub_db.get_latest_metric("wan-tracker", "wan_ip")
         return jsonify({"history": history, "current": latest})
     return jsonify({"history": [], "current": None})
 
