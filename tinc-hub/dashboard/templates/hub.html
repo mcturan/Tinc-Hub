@@ -606,6 +606,11 @@ setInterval(async () => {
             document.getElementById('sys-disk').innerText = `${d.disk_percent}%`;
             document.getElementById('bar-disk').style.width = `${d.disk_percent}%`;
             document.getElementById('bar-disk').className = `bar-fill ${d.disk_percent>90?'bar-red':d.disk_percent>80?'bar-yellow':'bar-green'}`;
+            
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('tr-TR');
+            const timeEl = document.getElementById('last-update-time');
+            if(timeEl) timeEl.innerText = 'Son Güncelleme: ' + timeString;
         }
     } catch(e){}
 }, 30000);

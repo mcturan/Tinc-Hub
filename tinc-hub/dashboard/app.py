@@ -430,35 +430,55 @@ def api_update_app(app_id):
 @auth_required
 def api_delete_app(app_id):
     uninstall = request.args.get('uninstall', 'false') == 'true'
+    logs = []
     
     if uninstall:
         import subprocess
+        from registry import load_apps
         app_data = next((a for a in load_apps() if a.get("id") == app_id), None)
         if app_data and app_data.get("service"):
             service = app_data["service"]
             is_user = app_data.get("is_user_service", False)
             try:
                 if is_user:
-                    subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "stop", service], timeout=5)
-                    subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "disable", service], timeout=5)
+                    p1 = subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "stop", service], capture_output=True, text=True, timeout=10)
+                    p2 = subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "disable", service], capture_output=True, text=True, timeout=10)
+                    logs.append(p1.stdout + "
+" + p1.stderr)
+                    logs.append(p2.stdout + "
+" + p2.stderr)
                 else:
-                    subprocess.run(["sudo", "systemctl", "stop", service], timeout=5)
-                    subprocess.run(["sudo", "systemctl", "disable", service], timeout=5)
+                    p1 = subprocess.run(["sudo", "systemctl", "stop", service], capture_output=True, text=True, timeout=10)
+                    p2 = subprocess.run(["sudo", "systemctl", "disable", service], capture_output=True, text=True, timeout=10)
+                    logs.append(p1.stdout + "
+" + p1.stderr)
+                    logs.append(p2.stdout + "
+" + p2.stderr)
             except Exception as e:
                 return jsonify({"ok": False, "error": f"Servis durdurulamadı: {str(e)}"}), 500
                 
             # Çalıştırma scripti
             repo = app_data.get("repo")
-            if repo:
+            if repo and repo.startswith("file://") or repo.startswith("http"):
                 app_name_slug = repo.rstrip('/').split('/')[-1]
                 target_dir = f"/home/turan/101/{app_name_slug}"
+                import os
                 uninstall_script = f"{target_dir}/uninstall.sh"
                 if os.path.exists(uninstall_script):
-                    import subprocess
-                    subprocess.run(["sudo", "bash", uninstall_script], check=False)
+                    p3 = subprocess.run(["sudo", "bash", uninstall_script], capture_output=True, text=True)
+                    logs.append(p3.stdout + "
+" + p3.stderr)
+                else:
+                    logs.append(f"
+[UYARI] {uninstall_script} bulunamadı! Sadece servis durduruldu, uygulama dosyaları sistemde (apt, snap vb. ile kurulduysa) kalmış olabilir. Tamamen silmek için manuel müdahale gerekebilir.")
+            else:
+                logs.append("
+[UYARI] Bu uygulamanın özel bir kaldırıcı betiği yok. Sadece servis durduruldu. (apt, snap veya manuel kurulduysa dosyalar hala sistemdedir.)")
                 
+    from registry import delete_app
     ok = delete_app(app_id)
-    return jsonify({"ok": ok})
+    return jsonify({"ok": ok, "log": "
+".join(logs)})
 
 @app.route("/api/docker/<container_id>", methods=["DELETE"])
 @auth_required
@@ -551,7 +571,7 @@ def _system_summary() -> dict:
         import psutil
         ram  = psutil.virtual_memory()
         swap = psutil.swap_memory()
-        cpu  = psutil.cpu_percent(interval=0.2)
+        cpu  = psutil.cpu_percent(interval=0.8)
         disk = shutil.disk_usage("/")
         return {
             "cpu_percent":  round(cpu, 1),

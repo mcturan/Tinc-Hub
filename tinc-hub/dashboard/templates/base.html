@@ -40,6 +40,21 @@
     </footer>
 
     {% block scripts %}{% endblock %}
+    
+    <!-- Terminal Log Modal -->
+    <div id="termModal" class="modal-overlay hidden" style="z-index: 10000;">
+        <div class="modal" style="max-width: 800px; width: 90%;">
+            <div class="modal-header">
+                <div class="modal-title">İşlem Çıktısı (Terminal)</div>
+                <button class="modal-close" onclick="document.getElementById('termModal').classList.add('hidden'); location.reload();">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="termOutput" style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 6px; height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; margin-bottom: 15px;"></pre>
+                <button class="btn btn-primary" onclick="document.getElementById('termModal').classList.add('hidden'); location.reload();" style="width: 100%">Kapat ve Sayfayı Yenile</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Delete Modal -->
     <div id="deleteModal" class="modal-overlay hidden">
         <div class="modal">
@@ -107,10 +122,27 @@
         try {
             if (type === 'app') {
                 const r = await fetch(`/api/settings/apps/${id}?uninstall=${fullUninstall}`, {method: 'DELETE'});
-                if(r.ok) location.reload();
+                if(r.ok) {
+                    const res = await r.json();
+                    if(res.log) {
+                        document.getElementById('termOutput').textContent = res.log;
+                        document.getElementById('termModal').classList.remove('hidden');
+                    } else {
+                        location.reload();
+                    }
+                }
                 else {
                     const res = await r.json();
-                    alert(`Hata: ${res.error || 'Silinemedi!'}`);
+                    if(res.log) {
+                        document.getElementById('termOutput').textContent = "HATA:
+" + res.error + "
+
+LOGS:
+" + res.log;
+                        document.getElementById('termModal').classList.remove('hidden');
+                    } else {
+                        alert(`Hata: ${res.error || 'Silinemedi!'}`);
+                    }
                 }
             } else if (type === 'docker') {
                 if (fullUninstall) {
