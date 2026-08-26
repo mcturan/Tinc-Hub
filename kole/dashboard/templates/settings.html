@@ -1,0 +1,216 @@
+{% extends 'base.html' %}
+{% set refresh = 0 %}
+
+{% block content %}
+<div class="section-header">
+    <h2>Hub Ayarları</h2>
+</div>
+
+<!-- Uygulama Listesi -->
+<div class="settings-section">
+    <h3>Uygulamalar (apps.yaml)</h3>
+    <p style="font-size:0.8rem; color:var(--muted); margin-bottom:14px;">Hub ana sayfasında ve menülerde görünen uygulamalarınız. Buradan düzenleyebilir veya silebilirsiniz.</p>
+    
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th width="40"></th>
+                    <th>Uygulama</th>
+                    <th>Servis / URL</th>
+                    <th>Port</th>
+                    <th>Sağlık</th>
+                    <th>Durum</th>
+                    <th width="100">Eylemler</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for app in apps %}
+                <tr>
+                    <td style="font-size:1.2rem; text-align:center;">{{ app.icon or '📦' }}</td>
+                    <td>
+                        <strong>{{ app.name }}</strong><br>
+                        <span style="font-size:0.75rem; color:var(--muted);">{{ app.category }}</span>
+                    </td>
+                    <td>
+                        {% if app.service %}<code>{{ app.service }}</code><br>{% endif %}
+                        {% if app.url %}<a href="{{ app.url }}" target="_blank" style="font-size:0.75rem;">{{ app.url }}</a>{% endif %}
+                    </td>
+                    <td>{{ app.port or '-' }}</td>
+                    <td><span class="badge">{{ app.health_check }}</span></td>
+                    <td>{% if app.pinned %}📌 Sabit{% else %}-{% endif %}</td>
+                    <td>
+                        <button class="btn btn-sm" onclick="editApp('{{ app.id }}')">✏</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteApp('{{ app.id }}', '{{ app.name }}')">🗑</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="7" class="empty-state">Kayıtlı uygulama yok.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div style="margin-top: 14px;">
+        <button onclick="openAddModal()" class="btn btn-primary">+ Yeni Uygulama Ekle</button>
+    </div>
+</div>
+
+<!-- Güvenlik Ayarları -->
+<div class="settings-section">
+    <h3>Güvenlik & Erişim</h3>
+    <div class="info-box {% if not has_auth %}warn{% endif %}" style="margin-bottom:14px;">
+        Kimlik Doğrulama: <strong>{% if has_auth %}AÇIK ✓{% else %}KAPALI ⚠{% endif %}</strong>
+    </div>
+    <p style="font-size:0.8rem; color:var(--muted);">
+        Şifre değiştirmek veya açmak/kapatmak için sunucudaki config dosyasını düzenleyin:
+    </p>
+    <div style="margin-top:8px;">
+        <code>sudo nano /etc/kole/config.env</code>
+    </div>
+    <p style="font-size:0.8rem; color:var(--muted); margin-top:8px;">
+        <code>KOLE_PASSWORD=yenisifre</code> satırını ayarlayıp servisi yeniden başlatın:<br>
+        <code>sudo systemctl restart kole-dashboard</code>
+    </p>
+</div>
+
+<!-- Tehlikeli Bölge -->
+<div class="settings-section danger-zone">
+    <h3>Tehlikeli Bölge</h3>
+    <div style="display:flex; gap:12px; align-items:center;">
+        <button class="btn btn-danger" onclick="refreshDiscovery()">🔄 Keşif Motorunu Yenile</button>
+        <span style="font-size:0.8rem; color:var(--muted);">Sistemdeki yeni servisleri ve portları hemen tarar (Normalde 60s'de bir otomatik yapılır).</span>
+    </div>
+</div>
+
+<!-- Edit/Add Modal -->
+<div id="editModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title" id="modalTitle">Uygulama Düzenle</div>
+            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-id">
+            <div class="form-row">
+                <div class="form-group"><label>Uygulama Adı</label><input type="text" id="edit-name" required></div>
+                <div class="form-group"><label>Kategori</label><input type="text" id="edit-cat" list="cat-list">
+                    <datalist id="cat-list">
+                        {% for c in categories %}<option value="{{ c }}">{% endfor %}
+                    </datalist>
+                </div>
+            </div>
+            <div class="form-group"><label>Açıklama</label><input type="text" id="edit-desc"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Systemd Servis Adı</label><input type="text" id="edit-service" placeholder="Örn: nginx"></div>
+                <div class="form-group"><label>Port</label><input type="number" id="edit-port"></div>
+            </div>
+            <div class="form-group"><label>Harici URL</label><input type="text" id="edit-url" placeholder="https://..."></div>
+            <div class="form-row">
+                <div class="form-group"><label>İkon (Emoji)</label><input type="text" id="edit-icon" value="📦"></div>
+                <div class="form-group">
+                    <label>Sağlık Kontrol Tipi</label>
+                    <select id="edit-health">
+                        <option value="systemd">Systemd Durumu</option>
+                        <option value="http">HTTP İsteği</option>
+                        <option value="port">TCP Portu</option>
+                        <option value="none">Kapalı</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" id="edit-pinned">
+                <label for="edit-pinned">Ana sayfada öne çıkar (Sabitle)</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeEditModal()">İptal</button>
+            <button class="btn btn-primary" onclick="submitEditModal()">Kaydet</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openAddModal() {
+    document.getElementById('modalTitle').textContent = 'Yeni Uygulama Ekle';
+    document.getElementById('edit-id').value = '';
+    ['name','cat','desc','service','port','url','icon'].forEach(id => document.getElementById('edit-'+id).value = '');
+    document.getElementById('edit-icon').value = '📦';
+    document.getElementById('edit-health').value = 'systemd';
+    document.getElementById('edit-pinned').checked = true;
+    document.getElementById('editModal').classList.remove('hidden');
+}
+
+async function editApp(appId) {
+    try {
+        const r = await fetch(`/api/app/${appId}`);
+        const data = await r.json();
+        document.getElementById('modalTitle').textContent = 'Uygulama Düzenle';
+        document.getElementById('edit-id').value = data.id || '';
+        document.getElementById('edit-name').value = data.name || '';
+        document.getElementById('edit-cat').value = data.category || '';
+        document.getElementById('edit-desc').value = data.description || '';
+        document.getElementById('edit-service').value = data.service || '';
+        document.getElementById('edit-port').value = data.port || '';
+        document.getElementById('edit-url').value = data.url || '';
+        document.getElementById('edit-icon').value = data.icon || '📦';
+        document.getElementById('edit-health').value = data.health_check || 'systemd';
+        document.getElementById('edit-pinned').checked = !!data.pinned;
+        document.getElementById('editModal').classList.remove('hidden');
+    } catch(e) { alert("Bilgiler alınamadı: "+e); }
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+}
+
+async function submitEditModal() {
+    const id = document.getElementById('edit-id').value;
+    const data = {
+        name: document.getElementById('edit-name').value,
+        category: document.getElementById('edit-cat').value,
+        description: document.getElementById('edit-desc').value,
+        service: document.getElementById('edit-service').value,
+        port: document.getElementById('edit-port').value ? parseInt(document.getElementById('edit-port').value) : null,
+        url: document.getElementById('edit-url').value,
+        icon: document.getElementById('edit-icon').value,
+        health_check: document.getElementById('edit-health').value,
+        pinned: document.getElementById('edit-pinned').checked
+    };
+    if(!data.name) return alert("Ad gerekli!");
+    
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `/api/settings/apps/${id}` : `/api/settings/apps/add`;
+    
+    try {
+        const r = await fetch(url, {
+            method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if(r.ok) location.reload();
+        else alert("Kaydedilemedi!");
+    } catch(e) { alert("Hata: "+e); }
+}
+
+async function deleteApp(appId, appName) {
+    if(!confirm(`'${appName}' uygulamasını kayıt defterinden silmek istediğinize emin misiniz? (Sistemden silinmez, sadece Hub'dan kalkar)`)) return;
+    try {
+        const r = await fetch(`/api/settings/apps/${appId}`, {method: 'DELETE'});
+        if(r.ok) location.reload();
+        else alert("Silinemedi!");
+    } catch(e) { alert("Hata: "+e); }
+}
+
+async function refreshDiscovery() {
+    try {
+        const r = await fetch(`/api/discovery/refresh`, {method: 'POST'});
+        const d = await r.json();
+        alert(`Keşif yenilendi! ${d.services} servis, ${d.ports} port bulundu.`);
+        location.reload();
+    } catch(e) { alert("Hata: "+e); }
+}
+</script>
+{% endblock %}

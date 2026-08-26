@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% set refresh = 60 %}
+
+{% block content %}
+<div class="section-header">
+    <h2>Tüm Uygulamalar</h2>
+    <button onclick="openAddModal()" class="btn btn-primary">+ Yeni Ekle</button>
+</div>
+
+<!-- Kategori Filtreleri -->
+<div class="cat-filters">
+    <a href="/apps" class="cat-chip {% if not selected_cat %}active{% endif %}">Tümü</a>
+    {% for c in categories %}
+    <a href="/apps?cat={{ c }}" class="cat-chip {% if selected_cat == c %}active{% endif %}">{{ c }}</a>
+    {% endfor %}
+</div>
+
+<!-- Uygulama Grid -->
+<div class="app-grid">
+    {% for app in apps %}
+    <div class="app-card {{ app.status_class }}" onclick="if(!event.target.closest('button') && !event.target.closest('a.btn')) window.location.href='/app/{{ app.id }}'">
+        <button class="pin-btn {% if app.pinned %}pinned{% endif %}" onclick="togglePin('{{ app.id }}', {{ 'true' if app.pinned else 'false' }})" title="Sabitle/Kaldır">📌</button>
+        <div class="card-header">
+            <div class="card-icon">{{ app.icon or '📦' }}</div>
+            <div class="card-title">
+                <div class="card-name">{{ app.name }}</div>
+                <div class="card-cat">{{ app.category or 'Uygulama' }} {% if app.port %}· port {{ app.port }}{% endif %}</div>
+            </div>
+            <div class="status-badge {{ app.status_class }}">
+                {% if app.status_class == 'healthy' %}🟢 Çalışıyor
+                {% elif app.status_class == 'dead' %}🔴 Durdu
+                {% else %}🟡 Bilinmiyor{% endif %}
+            </div>
+        </div>
+        <div class="card-actions">
+            {% if app.url %}<a href="{{ app.url }}" target="_blank" class="btn btn-sm btn-icon">↗ Aç</a>{% endif %}
+            {% if app.service %}
+            <button onclick="serviceAction('{{ app.id }}', 'restart')" class="btn btn-sm btn-icon">⟳ Yeniden Başlat</button>
+            <a href="/logs?service={{ app.service }}" class="btn btn-sm btn-icon">📜 Log</a>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">Bu kategoride uygulama bulunamadı.</div>
+    {% endfor %}
+</div>
+
+<!-- Docker Containerları -->
+{% if not selected_cat %}
+<div class="section" style="margin-top: 40px;">
+    <h2>Docker Container'ları</h2>
+    {% if docker %}
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>ID</th><th>İsim</th><th>Image</th><th>Durum</th><th>Portlar</th></tr></thead>
+            <tbody>
+                {% for c in docker %}
+                <tr>
+                    <td><code>{{ c.id[:8] }}</code></td>
+                    <td><strong>{{ c.name }}</strong></td>
+                    <td>{{ c.image }}</td>
+                    <td><span class="badge {% if c.running %}status-badge healthy{% else %}status-badge dead{% endif %}">{{ c.state_str }}</span></td>
+                    <td>{{ c.ports|join(', ') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="info-box">Çalışan Docker container bulunamadı.</div>
+    {% endif %}
+</div>
+
+<!-- Keşfedilen Diğer Servisler -->
+<div class="section" style="margin-top: 40px;">
+    <h2>Keşfedilen Diğer Servisler</h2>
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Servis Adı</th><th>Durum</th><th>Eylem</th></tr></thead>
+            <tbody>
+                {% for s in unknown_services %}
+                <tr>
+                    <td>{{ s.name }}</td>
+                    <td><span class="badge {% if s.running %}status-badge healthy{% else %}status-badge dead{% endif %}">{{ s.sub }}</span></td>
+                    <td><button onclick="openAddModal('{{ s.name }}')" class="btn btn-sm">+ Hub'a Ekle</button></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Add Modal -->
+<div id="addModal" class="modal-overlay hidden">
+    <div class="modal">
+        <div class="modal-header">
+            <div class="modal-title">Yeni Uygulama Ekle</div>
+            <button class="modal-close" onclick="closeAddModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-row">
+                <div class="form-group"><label>Uygulama Adı</label><input type="text" id="add-name" required></div>
+                <div class="form-group"><label>Kategori</label><input type="text" id="add-cat" placeholder="İş, Medya, Sistem..."></div>
+            </div>
+            <div class="form-group"><label>Açıklama</label><input type="text" id="add-desc"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Systemd Servis Adı</label><input type="text" id="add-service"></div>
+                <div class="form-group"><label>Port</label><input type="number" id="add-port"></div>
+            </div>
+            <div class="form-group"><label>Harici URL</label><input type="text" id="add-url" placeholder="https://..."></div>
+            <div class="form-row">
+                <div class="form-group"><label>İkon (Emoji)</label><input type="text" id="add-icon" value="📦"></div>
+                <div class="form-group">
+                    <label>Sağlık Kontrol Tipi</label>
+                    <select id="add-health">
+                        <option value="systemd">Systemd</option>
+                        <option value="http">HTTP URL</option>
+                        <option value="port">TCP Port</option>
+                        <option value="none">Kapalı</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" id="add-pinned" checked>
+                <label for="add-pinned">Ana sayfada öne çıkar (Sabitle)</label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" onclick="closeAddModal()">İptal</button>
+            <button class="btn btn-primary" onclick="submitAddModal()">Ekle</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function togglePin(appId, currentPinned) {
+    event.stopPropagation();
+    try {
+        await fetch(`/api/settings/apps/${appId}/pin`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({pinned: !currentPinned})
+        });
+        location.reload();
+    } catch(e) {}
+}
+
+async function serviceAction(appId, action) {
+    event.stopPropagation();
+    try {
+        const r = await fetch(`/api/app/${appId}/action`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action})
+        });
+        const d = await r.json();
+        if(d.ok) { alert(`${action} başarılı`); location.reload(); }
+        else alert(`Hata: ${d.message}`);
+    } catch(e) {}
+}
+
+function openAddModal(serviceName='') {
+    document.getElementById('add-service').value = serviceName;
+    if(serviceName) document.getElementById('add-name').value = serviceName;
+    document.getElementById('addModal').classList.remove('hidden');
+}
+function closeAddModal() {
+    document.getElementById('addModal').classList.add('hidden');
+}
+async function submitAddModal() {
+    const data = {
+        name: document.getElementById('add-name').value,
+        category: document.getElementById('add-cat').value,
+        description: document.getElementById('add-desc').value,
+        service: document.getElementById('add-service').value,
+        port: document.getElementById('add-port').value ? parseInt(document.getElementById('add-port').value) : null,
+        url: document.getElementById('add-url').value,
+        icon: document.getElementById('add-icon').value,
+        health_check: document.getElementById('add-health').value,
+        pinned: document.getElementById('add-pinned').checked
+    };
+    if(!data.name) return alert("Uygulama adı gerekli");
+    try {
+        const r = await fetch('/api/settings/apps/add', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        if(r.ok) location.reload();
+        else alert("Hata oluştu");
+    } catch(e) { alert("Hata: "+e); }
+}
+</script>
+{% endblock %}

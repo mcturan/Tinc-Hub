@@ -1,0 +1,119 @@
+# TINC Köle Hub — Varsayılan uygulama tanımları
+# Bu dosya install sırasında /etc/kole/apps.yaml olarak kopyalanır.
+# Web arayüzünden veya elle düzenleyebilirsiniz.
+#
+# health_check seçenekleri: http | systemd | port | none
+# Kategori önerileri: İş | Medya | Sistem | Telsiz | Araç | Güvenlik
+
+apps:
+  - id: firinna-pos
+    name: Firinna POS
+    description: Kafe sipariş ve yönetim sistemi
+    url: https://pos.firinna.com
+    internal_url: http://127.0.0.1:5000
+    health_url: http://127.0.0.1:5000
+    service: firinna-pos
+    port: 5000
+    category: İş
+    icon: "🍞"
+    health_check: http
+    pinned: true
+
+  - id: firinna-web
+    name: Firinna Web
+    description: Kafe web sitesi
+    url: https://firinna.com
+    health_url: https://firinna.com
+    service: nginx
+    port: 443
+    category: İş
+    icon: "🌐"
+    health_check: http
+    pinned: true
+
+  - id: aprs-beacon
+    name: APRS Beacon
+    description: Telsiz konum beacon servisi
+    service: aprs-beacon@default
+    category: Telsiz
+    icon: "📡"
+    health_check: systemd
+    pinned: true
+
+  - id: plex
+    name: Plex Media Server
+    description: Medya yayın sunucusu
+    url: http://127.0.0.1:32400/web
+    health_url: http://127.0.0.1:32400/identity
+    service: plexmediaserver
+    port: 32400
+    category: Medya
+    icon: "🎬"
+    health_check: http
+    pinned: false
+
+  - id: ollama
+    name: Ollama AI
+    description: Yerel yapay zeka sunucusu
+    health_url: http://127.0.0.1:11434
+    service: ollama
+    port: 11434
+    category: Araç
+    icon: "🧠"
+    health_check: http
+    pinned: false
+
+  - id: nginx
+    name: Nginx Web Proxy
+    description: Web sunucu ve ters proxy
+    service: nginx
+    port: 80
+    category: Sistem
+    icon: "⚡"
+    health_check: systemd
+    pinned: false
+
+  - id: anydesk
+    name: AnyDesk
+    description: Uzak masaüstü erişimi
+    service: anydesk
+    category: Araç
+    icon: "🖥️"
+    health_check: systemd
+    pinned: false
+
+  - id: samba
+    name: Samba Dosya Paylaşımı
+    description: Ağ dosya paylaşımı (SMB/CIFS)
+    service: smbd
+    port: 445
+    category: Sistem
+    icon: "📁"
+    health_check: systemd
+    pinned: false
+
+  - id: cctv
+    name: CCTV
+    description: Güvenlik kamera sistemi (snap)
+    category: Güvenlik
+    icon: "📷"
+    health_check: none
+    pinned: false
+
+  - id: rclone
+    name: rclone Bulut Sync
+    description: Bulut depolama senkronizasyonu
+    service: rclone
+    category: Araç
+    icon: "☁️"
+    health_check: systemd
+    pinned: false
+
+  - id: docker
+    name: Docker
+    description: Container yönetimi
+    service: docker
+    category: Sistem
+    icon: "🐳"
+    health_check: systemd
+    pinned: false

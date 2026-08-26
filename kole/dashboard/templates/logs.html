@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% set refresh = 0 %} {# SSE çalışırken sayfayı yenileme #}
+
+{% block content %}
+<div class="section-header">
+    <h2>Canlı Log İzleme</h2>
+</div>
+
+<div class="log-controls">
+    <select id="service-select" class="btn" style="min-width: 200px;" onchange="changeService()">
+        <option value="">Servis Seçin...</option>
+        <optgroup label="Uygulamalar (apps.yaml)">
+            {% for app in services %}
+            <option value="{{ app.service }}" {% if selected == app.service %}selected{% endif %}>
+                {{ app.name }} ({{ app.service }})
+            </option>
+            {% endfor %}
+        </optgroup>
+        <optgroup label="Sistem Servisleri">
+            {% for s in disc_services %}
+            {% if s not in (services|map(attribute='service')|list) %}
+            <option value="{{ s }}" {% if selected == s %}selected{% endif %}>{{ s }}</option>
+            {% endif %}
+            {% endfor %}
+        </optgroup>
+    </select>
+    
+    <button id="btn-toggle" class="btn" onclick="togglePause()">⏸ Duraklat</button>
+    <button class="btn" onclick="clearLogs()">🗑 Temizle</button>
+    <button class="btn" onclick="scrollToBottom()">⬇ En Alta İn</button>
+    
+    <div class="log-status">
+        Durum: <span id="conn-indicator" class="indicator"></span> <span id="conn-text">Bekliyor</span>
+        | Satır: <span id="line-count">0</span>
+    </div>
+</div>
+
+<div class="log-terminal" id="log-output" style="height: 70vh; max-height: none;">
+    <div class="log-line system">Lütfen yukarıdan izlemek istediğiniz servisi seçin.</div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let es = null;
+let paused = false;
+let lineCount = 0;
+const MAX_LINES = 1000;
+const outDiv = document.getElementById('log-output');
+const ind = document.getElementById('conn-indicator');
+const txt = document.getElementById('conn-text');
+const cnt = document.getElementById('line-count');
+const btnToggle = document.getElementById('btn-toggle');
+
+function setStatus(state, msg) {
+    txt.textContent = msg;
+    ind.className = 'indicator ' + state;
+}
+
+function addLine(text, cls='') {
+    const span = document.createElement('div');
+    span.className = `log-line ${cls}`;
+    span.textContent = text;
+    outDiv.appendChild(span);
+    lineCount++;
+    if (lineCount > MAX_LINES) {
+        outDiv.removeChild(outDiv.firstChild);
+        lineCount--;
+    }
+    cnt.textContent = lineCount;
+    // Auto-scroll if near bottom
+    if (outDiv.scrollHeight - outDiv.scrollTop - outDiv.clientHeight < 100) {
+        outDiv.scrollTop = outDiv.scrollHeight;
+    }
+}
+
+function connect(service) {
+    if (es) { es.close(); }
+    clearLogs();
+    if (!service) {
+        setStatus('', 'Bekliyor');
+        addLine('Lütfen bir servis seçin.', 'system');
+        return;
+    }
+    
+    setStatus('live', 'Bağlanıyor...');
+    es = new EventSource(`/api/logs/stream/${service}?lines=100`);
+    
+    es.onopen = () => {
+        setStatus('live', 'Canlı');
+    };
+    
+    es.onmessage = (e) => {
+        if (paused) return;
+        try {
+            const d = JSON.parse(e.data);
+            if (d.type === 'line') {
+                // Basit renklendirme denemesi
+                let cls = '';
+                if(d.line.toLowerCase().includes('error') || d.line.toLowerCase().includes('failed') || d.line.includes('Exception')) cls = 'error';
+                else if(d.line.toLowerCase().includes('warn')) cls = 'warning';
+                addLine(d.line, cls);
+            } else if (d.type === 'connected') {
+                addLine(`--- ${d.service} canlı akışı bağlandı ---`, 'system');
+            }
+        } catch(err) {
+            addLine(e.data);
+        }
+    };
+    
+    es.onerror = () => {
+        setStatus('error', 'Bağlantı Kesildi');
+        addLine('--- Bağlantı kesildi, yeniden bağlanılıyor... ---', 'error');
+    };
+}
+
+function changeService() {
+    const sel = document.getElementById('service-select').value;
+    if(sel) {
+        // URL'i güncelle (paylaşılabilir olması için)
+        window.history.replaceState(null, null, `?service=${sel}`);
+    } else {
+        window.history.replaceState(null, null, `/logs`);
+    }
+    connect(sel);
+}
+
+function togglePause() {
+    paused = !paused;
+    btnToggle.textContent = paused ? '▶ Devam Et' : '⏸ Duraklat';
+    if(paused) setStatus('', 'Duraklatıldı');
+    else setStatus('live', 'Canlı');
+}
+
+function clearLogs() {
+    outDiv.innerHTML = '';
+    lineCount = 0;
+    cnt.textContent = '0';
+}
+
+function scrollToBottom() {
+    outDiv.scrollTop = outDiv.scrollHeight;
+}
+
+// Başlangıçta seçili varsa bağlan
+window.onload = () => {
+    const sel = document.getElementById('service-select').value;
+    if (sel) connect(sel);
+};
+</script>
+{% endblock %}
