@@ -21,8 +21,7 @@ def send_telegram_alert(msg: str):
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
-        requests.post(url, json={"chat_id": TELEGRAM_CHAT, "text": f"🚨 [TINC HUB ALERT]
-{msg}"}, timeout=5)
+        requests.post(url, json={"chat_id": TELEGRAM_CHAT, "text": f"🚨 [TINC HUB ALERT]\n{msg}"}, timeout=5)
     except:
         pass
 
