@@ -1,0 +1,17 @@
+[Unit]
+Description=Tinc Hub — WAN Tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/etc/tinc-hub/config.env
+ExecStart=/opt/tinc-hub/agents/wan-tracker/agent.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/var/log/tinc-hub/wan-tracker.log
+StandardError=append:/var/log/tinc-hub/wan-tracker.log
+
+[Install]
+WantedBy=multi-user.target

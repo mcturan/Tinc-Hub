@@ -1,0 +1,20 @@
+[Unit]
+Description=Tinc Hub — Router Guardian
+Documentation=https://github.com/tinc-kole
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/etc/tinc-hub/config.env
+ExecStart=/opt/tinc-hub/agents/router-guardian/agent.py
+Restart=always
+RestartSec=30
+# Reboot işlemi uzun sürebilir, kill timeout yüksek tutuldu
+TimeoutStopSec=60
+StandardOutput=append:/var/log/tinc-hub/router-guardian.log
+StandardError=append:/var/log/tinc-hub/router-guardian.log
+
+[Install]
+WantedBy=multi-user.target

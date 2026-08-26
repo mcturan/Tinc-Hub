@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olaylar — Tinc Hub</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">⚙</span>
+                <span class="logo-text">TINC <strong>Köle</strong></span>
+            </div>
+            <nav>
+                <a href="/">Panel</a>
+                <a href="/events" class="active">Olaylar</a>
+            </nav>
+            <div class="header-time">{{ now }}</div>
+        </div>
+    </header>
+
+    <main>
+        <div class="breadcrumb"><a href="/">← Panel</a> / Olaylar</div>
+
+        <!-- Filtreler -->
+        <section class="section">
+            <form class="filter-form" method="get">
+                <select name="agent">
+                    <option value="">Tüm Agent'lar</option>
+                    {% for a in agents %}
+                    <option value="{{ a.id }}" {% if selected_agent == a.id %}selected{% endif %}>{{ a.name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="level">
+                    <option value="">Tüm Seviyeler</option>
+                    <option value="INFO" {% if selected_level == 'INFO' %}selected{% endif %}>INFO</option>
+                    <option value="WARN" {% if selected_level == 'WARN' %}selected{% endif %}>WARN</option>
+                    <option value="ERROR" {% if selected_level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                    <option value="CRITICAL" {% if selected_level == 'CRITICAL' %}selected{% endif %}>CRITICAL</option>
+                </select>
+                <select name="hours">
+                    <option value="6" {% if hours == 6 %}selected{% endif %}>Son 6 saat</option>
+                    <option value="24" {% if hours == 24 %}selected{% endif %}>Son 24 saat</option>
+                    <option value="72" {% if hours == 72 %}selected{% endif %}>Son 3 gün</option>
+                    <option value="168" {% if hours == 168 %}selected{% endif %}>Son 7 gün</option>
+                </select>
+                <button type="submit">Filtrele</button>
+            </form>
+        </section>
+
+        <section class="section">
+            <div class="events-count">{{ events|length }} olay</div>
+            <div class="events-list events-list-full">
+                {% for ev in events %}
+                <div class="event-row level-{{ ev.level.lower() }}">
+                    <span class="event-time-full">{{ ev.created_at[:16] }}</span>
+                    <span class="event-level">{{ ev.level }}</span>
+                    <span class="event-agent">{{ ev.agent_name or ev.agent_id }}</span>
+                    <span class="event-cat">{{ ev.category or '' }}</span>
+                    <span class="event-msg">{{ ev.message }}</span>
+                </div>
+                {% else %}
+                <div class="empty-events">Filtre kriterlerine uygun olay bulunamadı.</div>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <span>Tinc Hub · Agent İzleme Sistemi</span>
+    </footer>
+</body>
+</html>

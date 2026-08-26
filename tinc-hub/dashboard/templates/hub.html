@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% set refresh = 60 %}
+
+{% macro render_app_card(app) %}
+<div class="app-card {{ app.status_class }}" onclick="if(!event.target.closest('button') && !event.target.closest('a.btn')) window.location.href='/app/{{ app.id }}'">
+    <button class="pin-btn {% if app.pinned %}pinned{% endif %}" onclick="togglePin('{{ app.id }}', {{ 'true' if app.pinned else 'false' }})" title="Sabitle/Kaldır">📌</button>
+    
+    <div class="card-main">
+        <div class="card-icon">{{ app.icon or '📦' }}</div>
+        <div class="card-title">
+            <div class="card-name">{{ app.name }}</div>
+            <div class="card-desc">{{ app.description or 'Açıklama yok' }}</div>
+            {% if app.children %}
+            <div style="font-size: 0.7rem; color: var(--accent); margin-top: 4px; font-weight: 600;">
+                ↘️ Bağlı Uygulamalar: {{ app.children|map(attribute='name')|join(', ') }}
+            </div>
+            {% endif %}
+            <div style="font-size: 0.7rem; color: var(--muted); margin-top: 4px;">
+                {% if app.repo %}🔗 Kaynak: <a href="https://{{ app.repo }}" target="_blank" onclick="event.stopPropagation()">{{ app.repo }}</a>{% else %}⚙️ Sistem Servisi{% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="card-meta-info">
+        <div>Durum: <span class="status-badge {{ app.status_class }}">
+            {% if app.status_class == 'healthy' %}🟢 Çalışıyor
+            {% elif app.status_class == 'dead' %}🔴 Durdu
+            {% else %}🟡 Bilinmiyor{% endif %}
+        </span></div>
+        <div>Kategori: <strong>{{ app.category or 'Uygulama' }}</strong></div>
+        {% if app.port %}<div>Port: <strong>{{ app.port }}</strong></div>{% endif %}
+        {% if app.since %}<div>Uptime: <strong>{{ format_uptime(app.since) }}</strong></div>{% endif %}
+    </div>
+
+    <div class="card-actions">
+        {% if app.url %}
+        <a href="{{ app.url }}" target="_blank" class="btn btn-sm btn-icon" title="Uygulamayı tarayıcıda aç">↗ Aç</a>
+        {% endif %}
+        {% if app.service %}
+        <button onclick="serviceAction('{{ app.id }}', 'restart')" class="btn btn-sm btn-icon" title="Servisi yeniden başlat">⟳ Yeniden Başlat</button>
+        <a href="/logs?service={{ app.service }}" class="btn btn-sm btn-icon" title="Canlı logları görüntüle">📜 Log</a>
+        {% endif %}
+        {% if app.repo %}
+        <button onclick="alert('Yeniden yükleme işlevi yakında eklenecek: ' + '{{ app.repo }}')" class="btn btn-sm btn-icon" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
+        <button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="btn btn-sm btn-icon btn-danger" title="Uygulamayı ve ayarlarını tamamen sil">🗑 Sil</button>
+        {% endif %}
+    </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+<!-- Sistem Bar -->
+<div class="sysbar">
+    <div class="sysbar-item">
+        <div class="sysbar-label">CPU</div>
+        <div class="sysbar-value" id="sys-cpu">{{ system.cpu_percent }}%</div>
+        <div class="bar"><div class="bar-fill {% if system.cpu_percent > 90 %}bar-red{% elif system.cpu_percent > 70 %}bar-yellow{% else %}bar-green{% endif %}" id="bar-cpu" style="width: {{ system.cpu_percent }}%"></div></div>
+    </div>
+    <div class="sysbar-item">
+        <div class="sysbar-label">RAM</div>
+        <div class="sysbar-value" id="sys-ram">{{ system.ram_percent }}% ({{ system.ram_used_gb }}GB)</div>
+        <div class="bar"><div class="bar-fill {% if system.ram_percent > 90 %}bar-red{% elif system.ram_percent > 70 %}bar-yellow{% else %}bar-green{% endif %}" id="bar-ram" style="width: {{ system.ram_percent }}%"></div></div>
+    </div>
+    <div class="sysbar-item">
+        <div class="sysbar-label">DİSK</div>
+        <div class="sysbar-value" id="sys-disk">{{ system.disk_percent }}%</div>
+        <div class="bar"><div class="bar-fill {% if system.disk_percent > 90 %}bar-red{% elif system.disk_percent > 80 %}bar-yellow{% else %}bar-green{% endif %}" id="bar-disk" style="width: {{ system.disk_percent }}%"></div></div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Öne Çıkanlar</h2>
+    <div class="app-grid">
+        {% for app in pinned %}
+            {{ render_app_card(app) }}
+        {% else %}
+            <div class="empty-state">Öne çıkan uygulama yok.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="section">
+    <h2>Diğer Uygulamalar</h2>
+    <div class="app-grid">
+        {% for app in unpinned %}
+            {{ render_app_card(app) }}
+        {% else %}
+            <div class="empty-state">Kayıtlı başka uygulama yok.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function togglePin(appId, currentPinned) {
+    event.stopPropagation();
+    try {
+        await fetch(`/api/settings/apps/${appId}/pin`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({pinned: !currentPinned})
+        });
+        location.reload();
+    } catch(e) { alert("Hata: " + e); }
+}
+
+async function serviceAction(appId, action) {
+    event.stopPropagation();
+    try {
+        const r = await fetch(`/api/app/${appId}/action`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action})
+        });
+        const d = await r.json();
+        if(d.ok) {
+            alert(`${action} başarılı`);
+            location.reload();
+        } else {
+            alert(`Hata: ${d.message}`);
+        }
+    } catch(e) { alert("Hata: " + e); }
+}
+
+// System status auto-update
+setInterval(async () => {
+    try {
+        const r = await fetch('/api/system');
+        const d = await r.json();
+        if(d.cpu_percent !== undefined) {
+            document.getElementById('sys-cpu').innerText = `${d.cpu_percent}%`;
+            document.getElementById('bar-cpu').style.width = `${d.cpu_percent}%`;
+            document.getElementById('bar-cpu').className = `bar-fill ${d.cpu_percent>90?'bar-red':d.cpu_percent>70?'bar-yellow':'bar-green'}`;
+            
+            document.getElementById('sys-ram').innerText = `${d.ram_percent}% (${d.ram_used_gb}GB)`;
+            document.getElementById('bar-ram').style.width = `${d.ram_percent}%`;
+            document.getElementById('bar-ram').className = `bar-fill ${d.ram_percent>90?'bar-red':d.ram_percent>70?'bar-yellow':'bar-green'}`;
+            
+            document.getElementById('sys-disk').innerText = `${d.disk_percent}%`;
+            document.getElementById('bar-disk').style.width = `${d.disk_percent}%`;
+            document.getElementById('bar-disk').className = `bar-fill ${d.disk_percent>90?'bar-red':d.disk_percent>80?'bar-yellow':'bar-green'}`;
+        }
+    } catch(e){}
+}, 30000);
+</script>
+{% endblock %}

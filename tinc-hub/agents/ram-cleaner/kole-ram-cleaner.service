@@ -1,0 +1,16 @@
+[Unit]
+Description=Tinc Hub — RAM Cleaner Agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+EnvironmentFile=/etc/tinc-hub/config.env
+ExecStart=/opt/tinc-hub/agents/ram-cleaner/agent.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/var/log/tinc-hub/ram-cleaner.log
+StandardError=append:/var/log/tinc-hub/ram-cleaner.log
+
+[Install]
+WantedBy=multi-user.target

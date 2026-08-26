@@ -1,0 +1,27 @@
+[Unit]
+Description=Tinc Hub — Disk Sentinel
+Documentation=https://github.com/tinc/kole
+After=network.target tinc-hub-db.service
+Wants=tinc-hub-db.service
+
+[Service]
+Type=simple
+# /tmp temizliği ve SMART erişimi için root gerekli
+User=root
+Group=root
+EnvironmentFile=/etc/tinc-hub/config.env
+ExecStart=/opt/tinc-hub/agents/disk-sentinel/agent.py
+Restart=always
+RestartSec=30
+# Loglar doğrudan dosyaya yönlendiriliyor
+StandardOutput=append:/var/log/tinc-hub/disk-sentinel.log
+StandardError=append:/var/log/tinc-hub/disk-sentinel.log
+# Servis çöktüğünde watchdog
+TimeoutStartSec=30
+TimeoutStopSec=15
+# Süreç önceliği — disk I/O yoğun işlemler için nice ayarı
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target
