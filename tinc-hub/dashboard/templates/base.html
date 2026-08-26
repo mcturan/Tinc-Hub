@@ -51,11 +51,29 @@
                 if (!confirm(`DİKKAT: '${appName}' uygulamasını siliyorsunuz, ancak şu uygulamalar ona bağlı: ${childNames}\n\nYine de silmek istiyor musunuz?`)) {
                     return;
                 }
-            } else {
-                if(!confirm(`'${appName}' uygulamasını siliyorsunuz. Emin misiniz?`)) return;
             }
             
-            const r = await fetch(`/api/settings/apps/${appId}`, {method: 'DELETE'});
+            // Tamamen kaldırma sorusu
+            let fullUninstall = false;
+            if(confirm(`'${appName}' uygulamasını sistemden tamamen kaldırmak (uninstall/stop/disable) istiyor musunuz?\n\n- İptal derseniz sadece Hub panosundan silinir, arka planda çalışmaya devam eder.\n- Tamam derseniz sistemden sökülür.`)) {
+                fullUninstall = true;
+            } else {
+                if(!confirm(`Sadece Hub panosundan silinecek. Emin misiniz?`)) return;
+            }
+            
+            const r = await fetch(`/api/settings/apps/${appId}?uninstall=${fullUninstall}`, {method: 'DELETE'});
+            if(r.ok) location.reload();
+            else {
+                const res = await r.json();
+                alert(`Hata: ${res.error || 'Silinemedi!'}`);
+            }
+        } catch(e) { alert("Hata: "+e); }
+    }
+    
+    async function deleteDocker(containerId, containerName) {
+        if(!confirm(`'${containerName}' Docker container'ını sistemden tamamen SİLMEK istediğinize emin misiniz?`)) return;
+        try {
+            const r = await fetch(`/api/docker/${containerId}`, {method: 'DELETE'});
             if(r.ok) location.reload();
             else alert("Silinemedi!");
         } catch(e) { alert("Hata: "+e); }

@@ -353,8 +353,38 @@ def api_update_app(app_id):
 @app.route("/api/settings/apps/<app_id>", methods=["DELETE"])
 @auth_required
 def api_delete_app(app_id):
+    uninstall = request.args.get('uninstall', 'false') == 'true'
+    
+    if uninstall:
+        import subprocess
+        app_data = next((a for a in load_apps() if a.get("id") == app_id), None)
+        if app_data and app_data.get("service"):
+            service = app_data["service"]
+            is_user = app_data.get("is_user_service", False)
+            try:
+                if is_user:
+                    subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "stop", service], timeout=5)
+                    subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "disable", service], timeout=5)
+                else:
+                    subprocess.run(["sudo", "systemctl", "stop", service], timeout=5)
+                    subprocess.run(["sudo", "systemctl", "disable", service], timeout=5)
+            except Exception as e:
+                return jsonify({"ok": False, "error": f"Servis durdurulamadı: {str(e)}"}), 500
+                
     ok = delete_app(app_id)
     return jsonify({"ok": ok})
+
+@app.route("/api/docker/<container_id>", methods=["DELETE"])
+@auth_required
+def api_delete_docker(container_id):
+    import subprocess
+    try:
+        subprocess.run(["sudo", "docker", "rm", "-f", container_id], check=True, capture_output=True, timeout=10)
+        return jsonify({"ok": True})
+    except subprocess.CalledProcessError as e:
+        return jsonify({"ok": False, "error": e.stderr.decode()}), 500
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/settings/apps/<app_id>/pin", methods=["POST"])

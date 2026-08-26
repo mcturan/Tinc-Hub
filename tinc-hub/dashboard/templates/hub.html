@@ -113,7 +113,7 @@
     {% if docker %}
     <div class="table-wrap">
         <table>
-            <thead><tr><th>ID</th><th>İsim</th><th>Image</th><th>Durum</th><th>Portlar</th></tr></thead>
+            <thead><tr><th>ID</th><th>İsim</th><th>Image</th><th>Durum</th><th>Portlar</th><th>İşlemler</th></tr></thead>
             <tbody>
                 {% for c in docker %}
                 <tr>
@@ -122,6 +122,10 @@
                     <td>{{ c.image }}</td>
                     <td><span class="badge {% if c.running %}status-badge healthy{% else %}status-badge dead{% endif %}">{{ c.state_str }}</span></td>
                     <td>{{ c.ports|join(', ') }}</td>
+                    <td>
+                        <button onclick="openAddModal('{{ c.name }}')" class="btn btn-sm" title="Hub Panosuna Ekle">➕ Ekle</button>
+                        <button onclick="deleteDocker('{{ c.id }}', '{{ c.name }}')" class="btn btn-sm btn-danger" title="Sistemden SİL">🗑 Sil</button>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
