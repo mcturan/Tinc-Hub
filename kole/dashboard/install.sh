@@ -43,11 +43,18 @@ cp "$SCRIPT_DIR/../shared/db.py" /opt/kole/shared/
 info "Shared DB modülü kopyalandı"
 
 # 5. Dashboard dosyalarını kopyala
-cp "$SCRIPT_DIR/app.py" "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/"*.py "$INSTALL_DIR/"
 cp -r "$SCRIPT_DIR/templates/"* "$INSTALL_DIR/templates/"
 cp -r "$SCRIPT_DIR/static/"* "$INSTALL_DIR/static/" 2>/dev/null || true
-chmod +x "$INSTALL_DIR/app.py"
+chmod +x "$INSTALL_DIR/"*.py
 info "Dashboard dosyaları kopyalandı"
+
+# 5.1. Varsayılan apps.yaml kopyala
+if [[ ! -f /etc/kole/apps.yaml ]]; then
+    mkdir -p /etc/kole
+    cp "$SCRIPT_DIR/apps.yaml" /etc/kole/apps.yaml
+    info "Varsayılan apps.yaml oluşturuldu"
+fi
 
 # 6. Config dosyası
 if [[ ! -f /etc/kole/config.env ]]; then
