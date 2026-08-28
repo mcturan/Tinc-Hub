@@ -98,8 +98,10 @@ def init_db():
         conn.close()
 
 
-def register_agent(agent_id: str, name: str, description: str, version: str = "1.0.0"):
+def register_agent(agent_id: str, name: str = "", description: str = "", version: str = "1.0.0"):
     """Agent kendini DB'ye kaydeder."""
+    name = name or agent_id
+    description = description or f"{agent_id} agent"
     with _lock:
         conn = get_conn()
         conn.execute("""
