@@ -199,14 +199,17 @@ def perform_self_update() -> dict:
     repo_dir = local_info.get("dir")
     
     if not repo_dir or not os.path.exists(repo_dir):
-        # Fallback directory
-        for d in ["/home/turan/101/tinc-hub", "/home/turan/tinc-hub"]:
-            if os.path.exists(d):
+        for d in ["/home/turan/tinc-hub", "/home/turan/101", "/home/turan/101/tinc-hub"]:
+            if os.path.exists(d) and os.path.exists(os.path.join(d, ".git")):
                 repo_dir = d
                 break
                 
     if not repo_dir:
         return {"ok": False, "error": "Tinc Hub kaynak git dizini bulunamadı."}
+        
+    # safe.directory ayarla (root veya başka kullanıcı ile çalıştırılınca hata vermemesi için)
+    subprocess.run(["git", "config", "--global", "--add", "safe.directory", repo_dir], capture_output=True)
+    subprocess.run(["git", "config", "--global", "--add", "safe.directory", "*"], capture_output=True)
         
     # Git pull
     r_pull = subprocess.run(["git", "-C", repo_dir, "pull", "origin", "main"], capture_output=True, text=True)
@@ -218,14 +221,16 @@ def perform_self_update() -> dict:
     install_script = os.path.join(repo_dir, "install.sh")
     if not os.path.exists(install_script):
         install_script = os.path.join(repo_dir, "tinc-hub", "install.sh")
+    if not os.path.exists(install_script):
+        install_script = os.path.join(repo_dir, "dashboard", "install.sh")
         
     if os.path.exists(install_script):
-        r_inst = subprocess.run(["sudo", "bash", install_script], capture_output=True, text=True)
+        r_inst = subprocess.run(["bash", install_script], capture_output=True, text=True)
         logs.append(r_inst.stdout + "\n" + r_inst.stderr)
         if r_inst.returncode != 0:
             return {"ok": False, "error": "Kurulum betiği hata verdi:\n" + r_inst.stderr, "log": "\n".join(logs)}
             
     # Servisi yeniden başlatmak için arka planda tetikle
-    subprocess.Popen(["sudo", "systemctl", "restart", "tinc-hub"])
+    subprocess.Popen(["systemctl", "restart", "tinc-hub"])
     
     return {"ok": True, "message": "Tinc Hub başarıyla güncellendi ve yeniden başlatılıyor.", "log": "\n".join(logs)}
