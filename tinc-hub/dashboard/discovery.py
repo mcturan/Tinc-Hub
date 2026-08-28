@@ -187,19 +187,39 @@ def get_docker_containers() -> list[dict]:
 
 # ─── Süreç Bilgisi (psutil) ──────────────────────────────────────────────────
 
+_process_cache = {}
+
 def get_process_info(pid: int) -> dict | None:
     """PID'e göre CPU/RAM bilgisi döner."""
     try:
         import psutil
-        p = psutil.Process(pid)
+        if pid not in _process_cache:
+            p = psutil.Process(pid)
+            p.cpu_percent(interval=None) # Start measurement
+            _process_cache[pid] = p
+            
+        p = _process_cache[pid]
+        
+        # Eğer süreç ölmüşse veya PID başka bir sürece geçmişse hata verebilir
+        if not p.is_running():
+            del _process_cache[pid]
+            return None
+            
         mem = p.memory_info()
+        
+        # CPU'yu 'interval=None' ile alarak son ölçümden (son sayfa yenilemesinden) bu yana ortalamayı alır.
+        # Böylece %0 gözükme sorunu ortadan kalkar.
+        cpu = p.cpu_percent(interval=None)
+        
         return {
-            "cpu_percent": p.cpu_percent(interval=0.1),
+            "cpu_percent": round(cpu, 1),
             "ram_mb": round(mem.rss / 1024 / 1024, 1),
             "status": p.status(),
             "create_time": p.create_time(),
         }
     except Exception:
+        if pid in _process_cache:
+            del _process_cache[pid]
         return None
 
 
