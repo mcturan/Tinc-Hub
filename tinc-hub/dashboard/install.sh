@@ -103,10 +103,13 @@ if [ -d "$SCRIPT_DIR/../tray" ]; then
     cp "$SCRIPT_DIR/../tray/"* /opt/tinc-hub/tray/
     
     # Mevcut kullanıcı için autostart ekle
-    if [ -n "$SUDO_USER" ]; then
-        USER_HOME=$(getent passwd $SUDO_USER | cut -d: -f6)
-        mkdir -p $USER_HOME/.config/autostart
-        cp "$SCRIPT_DIR/../tray/tinc-hub.desktop" $USER_HOME/.config/autostart/
-        chown -R $SUDO_USER:$SUDO_USER $USER_HOME/.config/autostart
+    ACTUAL_USER="${SUDO_USER:-}"
+    if [ -n "$ACTUAL_USER" ]; then
+        USER_HOME=$(getent passwd "$ACTUAL_USER" | cut -d: -f6)
+        if [ -n "$USER_HOME" ]; then
+            mkdir -p "$USER_HOME/.config/autostart"
+            cp "$SCRIPT_DIR/../tray/tinc-hub.desktop" "$USER_HOME/.config/autostart/"
+            chown -R "$ACTUAL_USER:$ACTUAL_USER" "$USER_HOME/.config/autostart"
+        fi
     fi
 fi
