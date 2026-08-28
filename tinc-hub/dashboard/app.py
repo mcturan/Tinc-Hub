@@ -537,12 +537,13 @@ def api_auditor_scan():
 def api_delete_docker(container_id):
     import subprocess
     try:
-        subprocess.run(["sudo", "docker", "rm", "-f", container_id], check=True, capture_output=True, timeout=10)
-        return jsonify({"ok": True})
-    except subprocess.CalledProcessError as e:
-        return jsonify({"ok": False, "error": e.stderr.decode()}), 500
+        r = subprocess.run(["sudo", "docker", "rm", "-f", container_id], capture_output=True, timeout=10, text=True)
+        if r.returncode == 0:
+            return jsonify({"ok": True, "log": "Docker container silindi:\n" + r.stdout + "\n" + r.stderr})
+        else:
+            return jsonify({"ok": False, "error": r.stderr, "log": "HATA OLUŞTU:\n" + r.stderr})
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return jsonify({"ok": False, "error": str(e), "log": str(e)}), 500
 
 
 @app.route("/api/store", methods=["GET"])
