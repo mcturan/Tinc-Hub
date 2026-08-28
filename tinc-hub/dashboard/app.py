@@ -59,6 +59,15 @@ app = Flask(__name__)
 app.secret_key = SECRET
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 
+@app.context_processor
+def inject_global_vars():
+    try:
+        from installer import get_git_info
+        ver_info = get_git_info()
+        return {"app_version": ver_info.get("version", "v1.0.0")}
+    except Exception:
+        return {"app_version": "v1.0.0"}
+
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -614,6 +623,22 @@ def api_discovery_refresh():
     disc = _get_discovery()
     return jsonify({"ok": True, "services": len(disc.get("services", [])),
                     "ports": len(disc.get("ports", {}))})
+
+
+@app.route("/api/system/version")
+@auth_required
+def api_system_version():
+    from installer import check_system_update
+    res = check_system_update()
+    return jsonify(res)
+
+
+@app.route("/api/system/update", methods=["POST"])
+@auth_required
+def api_system_self_update():
+    from installer import perform_self_update
+    res = perform_self_update()
+    return jsonify(res), (200 if res.get("ok") else 500)
 
 
 # ── API: Sistem Özeti ────────────────────────────────────────────────────────

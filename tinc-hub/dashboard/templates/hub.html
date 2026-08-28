@@ -690,8 +690,7 @@ async function takeBackup() {
     try {
         const r = await fetch('/api/settings/backup', {method: 'POST'});
         const res = await r.json();
-        if(r.ok) alert("✅ Yedek başarıyla alındı!
-Dosya: " + res.file);
+        if(r.ok) alert("✅ Yedek başarıyla alındı!\nDosya: " + res.file);
         else alert("❌ Hata: " + res.error);
     } catch(e) { alert("Bağlantı Hatası: " + e); }
 }

@@ -24,6 +24,23 @@
     </p>
 </div>
 
+<!-- Sistem Sürümü & Otomatik Güncelleme -->
+<div class="settings-section">
+    <h3>Sistem Sürümü & Güncelleme</h3>
+    <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <div>Mevcut Sürüm: <strong>{{ app_version }}</strong></div>
+                <div id="latest-version-info" style="font-size:0.85rem; color:var(--muted); margin-top:4px;">En son commit kontrol ediliyor...</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+                <button class="btn" onclick="checkAppUpdate(true)">🔍 Güncellemeleri Denetle</button>
+                <button class="btn btn-primary" id="btn-do-update" onclick="doAppSelfUpdate()" style="display:none;">⬇️ Şimdi Güncelle</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Tehlikeli Bölge -->
 <div class="settings-section danger-zone">
     <h3>Tehlikeli Bölge</h3>
@@ -36,14 +53,45 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-async function refreshDiscovery() {
+async function checkAppUpdate(showAlert = false) {
+    const infoEl = document.getElementById('latest-version-info');
+    const btnUpdate = document.getElementById('btn-do-update');
     try {
-        const r = await fetch(`/api/discovery/refresh`, {method: 'POST'});
+        const r = await fetch('/api/system/version');
         const d = await r.json();
-        alert(`Keşif yenilendi! ${d.services} servis, ${d.ports} port bulundu.`);
-        location.reload();
-    } catch(e) { alert("Hata: "+e); }
+        if(d.has_update) {
+            infoEl.innerHTML = `<span style="color:#ef4444; font-weight:bold;">⚠️ Yeni sürüm mevcut: ${d.remote_version}</span> (${d.remote_commit})`;
+            btnUpdate.style.display = 'inline-block';
+            if(showAlert) alert(`Yeni sürüm mevcut: ${d.remote_version}\nŞimdi güncelleyebilirsiniz.`);
+        } else {
+            infoEl.innerHTML = `<span style="color:#10b981; font-weight:bold;">✓ Sistem güncel</span> (Son Commit: ${d.local_commit})`;
+            btnUpdate.style.display = 'none';
+            if(showAlert) alert("Sisteminiz en güncel sürümde!");
+        }
+    } catch(e) {
+        infoEl.textContent = "Güncelleme kontrolü başarısız: " + e;
+    }
 }
+
+async function doAppSelfUpdate() {
+    if(!confirm("Tinc Hub güncellenecek ve servis yeniden başlatılacak. Devam edilsin mi?")) return;
+    try {
+        const r = await fetch('/api/system/update', {method: 'POST'});
+        const d = await r.json();
+        if(d.ok) {
+            alert("✅ Güncelleme başarılı! Sayfa yeniden yükleniyor...");
+            setTimeout(() => location.reload(), 2500);
+        } else {
+            alert("❌ Güncelleme hatası:\n" + (d.error || d.log));
+        }
+    } catch(e) {
+        alert("İşlem gönderildi: " + e);
+        setTimeout(() => location.reload(), 3000);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    checkAppUpdate(false);
+});
 </script>
 {% endblock %}

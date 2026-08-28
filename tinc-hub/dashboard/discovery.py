@@ -96,7 +96,7 @@ def get_systemd_services(all_states: bool = False) -> list[dict]:
 
         # Sistem gürültüsünü filtrele
         base_name = re.split(r"[@.]", name)[0]
-        if base_name in _SKIP_SERVICES:
+        if base_name in _SKIP_SERVICES or base_name.startswith("tinc-hub-") or base_name == "tinc-hub":
             continue
         # Snap, loop, dev gibi şeyleri atla
         if any(name.startswith(p) for p in ("snap.", "dev-", "sys-", "run-", "tmp-", "proc-")):
