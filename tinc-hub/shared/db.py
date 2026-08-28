@@ -129,15 +129,16 @@ def heartbeat(agent_id: str, status: str = "running"):
 
 
 def log_event(agent_id: str, level: str, message: str,
-              category: str = None, data: dict = None):
+              category: str = None, data: dict = None, extra: dict = None):
     """Olay / log yaz."""
+    event_data = data if data is not None else extra
     with _lock:
         conn = get_conn()
         conn.execute("""
             INSERT INTO events (agent_id, level, category, message, data)
             VALUES (?, ?, ?, ?, ?)
         """, (agent_id, level.upper(), category, message,
-               json.dumps(data) if data else None))
+               json.dumps(event_data) if event_data else None))
         conn.commit()
         conn.close()
 
