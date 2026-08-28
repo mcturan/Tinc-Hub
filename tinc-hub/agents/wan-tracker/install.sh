@@ -4,13 +4,15 @@ set -euo pipefail
 AGENT_ID="wan-tracker"
 INSTALL_DIR="/opt/tinc-hub/agents/$AGENT_ID"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "🔧 $AGENT_ID agent kuruluyor..."
 
 # 1. Dizin oluştur
 mkdir -p "$INSTALL_DIR"
 
 # 2. Dosyaları kopyala
-cp agent.py "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/agent.py" "$INSTALL_DIR/"
 chmod +x "$INSTALL_DIR/agent.py"
 
 # 3. Log dizinini garantile
@@ -23,7 +25,7 @@ if ! python3 -c "import requests, dotenv" 2>/dev/null; then
 fi
 
 # 5. Servisi kur
-cp "tinc-hub-$AGENT_ID.service" /etc/systemd/system/
+cp "$SCRIPT_DIR/tinc-hub-$AGENT_ID.service" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now "tinc-hub-$AGENT_ID.service"
 
