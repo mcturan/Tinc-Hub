@@ -17,8 +17,8 @@ echo "🔧  $AGENT_ID agent kuruluyor..."
 
 # ── 1. Bağımlılıklar ─────────────────────────────────────────────────────────
 echo "📦  Python bağımlılıkları kontrol ediliyor..."
-python3 -c "import psutil" 2>/dev/null || pip3 install -q psutil
-python3 -c "import dotenv" 2>/dev/null || pip3 install -q python-dotenv
+python3 -c "import psutil" 2>/dev/null || pip3 install -q --break-system-packages psutil
+python3 -c "import dotenv" 2>/dev/null || pip3 install -q --break-system-packages python-dotenv
 
 # ── 2. Log dizini ────────────────────────────────────────────────────────────
 mkdir -p /var/log/tinc-hub

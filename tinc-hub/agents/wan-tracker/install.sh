@@ -19,7 +19,7 @@ mkdir -p /var/log/tinc-hub
 # 4. Python bağımlılıklarını kontrol et / kur
 if ! python3 -c "import requests, dotenv" 2>/dev/null; then
     echo "📦 Python bağımlılıkları kuruluyor..."
-    pip3 install --quiet requests python-dotenv
+    pip3 install --quiet --break-system-packages requests python-dotenv
 fi
 
 # 5. Servisi kur

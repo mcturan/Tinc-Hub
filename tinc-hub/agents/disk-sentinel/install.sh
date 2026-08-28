@@ -37,7 +37,7 @@ echo "✔ Dosyalar kopyalandı: ${INSTALL_DIR}"
 # ---------------------------------------------------------------------------
 if ! python3 -c "import dotenv" 2>/dev/null; then
     echo "⚙ python-dotenv kuruluyor…"
-    pip3 install --quiet python-dotenv
+    pip3 install --quiet --break-system-packages python-dotenv
 fi
 
 # smartmontools varlık kontrolü (uyarı, hard hata değil)
