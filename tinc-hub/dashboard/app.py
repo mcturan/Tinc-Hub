@@ -293,7 +293,7 @@ def index():
         format_uptime=_format_uptime,
         has_auth=bool(PASSWORD),
         hub_id=hub_id,
-        api_token=api_token, tg_token=os.environ.get("TELEGRAM_BOT_TOKEN", ""), tg_chat=os.environ.get("TELEGRAM_CHAT_ID", ""))
+        role=session.get("role", "admin"), api_token=api_token, tg_token=os.environ.get("TELEGRAM_BOT_TOKEN", ""), tg_chat=os.environ.get("TELEGRAM_CHAT_ID", ""))
 
 
 @app.route("/app/<app_id>")
@@ -470,6 +470,67 @@ def api_delete_app(app_id):
     from registry import delete_app
     ok = delete_app(app_id)
     return jsonify({"ok": ok, "log": "\n".join(logs)})
+
+@app.route("/api/auditor/scan")
+@auth_required
+def api_auditor_scan():
+    import subprocess
+    from registry import load_apps
+    
+    logs = []
+    logs.append("====== TINC HUB AKILLI DENETÇİ (AI-AUDITOR) ======")
+    logs.append("Sistem analizi başlatıldı...\n")
+    
+    # 1. Disk Kontrolü
+    import shutil
+    disk = shutil.disk_usage("/")
+    disk_percent = disk.used / disk.total * 100
+    if disk_percent > 85:
+        logs.append(f"[UYARI] Disk kullanımınız çok yüksek (%{disk_percent:.1f}).")
+        logs.append("  Öneri: Tinc Hub üzerinden 'ram-cleaner' veya 'disk-sentinel' ajanlarını çalıştırabilirsiniz.")
+        logs.append("  Veya terminalden 'sudo apt autoremove' ile yer açabilirsiniz.\n")
+    else:
+        logs.append(f"[OK] Disk kullanımı sağlıklı (%{disk_percent:.1f}).\n")
+        
+    # 2. Yetim Servis (Orphaned Service) Kontrolü
+    logs.append("Başıboş (Yetim) Tinc / Kole Servisleri Taranıyor...")
+    apps = load_apps()
+    registered_services = [a.get("service") for a in apps if a.get("service")]
+    
+    try:
+        r = subprocess.run(["systemctl", "list-units", "--type=service", "--state=running", "--no-pager", "--no-legend"], capture_output=True, text=True)
+        running_services = []
+        for line in r.stdout.split('\n'):
+            parts = line.split()
+            if len(parts) > 0 and (parts[0].startswith("tinc-") or parts[0].startswith("kole-")):
+                running_services.append(parts[0])
+                
+        orphans = [s for s in running_services if s not in registered_services and s != "tinc-hub.service"]
+        
+        if orphans:
+            logs.append(f"[TESPİT] Dashboard'da olmayan ama arka planda çalışan servisler buldum: {', '.join(orphans)}")
+            logs.append("  Öneri: Bu uygulamaları daha önce silmişsiniz ama servisleri arka planda kalmış olabilir.")
+            logs.append(f"  Temizlemek için terminalde şunu çalıştırın:")
+            for o in orphans:
+                logs.append(f"    sudo systemctl stop {o} && sudo systemctl disable {o}")
+            logs.append("")
+        else:
+            logs.append("[OK] Başıboş Tinc/Kole servisi bulunamadı.\n")
+    except Exception as e:
+        logs.append(f"[HATA] Servis taraması başarısız: {e}\n")
+        
+    # 3. RAM ve Zombi Süreçler
+    import psutil
+    ram = psutil.virtual_memory()
+    if ram.percent > 90:
+        logs.append(f"[UYARI] RAM kullanımı çok yüksek (%{ram.percent:.1f})!")
+        logs.append("  Öneri: RAM Cleaner ajanını kurup otomatik boşaltma sağlayabilirsiniz.\n")
+    else:
+        logs.append(f"[OK] RAM durumu normal (%{ram.percent:.1f}).\n")
+        
+    logs.append("====== DENETİM TAMAMLANDI ======")
+    
+    return jsonify({"ok": True, "log": "\n".join(logs)})
 
 @app.route("/api/docker/<container_id>", methods=["DELETE"])
 @auth_required

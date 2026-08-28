@@ -65,7 +65,9 @@
     <h2>Tinc Hub - Sistem Merkezi</h2>
     <div class="actions">
         {% if role == "admin" %}
-        <button onclick="openSettingsModal()" class="btn" style="background-color: #475569; color: white;">⚙️ Ayarlar</button>
+        <button onclick="runSystemAudit()" class="btn" style="background-color: #f59e0b; color: white;" title="Sistemi Denetle (Akıllı Ajan)">🔍 Denetle</button>
+        <button onclick="openSettingsModal()"
+         class="btn" style="background-color: #475569; color: white;">⚙️ Ayarlar</button>
         <button onclick="openStoreModal()" class="btn" title="Uygulama Mağazası" style="background-color: #8b5cf6; color: white;">🛒 App Store</button>
         <button onclick="openAddModal()" class="btn btn-primary" title="Yeni uygulama, docker container veya sistem servisi ekle">+ Yeni Ekle</button>
         {% endif %}
@@ -587,6 +589,24 @@ async function serviceAction(appId, action) {
             alert(`Hata: ${d.message}`);
         }
     } catch(e) { alert("Hata: " + e); }
+}
+
+async function runSystemAudit() {
+    try {
+        document.getElementById('termOutput').textContent = "🔍 Sistem taranıyor, lütfen bekleyin...";
+        document.getElementById('termModal').classList.remove('hidden');
+        
+        const r = await fetch('/api/auditor/scan');
+        const d = await r.json();
+        
+        if (d.ok) {
+            document.getElementById('termOutput').textContent = d.log;
+        } else {
+            document.getElementById('termOutput').textContent = "HATA:\n" + d.error;
+        }
+    } catch(e) {
+        document.getElementById('termOutput').textContent = "HATA: " + e;
+    }
 }
 
 // System status auto-update
