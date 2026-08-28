@@ -31,28 +31,21 @@ def install_app_from_store(store_app_id: str) -> dict:
     
     if os.path.exists(target_dir):
         r = subprocess.run(["git", "-C", target_dir, "pull"], capture_output=True, text=True)
-        logs.append(r.stdout + "
-" + r.stderr)
+        logs.append(str(r.stdout) + "\n" + str(r.stderr))
         if r.returncode != 0:
-            return {"ok": False, "error": f"Git pull hatası
-{r.stderr}"}
+            return {"ok": False, "error": f"Git pull hatası:\n{r.stderr}"}
     else:
         r = subprocess.run(["git", "clone", repo_url, target_dir], capture_output=True, text=True)
-        logs.append(r.stdout + "
-" + r.stderr)
+        logs.append(str(r.stdout) + "\n" + str(r.stderr))
         if r.returncode != 0:
-            return {"ok": False, "error": f"Git clone hatası
-{r.stderr}"}
+            return {"ok": False, "error": f"Git clone hatası:\n{r.stderr}"}
             
     install_script = os.path.join(target_dir, "install.sh")
     if os.path.exists(install_script):
         r = subprocess.run(["sudo", "bash", install_script], capture_output=True, text=True)
-        logs.append(r.stdout + "
-" + r.stderr)
+        logs.append(str(r.stdout) + "\n" + str(r.stderr))
         if r.returncode != 0:
-            return {"ok": False, "error": f"Kurulum hatası
-{r.stderr}", "log": "
-".join(logs)}
+            return {"ok": False, "error": f"Kurulum hatası:\n{r.stderr}", "log": "\n".join(logs)}
             
     apps = load_apps()
     existing = next((a for a in apps if a.get("repo") == repo_url or a.get("id") == app_meta["id"]), None)
@@ -75,8 +68,7 @@ def install_app_from_store(store_app_id: str) -> dict:
         apps.append(new_app)
         save_apps(apps)
         
-    return {"ok": True, "message": "Başarıyla kuruldu", "log": "
-".join(logs)}
+    return {"ok": True, "message": "Başarıyla kuruldu", "log": "\n".join(logs)}
 
 def update_app_local(app_id: str, new_repo: str = None) -> dict:
     import subprocess
@@ -103,28 +95,20 @@ def update_app_local(app_id: str, new_repo: str = None) -> dict:
     
     if not os.path.exists(target_dir):
         r = subprocess.run(["git", "clone", repo_url, target_dir], capture_output=True, text=True)
-        logs.append(r.stdout + "
-" + r.stderr)
+        logs.append(str(r.stdout) + "\n" + str(r.stderr))
         if r.returncode != 0:
-            return {"ok": False, "error": f"Git clone hatası
-{r.stderr}"}
+            return {"ok": False, "error": f"Git clone hatası:\n{r.stderr}"}
     else:
         r = subprocess.run(["git", "-C", target_dir, "pull"], capture_output=True, text=True)
-        logs.append(r.stdout + "
-" + r.stderr)
+        logs.append(str(r.stdout) + "\n" + str(r.stderr))
         if r.returncode != 0:
-            return {"ok": False, "error": f"Git pull hatası
-{r.stderr}"}
+            return {"ok": False, "error": f"Git pull hatası:\n{r.stderr}"}
         
     install_script = os.path.join(target_dir, "install.sh")
     if os.path.exists(install_script):
         r = subprocess.run(["sudo", "bash", install_script], capture_output=True, text=True)
-        logs.append(r.stdout + "
-" + r.stderr)
+        logs.append(str(r.stdout) + "\n" + str(r.stderr))
         if r.returncode != 0:
-            return {"ok": False, "error": f"Kurulum scripti hatası
-{r.stderr}", "log": "
-".join(logs)}
+            return {"ok": False, "error": f"Kurulum scripti hatası:\n{r.stderr}", "log": "\n".join(logs)}
             
-    return {"ok": True, "message": "Başarıyla güncellendi.", "log": "
-".join(logs)}
+    return {"ok": True, "message": "Başarıyla güncellendi.", "log": "\n".join(logs)}

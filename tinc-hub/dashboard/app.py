@@ -443,42 +443,33 @@ def api_delete_app(app_id):
                 if is_user:
                     p1 = subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "stop", service], capture_output=True, text=True, timeout=10)
                     p2 = subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "disable", service], capture_output=True, text=True, timeout=10)
-                    logs.append(p1.stdout + "
-" + p1.stderr)
-                    logs.append(p2.stdout + "
-" + p2.stderr)
+                    logs.append(str(p1.stdout) + "\n" + str(p1.stderr))
+                    logs.append(str(p2.stdout) + "\n" + str(p2.stderr))
                 else:
                     p1 = subprocess.run(["sudo", "systemctl", "stop", service], capture_output=True, text=True, timeout=10)
                     p2 = subprocess.run(["sudo", "systemctl", "disable", service], capture_output=True, text=True, timeout=10)
-                    logs.append(p1.stdout + "
-" + p1.stderr)
-                    logs.append(p2.stdout + "
-" + p2.stderr)
+                    logs.append(str(p1.stdout) + "\n" + str(p1.stderr))
+                    logs.append(str(p2.stdout) + "\n" + str(p2.stderr))
             except Exception as e:
                 return jsonify({"ok": False, "error": f"Servis durdurulamadı: {str(e)}"}), 500
                 
-            # Çalıştırma scripti
             repo = app_data.get("repo")
-            if repo and repo.startswith("file://") or repo.startswith("http"):
+            if repo and (repo.startswith("file://") or repo.startswith("http")):
                 app_name_slug = repo.rstrip('/').split('/')[-1]
                 target_dir = f"/home/turan/101/{app_name_slug}"
                 import os
                 uninstall_script = f"{target_dir}/uninstall.sh"
                 if os.path.exists(uninstall_script):
                     p3 = subprocess.run(["sudo", "bash", uninstall_script], capture_output=True, text=True)
-                    logs.append(p3.stdout + "
-" + p3.stderr)
+                    logs.append(str(p3.stdout) + "\n" + str(p3.stderr))
                 else:
-                    logs.append(f"
-[UYARI] {uninstall_script} bulunamadı! Sadece servis durduruldu, uygulama dosyaları sistemde (apt, snap vb. ile kurulduysa) kalmış olabilir. Tamamen silmek için manuel müdahale gerekebilir.")
+                    logs.append("\n[UYARI] uninstall.sh bulunamadı! Sadece servis durduruldu, uygulama dosyaları sistemde (apt, snap vb. ile kurulduysa) kalmış olabilir. Tamamen silmek için manuel müdahale gerekebilir.")
             else:
-                logs.append("
-[UYARI] Bu uygulamanın özel bir kaldırıcı betiği yok. Sadece servis durduruldu. (apt, snap veya manuel kurulduysa dosyalar hala sistemdedir.)")
+                logs.append("\n[UYARI] Bu uygulamanın özel bir kaldırıcı betiği yok. Sadece servis durduruldu. (apt, snap veya manuel kurulduysa dosyalar hala sistemdedir.)")
                 
     from registry import delete_app
     ok = delete_app(app_id)
-    return jsonify({"ok": ok, "log": "
-".join(logs)})
+    return jsonify({"ok": ok, "log": "\n".join(logs)})
 
 @app.route("/api/docker/<container_id>", methods=["DELETE"])
 @auth_required
@@ -571,7 +562,7 @@ def _system_summary() -> dict:
         import psutil
         ram  = psutil.virtual_memory()
         swap = psutil.swap_memory()
-        cpu  = psutil.cpu_percent(interval=0.8)
+        cpu  = psutil.cpu_percent(interval=0.2)
         disk = shutil.disk_usage("/")
         return {
             "cpu_percent":  round(cpu, 1),
