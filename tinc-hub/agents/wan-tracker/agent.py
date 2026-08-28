@@ -29,9 +29,9 @@ AGENT_VERSION = '1.0.0'
 
 # IP sorgu kaynakları (sırayla denenir, ilk başarılı kullanılır)
 WAN_SOURCES = [
-    'https://ifconfig.me',
     'https://api.ipify.org',
     'https://icanhazip.com',
+    'https://ifconfig.me/ip',
 ]
 
 # Latans ölçümü hedefleri

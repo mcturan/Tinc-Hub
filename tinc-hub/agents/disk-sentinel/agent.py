@@ -257,6 +257,10 @@ def _detect_block_devices() -> list[str]:
 
 def check_smart_health() -> None:
     """smartctl ile disk sağlığını kontrol eder."""
+    if not shutil.which('smartctl'):
+        log.info('smartmontools (smartctl) kurulu değil, SMART kontrolü atlandı.')
+        return
+
     devices = _detect_block_devices()
     log.info(f'SMART kontrolü başlıyor: {devices}')
 

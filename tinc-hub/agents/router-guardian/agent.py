@@ -281,15 +281,24 @@ def should_run_scheduled_reboot() -> bool:
     """
     global last_scheduled_reboot_date
     try:
-        hour, minute = map(int, ROUTER_REBOOT_CRON.split(':'))
+        parts = ROUTER_REBOOT_CRON.strip().split()
+        if len(parts) >= 2:
+            # Cron format: "minute hour ..." e.g. "0 6 * * *"
+            minute = int(parts[0])
+            hour = int(parts[1])
+        elif ':' in ROUTER_REBOOT_CRON:
+            # "HH:MM" e.g. "06:00"
+            hour, minute = map(int, ROUTER_REBOOT_CRON.split(':'))
+        else:
+            return False
+
         now = datetime.now()
-        scheduled_time = dtime(hour, minute)
         now_time = now.time()
         today = now.date()
 
         # Saat geldi ve bugün henüz yapılmadıysa
         window_start = dtime(hour, minute)
-        window_end   = dtime(hour, minute + 2 if minute < 58 else 59)
+        window_end   = dtime(hour, (minute + 2) if minute < 58 else 59)
 
         if window_start <= now_time <= window_end and last_scheduled_reboot_date != today:
             return True
