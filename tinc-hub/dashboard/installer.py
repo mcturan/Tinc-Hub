@@ -116,18 +116,17 @@ def update_app_local(app_id: str, new_repo: str = None) -> dict:
 
 def get_git_info() -> dict:
     """Yerel git commit sayısı ve kısa commit hash'ini döner."""
-    try:
-        cur_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        # Eğer /opt/tinc-hub'daysa git bilgisi ana repoda olmayabilir, /home/turan/101/tinc-hub veya /home/turan/tinc-hub kontrol edilir
-        git_dirs = [
-            cur_dir,
-            "/home/turan/101",
-            "/home/turan/101/tinc-hub",
-            "/home/turan/tinc-hub",
-            "/home/turan/101/tinc-hub/tinc-hub",
-            "/home/turan/tinc-hub/tinc-hub"
-        ]
-        for gd in git_dirs:
+    cur_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    git_dirs = [
+        cur_dir,
+        "/home/turan/101",
+        "/home/turan/101/tinc-hub",
+        "/home/turan/tinc-hub",
+        "/home/turan/101/tinc-hub/tinc-hub",
+        "/home/turan/tinc-hub/tinc-hub"
+    ]
+    for gd in git_dirs:
+        try:
             if os.path.exists(os.path.join(gd, ".git")):
                 r_count = subprocess.run(["git", "-C", gd, "rev-list", "--count", "HEAD"], capture_output=True, text=True, timeout=3)
                 r_hash = subprocess.run(["git", "-C", gd, "rev-parse", "--short", "HEAD"], capture_output=True, text=True, timeout=3)
@@ -140,8 +139,24 @@ def get_git_info() -> dict:
                         "version": f"v1.{cnt}.{hsh}",
                         "dir": gd
                     }
-    except Exception:
-        pass
+        except Exception:
+            pass
+
+    # version.json kontrol et (/opt/tinc-hub/dashboard/version.json)
+    vfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version.json")
+    if os.path.exists(vfile):
+        try:
+            with open(vfile, "r", encoding="utf-8") as f:
+                vdata = json.load(f)
+                return {
+                    "count": vdata.get("count", 1),
+                    "hash": vdata.get("hash", "release"),
+                    "version": vdata.get("version", "v1.0.0"),
+                    "dir": vdata.get("repo_dir")
+                }
+        except Exception:
+            pass
+
     return {"count": 1, "hash": "release", "version": "v1.0.0", "dir": None}
 
 

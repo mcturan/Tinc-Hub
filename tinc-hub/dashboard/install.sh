@@ -48,6 +48,14 @@ cp "$SCRIPT_DIR/"*.json "$INSTALL_DIR/" 2>/dev/null || true
 cp -r "$SCRIPT_DIR/templates/"* "$INSTALL_DIR/templates/"
 cp -r "$SCRIPT_DIR/static/"* "$INSTALL_DIR/static/" 2>/dev/null || true
 chmod +x "$INSTALL_DIR/"*.py
+
+# Git sürüm bilgisini kaydet
+GIT_DIR_FOUND="$(cd "$SCRIPT_DIR" && git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -n "$GIT_DIR_FOUND" ]]; then
+    GIT_COUNT=$(git -C "$GIT_DIR_FOUND" rev-list --count HEAD 2>/dev/null || echo "1")
+    GIT_HASH=$(git -C "$GIT_DIR_FOUND" rev-parse --short HEAD 2>/dev/null || echo "release")
+    echo "{\"count\": $GIT_COUNT, \"hash\": \"$GIT_HASH\", \"version\": \"v1.${GIT_COUNT}.${GIT_HASH}\", \"repo_dir\": \"$GIT_DIR_FOUND\"}" > "$INSTALL_DIR/version.json"
+fi
 info "Dashboard dosyaları kopyalandı"
 
 # 5.1. Varsayılan apps.yaml kopyala
