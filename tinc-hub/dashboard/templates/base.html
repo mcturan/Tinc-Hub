@@ -134,11 +134,7 @@
                 else {
                     const res = await r.json();
                     if(res.log) {
-                        document.getElementById('termOutput').textContent = "HATA:
-" + res.error + "
-
-LOGS:
-" + res.log;
+                        document.getElementById('termOutput').textContent = "HATA:\n" + res.error + "\n\nLOGS:\n" + res.log;
                         document.getElementById('termModal').classList.remove('hidden');
                     } else {
                         alert(`Hata: ${res.error || 'Silinemedi!'}`);
