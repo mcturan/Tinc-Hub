@@ -8,6 +8,12 @@ systemd servisleri, açık portları ve Docker container'larını otomatik tarar
 import subprocess
 import re
 import os
+
+from dotenv import dotenv_values
+import os
+_config = dotenv_values("/etc/tinc-hub/config.env") if os.path.exists("/etc/tinc-hub/config.env") else {}
+RUN_USER = _config.get("RUN_USER", "turan")
+RUN_UID = _config.get("RUN_UID", "1000")
 import socket
 import json
 from datetime import datetime
@@ -17,7 +23,9 @@ def _run(cmd: list[str], timeout: int = 5) -> str:
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return r.stdout
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.warning(f"Exception caught: {e}")
         return ""
 
 
@@ -181,7 +189,9 @@ def get_docker_containers() -> list[dict]:
                 "running": c.get("State") == "running",
             })
         return containers
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.warning(f"Exception caught: {e}")
         return []
 
 
@@ -217,7 +227,9 @@ def get_process_info(pid: int) -> dict | None:
             "status": p.status(),
             "create_time": p.create_time(),
         }
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.warning(f"Exception caught: {e}")
         if pid in _process_cache:
             del _process_cache[pid]
         return None
@@ -266,7 +278,7 @@ def get_running_docker_containers():
 def discover_user_services():
     try:
         import subprocess
-        cmd1 = ["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "list-units", "--type=service", "--state=running", "--no-pager", "--no-legend"]
+        cmd1 = ["sudo", f"XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "-u", RUN_USER, "systemctl", "--user", "list-units", "--type=service", "--state=running", "--no-pager", "--no-legend"]
         r1 = subprocess.run(cmd1, capture_output=True, text=True, timeout=5)
         
         cmd2 = ["systemctl", "list-units", "--type=service", "--state=running", "--no-pager", "--no-legend"]
@@ -289,5 +301,7 @@ def discover_user_services():
                         services.append(srv)
         
         return sorted(list(set(services)))
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.warning(f"Exception caught: {e}")
         return []

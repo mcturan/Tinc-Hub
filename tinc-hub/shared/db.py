@@ -269,6 +269,15 @@ def get_wan_history(limit: int = 50):
     return [dict(r) for r in rows]
 
 
+def cleanup_old_metrics(days: int = 30):
+    """30 günden eski metrikleri sil."""
+    with _lock:
+        conn = get_conn()
+        conn.execute("DELETE FROM metrics WHERE created_at < datetime('now', ?)", (f'-{days} days',))
+        conn.execute("DELETE FROM events WHERE created_at < datetime('now', ?)", (f'-{days} days',))
+        conn.commit()
+        conn.close()
+
 if __name__ == "__main__":
     init_db()
     print(f"DB initialized: {DB_PATH}")

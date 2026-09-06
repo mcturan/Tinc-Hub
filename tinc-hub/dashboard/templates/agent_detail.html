@@ -48,7 +48,15 @@
         <!-- Metrik Grafikleri -->
         {% if metrics_data %}
         <section class="section">
-            <h2>Metrikler (Son 24 saat)</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Metrikler</h2>
+                <div class="time-selector" style="display: flex; gap: 5px;">
+                    <button class="btn btn-sm" onclick="loadChart(1)">1 Saat</button>
+                    <button class="btn btn-sm" onclick="loadChart(6)">6 Saat</button>
+                    <button class="btn btn-sm active" onclick="loadChart(24)">24 Saat</button>
+                    <button class="btn btn-sm" onclick="loadChart(168)">7 Gün</button>
+                </div>
+            </div>
             <div class="charts-grid">
                 {% for metric_name, series in metrics_data.items() %}
                 {% if series %}
@@ -86,44 +94,54 @@
     </footer>
 
     <script>
-    const metricsData = {{ metrics_data | tojson }};
-
-    Object.entries(metricsData).forEach(([metric, series]) => {
-        if (!series || series.length === 0) return;
-        const canvas = document.getElementById('chart_' + metric);
-        if (!canvas) return;
-
-        const reversed = [...series].reverse();
-        const labels = reversed.map(p => p.created_at.substring(11, 16));
-        const values = reversed.map(p => p.value !== null ? p.value : p.value_str);
-
-        const isNumeric = reversed.every(p => p.value !== null);
-
-        if (isNumeric) {
-            new Chart(canvas, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: metric,
-                        data: values,
-                        borderColor: '#4f8ef7',
-                        backgroundColor: 'rgba(79,142,247,0.1)',
-                        tension: 0.3,
-                        pointRadius: 2,
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { ticks: { maxTicksLimit: 8, color: '#aaa' }, grid: { color: '#2a2a3a' } },
-                        y: { ticks: { color: '#aaa' }, grid: { color: '#2a2a3a' } }
-                    }
-                }
-            });
+    async function loadAgentChart(agentId, metric, canvasId, hours) {
+        const r = await fetch(`/api/agents/${agentId}/metrics?metric=${metric}&hours=${hours}`);
+        const data = await r.json();
+        
+        // Clear existing chart instance if any
+        let canvas = document.getElementById(canvasId);
+        if(canvas.chartInst) {
+            canvas.chartInst.destroy();
         }
+
+        canvas.chartInst = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels: data.map(d => new Date(d.created_at).toLocaleTimeString('tr-TR')),
+                datasets: [{
+                    label: metric,
+                    data: data.map(d => d.value !== null ? d.value : parseFloat(d.value_str) || 0),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: { display: true, ticks: { maxTicksLimit: 8, color: '#aaa' } },
+                    y: { beginAtZero: true, ticks: { color: '#aaa' } }
+                }
+            }
+        });
+    }
+
+    const agentId = "{{ agent.id }}";
+    
+    // Add loadChart global wrapper if needed for the buttons
+    window.loadChart = function(hours) {
+        document.querySelectorAll('.time-selector button').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        Object.keys(metricsData).forEach(metric => {
+            loadAgentChart(agentId, metric, 'chart_' + metric, hours);
+        });
+    };
+
+    const metricsData = {{ metrics_data | default('{}') | tojson }};
+    Object.keys(metricsData).forEach(metric => {
+        loadAgentChart(agentId, metric, 'chart_' + metric, 24);
     });
     </script>
 </body>

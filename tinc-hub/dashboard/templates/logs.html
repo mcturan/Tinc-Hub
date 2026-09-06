@@ -1,29 +1,45 @@
 {% extends 'base.html' %}
 {% set refresh = 0 %} {# SSE çalışırken sayfayı yenileme #}
 
+{% block head %}
+<style>
+.log-tag {
+    font-weight: 600;
+    font-size: 0.8rem;
+    min-width: 120px;
+    display: inline-block;
+}
+.log-line {
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.82rem;
+    padding: 1px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="section-header">
     <h2>Canlı Log İzleme</h2>
 </div>
 
 <div class="log-controls">
-    <select id="service-select" class="btn" style="min-width: 200px;" onchange="changeService()">
-        <option value="">Servis Seçin...</option>
-        <optgroup label="Uygulamalar (apps.yaml)">
+    <div class="multi-service-selector">
+        <label style="font-weight:600; margin-bottom:8px; display:block;">Servisleri Seç:</label>
+        <div id="service-checkboxes" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
             {% for app in services %}
-            <option value="{{ app.service }}" {% if selected == app.service %}selected{% endif %}>
-                {{ app.name }} ({{ app.service }})
-            </option>
+            <label><input type="checkbox" value="{{ app.service }}" onchange="startMultiStream()" {% if selected == app.service %}checked{% endif %}> {{ app.name }} ({{ app.service }})</label>
             {% endfor %}
-        </optgroup>
-        <optgroup label="Sistem Servisleri">
             {% for s in disc_services %}
             {% if s not in (services|map(attribute='service')|list) %}
-            <option value="{{ s }}" {% if selected == s %}selected{% endif %}>{{ s }}</option>
+            <label><input type="checkbox" value="{{ s }}" onchange="startMultiStream()" {% if selected == s %}checked{% endif %}> {{ s }}</label>
             {% endif %}
             {% endfor %}
-        </optgroup>
-    </select>
+        </div>
+        <button class="btn btn-sm" onclick="selectAllServices()">Tümünü Seç</button>
+        <button class="btn btn-sm" onclick="deselectAllServices()">Hiçbirini Seçme</button>
+    </div>
     
     <button id="btn-toggle" class="btn" onclick="togglePause()">⏸ Duraklat</button>
     <button class="btn" onclick="clearLogs()">🗑 Temizle</button>
@@ -35,6 +51,12 @@
     </div>
 </div>
 
+<div class="log-toolbar" style="margin-top: 10px; display: flex; gap: 10px; align-items: center; background: var(--bg); padding: 10px; border-radius: 8px;">
+    <input type="text" id="log-search" placeholder="Arama..." style="flex: 1; padding: 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
+    <button class="btn" onclick="searchLogs()">Ara</button>
+    <button class="btn" onclick="exportLogs()">📥 Dışa Aktar</button>
+</div>
+
 <div class="log-terminal" id="log-output" style="height: 70vh; max-height: none;">
     <div class="log-line system">Lütfen yukarıdan izlemek istediğiniz servisi seçin.</div>
 </div>
@@ -43,87 +65,129 @@
 
 {% block scripts %}
 <script>
-let es = null;
+let activeStreams = [];
 let paused = false;
 let lineCount = 0;
-const MAX_LINES = 1000;
+const MAX_LINES = 2000;
 const outDiv = document.getElementById('log-output');
 const ind = document.getElementById('conn-indicator');
 const txt = document.getElementById('conn-text');
 const cnt = document.getElementById('line-count');
 const btnToggle = document.getElementById('btn-toggle');
 
+const serviceColors = {};
+const colorPalette = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#a855f7', '#06b6d4', '#f97316', '#ec4899'];
+let colorIndex = 0;
+
+function getServiceColor(svc) {
+    if (!serviceColors[svc]) {
+        serviceColors[svc] = colorPalette[colorIndex % colorPalette.length];
+        colorIndex++;
+    }
+    return serviceColors[svc];
+}
+
+function colorizeLog(text) {
+    let html = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    if(html.toLowerCase().includes('error') || html.toLowerCase().includes('failed') || html.includes('Exception')) {
+        return `<span style="color: #ef4444">${html}</span>`;
+    }
+    if(html.toLowerCase().includes('warn')) {
+        return `<span style="color: #eab308">${html}</span>`;
+    }
+    return html;
+}
+
 function setStatus(state, msg) {
     txt.textContent = msg;
     ind.className = 'indicator ' + state;
 }
 
-function addLine(text, cls='') {
-    const span = document.createElement('div');
-    span.className = `log-line ${cls}`;
-    span.textContent = text;
-    outDiv.appendChild(span);
-    lineCount++;
-    if (lineCount > MAX_LINES) {
-        outDiv.removeChild(outDiv.firstChild);
-        lineCount--;
-    }
-    cnt.textContent = lineCount;
-    // Auto-scroll if near bottom
-    if (outDiv.scrollHeight - outDiv.scrollTop - outDiv.clientHeight < 100) {
-        outDiv.scrollTop = outDiv.scrollHeight;
-    }
+function selectAllServices() {
+    document.querySelectorAll('#service-checkboxes input').forEach(c => c.checked = true);
+    startMultiStream();
 }
 
-function connect(service) {
-    if (es) { es.close(); }
+function deselectAllServices() {
+    document.querySelectorAll('#service-checkboxes input').forEach(c => c.checked = false);
+    startMultiStream();
+}
+
+async function startMultiStream() {
+    // Önceki stream'leri kapat
+    activeStreams.forEach(s => s.close());
+    activeStreams = [];
     clearLogs();
-    if (!service) {
+    
+    const checked = document.querySelectorAll('#service-checkboxes input:checked');
+    const services = Array.from(checked).map(c => c.value);
+    
+    if (services.length === 0) {
         setStatus('', 'Bekliyor');
-        addLine('Lütfen bir servis seçin.', 'system');
+        outDiv.innerHTML = '<div class="log-line system">Lütfen yukarıdan izlemek istediğiniz servisi seçin.</div>';
         return;
     }
     
     setStatus('live', 'Bağlanıyor...');
-    es = new EventSource(`/api/logs/stream/${service}?lines=100`);
     
-    es.onopen = () => {
-        setStatus('live', 'Canlı');
-    };
-    
-    es.onmessage = (e) => {
-        if (paused) return;
-        try {
-            const d = JSON.parse(e.data);
-            if (d.type === 'line') {
-                // Basit renklendirme denemesi
-                let cls = '';
-                if(d.line.toLowerCase().includes('error') || d.line.toLowerCase().includes('failed') || d.line.includes('Exception')) cls = 'error';
-                else if(d.line.toLowerCase().includes('warn')) cls = 'warning';
-                addLine(d.line, cls);
-            } else if (d.type === 'connected') {
-                addLine(`--- ${d.service} canlı akışı bağlandı ---`, 'system');
+    services.forEach(svc => {
+        const es = new EventSource(`/api/logs/stream/${svc}?lines=100`);
+        
+        es.onopen = () => {
+            setStatus('live', 'Canlı (' + activeStreams.length + ' servis)');
+        };
+        
+        es.onmessage = (e) => {
+            if (paused) return;
+            try {
+                let text = '';
+                const d = JSON.parse(e.data);
+                if (d.type === 'line') {
+                    text = d.line;
+                } else if (d.type === 'connected') {
+                    text = `--- ${d.service} canlı akışı bağlandı ---`;
+                }
+                
+                const line = document.createElement('div');
+                line.className = 'log-line';
+                
+                const tag = document.createElement('span');
+                tag.className = 'log-tag';
+                tag.textContent = `[${svc}]`;
+                tag.style.color = getServiceColor(svc);
+                
+                const content = document.createElement('span');
+                content.innerHTML = colorizeLog(text);
+                
+                line.appendChild(tag);
+                line.appendChild(document.createTextNode(' '));
+                line.appendChild(content);
+                
+                outDiv.appendChild(line);
+                lineCount++;
+                
+                // Max satır tut
+                while (outDiv.children.length > MAX_LINES) {
+                    outDiv.removeChild(outDiv.firstChild);
+                    lineCount--;
+                }
+                cnt.textContent = lineCount;
+                
+                // Otomatik aşağı kaydır
+                if (outDiv.scrollHeight - outDiv.scrollTop - outDiv.clientHeight < 100) {
+                    outDiv.scrollTop = outDiv.scrollHeight;
+                }
+            } catch(err) {
+                // handle simple text
             }
-        } catch(err) {
-            addLine(e.data);
-        }
-    };
-    
-    es.onerror = () => {
-        setStatus('error', 'Bağlantı Kesildi');
-        addLine('--- Bağlantı kesildi, yeniden bağlanılıyor... ---', 'error');
-    };
-}
-
-function changeService() {
-    const sel = document.getElementById('service-select').value;
-    if(sel) {
-        // URL'i güncelle (paylaşılabilir olması için)
-        window.history.replaceState(null, null, `?service=${sel}`);
-    } else {
-        window.history.replaceState(null, null, `/logs`);
-    }
-    connect(sel);
+        };
+        
+        es.onerror = () => {
+            // let it reconnect automatically
+        };
+        
+        activeStreams.push(es);
+    });
 }
 
 function togglePause() {
@@ -143,10 +207,66 @@ function scrollToBottom() {
     outDiv.scrollTop = outDiv.scrollHeight;
 }
 
+async function searchLogs() {
+    const checked = document.querySelectorAll('#service-checkboxes input:checked');
+    const services = Array.from(checked).map(c => c.value);
+    const q = document.getElementById('log-search').value;
+    
+    if (services.length === 0) return alert('Önce servis seçin');
+    
+    clearLogs();
+    activeStreams.forEach(s => s.close());
+    activeStreams = [];
+    setStatus('', 'Arama Sonuçları');
+    
+    // Very simple sequential search implementation
+    for (const svc of services) {
+        const r = await fetch(`/api/logs/search?service=${svc}&q=${encodeURIComponent(q)}&n=500`);
+        const data = await r.json();
+        data.lines.forEach(l => {
+            const line = document.createElement('div');
+            line.className = 'log-line';
+            
+            const tag = document.createElement('span');
+            tag.className = 'log-tag';
+            tag.textContent = `[${svc}]`;
+            tag.style.color = getServiceColor(svc);
+            
+            const content = document.createElement('span');
+            content.innerHTML = colorizeLog(l);
+            
+            line.appendChild(tag);
+            line.appendChild(document.createTextNode(' '));
+            line.appendChild(content);
+            outDiv.appendChild(line);
+        });
+    }
+}
+
+async function exportLogs() {
+    const checked = document.querySelectorAll('#service-checkboxes input:checked');
+    const services = Array.from(checked).map(c => c.value);
+    if(services.length === 0) return alert("Önce servis seçin");
+    
+    let allLines = [];
+    for (const svc of services) {
+        const r = await fetch(`/api/logs/lines/${svc}?n=5000`);
+        const data = await r.json();
+        allLines.push(`--- ${svc} ---`);
+        allLines = allLines.concat(data.lines);
+    }
+    
+    const blob = new Blob([allLines.join('
+')], {type: 'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `logs-${new Date().toISOString().slice(0,10)}.log`;
+    a.click();
+}
+
 // Başlangıçta seçili varsa bağlan
 window.onload = () => {
-    const sel = document.getElementById('service-select').value;
-    if (sel) connect(sel);
+    startMultiStream();
 };
 </script>
 {% endblock %}

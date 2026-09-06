@@ -41,6 +41,21 @@
     </div>
 </div>
 
+<!-- Yüklü Pluginler -->
+<div class="settings-section" style="margin-top: 30px;">
+    <h3>🧩 Yüklü Pluginler</h3>
+    <div id="plugins-list" style="margin-top: 10px;"></div>
+    
+    <div style="margin-top: 20px;">
+        <h4>Yeni Plugin Kur</h4>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+            <input type="text" id="plugin-repo" placeholder="https://github.com/user/tinc-plugin-name" 
+                   style="flex:1; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+            <button class="btn btn-primary" onclick="installPlugin()">Kur</button>
+        </div>
+    </div>
+</div>
+
 <!-- Tehlikeli Bölge -->
 <div class="settings-section danger-zone">
     <h3>Tehlikeli Bölge</h3>
@@ -90,8 +105,71 @@ async function doAppSelfUpdate() {
     }
 }
 
+async function loadPlugins() {
+    const r = await fetch('/api/plugins');
+    const plugins = await r.json();
+    const container = document.getElementById('plugins-list');
+    
+    const entries = Object.entries(plugins);
+    if (entries.length === 0) {
+        container.innerHTML = '<div style="color:var(--muted);">Henüz plugin yüklenmemiş.</div>';
+        return;
+    }
+    
+    container.innerHTML = entries.map(([id, p]) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; 
+                    border:1px solid var(--border); border-radius:8px; margin-bottom:8px;">
+            <div>
+                <strong>${p.icon || '🧩'} ${p.name || id}</strong>
+                <div style="font-size:0.8rem; color:var(--muted);">${p.description || ''} · v${p.version || '?'}</div>
+            </div>
+            <button class="btn btn-sm" onclick="uninstallPlugin('${id}')" style="color:#ef4444;">🗑️ Kaldır</button>
+        </div>
+    `).join('');
+}
+
+async function installPlugin() {
+    const repo = document.getElementById('plugin-repo').value.trim();
+    if (!repo) { alert('Repo URL gerekli'); return; }
+    
+    const btn = event.target;
+    btn.textContent = 'Kuruluyor...';
+    btn.disabled = true;
+    
+    try {
+        const r = await fetch('/api/plugins/install', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({repo_url: repo})
+        });
+        const data = await r.json();
+        if (data.ok) {
+            alert('Plugin kuruldu: ' + data.plugin);
+            loadPlugins();
+        } else {
+            alert('Hata: ' + data.error);
+        }
+    } catch(e) {
+        alert('Bağlantı hatası: ' + e);
+    }
+    btn.textContent = 'Kur';
+    btn.disabled = false;
+}
+
+async function uninstallPlugin(id) {
+    if (!confirm(`"${id}" pluginini kaldırmak istediğinize emin misiniz?`)) return;
+    const r = await fetch(`/api/plugins/${id}`, { method: 'DELETE' });
+    const data = await r.json();
+    if (data.ok) {
+        loadPlugins();
+    } else {
+        alert('Hata: ' + data.error);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     checkAppUpdate(false);
+    loadPlugins();
 });
 </script>
 {% endblock %}

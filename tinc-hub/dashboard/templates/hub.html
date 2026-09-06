@@ -51,6 +51,8 @@
         
         <a {% if app.service %}href="/logs?service={{ app.service }}"{% else %}href="#" onclick="alert('Bu uygulama için log dosyası bağlantısı yok.'); return false;"{% endif %} class="btn btn-sm btn-icon {% if not app.service %}btn-disabled{% endif %}" title="Canlı logları görüntüle">📜 Log</a>
         
+        <button onclick="openTerminalFor('{{ app.service }}')" class="btn btn-sm btn-icon {% if not app.service %}btn-disabled{% endif %}" title="Terminal aç">💻 Shell</button>
+        
         <button onclick="editApp('{{ app.id }}')" class="btn btn-sm btn-icon" title="Uygulama ayarlarını düzenle">✏️ Düzenle</button>
         
         <button onclick="updateApp('{{ app.id }}', '{{ app.name }}', '{{ app.repo or '' }}')" class="btn btn-sm btn-icon" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
@@ -84,6 +86,7 @@
         <div class="progress-bar" style="height: 6px; background: var(--border); border-radius: 3px; margin-top: 10px; overflow: hidden;">
             <div id="sys-cpu-bar" style="height: 100%; width: 0%; background: #3b82f6; transition: width 0.5s;"></div>
         </div>
+        <canvas id="cpu-sparkline" width="200" height="40" style="margin-top: 10px;"></canvas>
     </div>
     <div class="widget-box" style="flex: 1; min-width: 200px; background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
         <div style="font-size: 0.9rem; color: var(--muted); margin-bottom: 5px;">RAM Kullanımı</div>
@@ -108,6 +111,17 @@
 </div>
 
 
+
+<!-- Plugin Widgetleri -->
+<div style="display: flex; gap: 20px; flex-wrap: wrap;">
+{% for widget in plugin_widgets %}
+    {% if widget.position == 'sidebar' or widget.position == 'main' %}
+        <div class="plugin-widget widget-box" id="widget-{{ widget.id }}" style="flex: 1; min-width: 200px; background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
+            {{ widget.html | safe }}
+        </div>
+    {% endif %}
+{% endfor %}
+</div>
 
 <!-- Kategori Filtreleri -->
 <div class="cat-filters" style="margin: 20px 0;">
@@ -329,6 +343,10 @@
 <script>
 function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
 function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
+function openTerminalFor(service) {
+    if(!service) return alert("Bu uygulama için servis tanımlı değil.");
+    window.open(`/terminal?service=${service}`, '_blank');
+}
 async function takeBackup() {
     try {
         const r = await fetch('/api/settings/backup', {method: 'POST'});
@@ -356,7 +374,35 @@ async function saveTelegram() {
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+async function loadSparklines() {
+    try {
+        const r = await fetch('/api/system/history?hours=1');
+        const data = await r.json();
+        
+        new Chart(document.getElementById('cpu-sparkline'), {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.time),
+                datasets: [{
+                    data: data.map(d => d.cpu_percent),
+                    borderColor: '#3b82f6',
+                    borderWidth: 1.5,
+                    fill: false,
+                    pointRadius: 0,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { x: { display: false }, y: { display: false, min: 0, max: 100 } }
+            }
+        });
+    } catch(e) {}
+}
+
 async function updateSystemMetrics() {
     try {
         const r = await fetch('/api/system');
@@ -383,6 +429,7 @@ async function updateSystemMetrics() {
 // Sayfa yüklendiğinde başlat
 document.addEventListener('DOMContentLoaded', () => {
     updateSystemMetrics();
+    loadSparklines();
 });
 
 async function openStoreModal() {
@@ -609,104 +656,6 @@ async function runSystemAudit() {
     }
 }
 
-// System status auto-update
-setInterval(async () => {
-    try {
-        const r = await fetch('/api/system');
-        const d = await r.json();
-        if(d.cpu_percent !== undefined) {
-            document.getElementById('sys-cpu').innerText = `${d.cpu_percent}%`;
-            document.getElementById('bar-cpu').style.width = `${d.cpu_percent}%`;
-            document.getElementById('bar-cpu').className = `bar-fill ${d.cpu_percent>90?'bar-red':d.cpu_percent>70?'bar-yellow':'bar-green'}`;
-            
-            document.getElementById('sys-ram').innerText = `${d.ram_percent}% (${d.ram_used_gb}GB)`;
-            document.getElementById('bar-ram').style.width = `${d.ram_percent}%`;
-            document.getElementById('bar-ram').className = `bar-fill ${d.ram_percent>90?'bar-red':d.ram_percent>70?'bar-yellow':'bar-green'}`;
-            
-            document.getElementById('sys-disk').innerText = `${d.disk_percent}%`;
-            document.getElementById('bar-disk').style.width = `${d.disk_percent}%`;
-            document.getElementById('bar-disk').className = `bar-fill ${d.disk_percent>90?'bar-red':d.disk_percent>80?'bar-yellow':'bar-green'}`;
-            
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('tr-TR');
-            const timeEl = document.getElementById('last-update-time');
-            if(timeEl) timeEl.innerText = 'Son Güncelleme: ' + timeString;
-        }
-    } catch(e){}
-}, 30000);
-</script>
-
-<!-- Settings Modal -->
-<div id="settingsModal" class="modal-overlay hidden">
-    <div class="modal">
-        <div class="modal-header">
-            <div class="modal-title">⚙️ Tinc Hub - Ayarlar</div>
-            <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
-        </div>
-        <div class="modal-body">
-            <h3>📱 Mobil Uygulama Eşleştirme</h3>
-            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <p>Mobil uygulamayı indirdikten sonra aşağıdaki bilgileri kullanarak bu Tinc Hub cihazını yönetebilirsiniz:</p>
-                <div style="margin-top: 10px;">
-                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Hub ID:</label>
-                    <input type="text" value="{{ hub_id }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
-                </div>
-                <div style="margin-top: 10px;">
-                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">API Token:</label>
-                    <input type="text" value="{{ api_token }}" readonly style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);">
-                </div>
-                <div style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 15px;">
-                    <a href="/static/Tinc-Hub-Manager.apk" class="btn btn-primary" style="text-decoration:none; display:inline-block;">📱 Mobil Uygulamayı (APK) İndir</a>
-                </div>
-            </div>
-
-            <h3>🔔 Telegram Bildirimleri (Kapanan Servisler İçin)</h3>
-            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <p>Kapanan veya yanıt vermeyen servisler anında Telegram hesabınıza düşer.</p>
-                <div style="margin-top: 10px;">
-                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Bot Token:</label>
-                    <input type="text" id="tg_token" value="{{ tg_token }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="BotFather'dan alınan token">
-                </div>
-                <div style="margin-top: 10px;">
-                    <label style="display:block; font-size: 0.9rem; margin-bottom: 4px;">Chat ID:</label>
-                    <input type="text" id="tg_chat" value="{{ tg_chat }}" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface);" placeholder="Sizin veya grubun Chat ID'si">
-                </div>
-                <button onclick="saveTelegram()" class="btn btn-primary" style="margin-top: 10px;">💾 Telegram Ayarlarını Kaydet</button>
-            </div>
-
-            <h3>📦 Sistem Yedeği (Snapshot)</h3>
-            <div style="background: var(--bg); padding: 15px; border-radius: 8px;">
-                <p>Tinc Hub konfigürasyonunu ve uygulama kayıtlarını (registry) yedekleyin.</p>
-                <button onclick="takeBackup()" class="btn btn-primary" style="margin-top: 10px;">💾 Şimdi Yedek Al</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
-function openSettingsModal() { document.getElementById('settingsModal').classList.remove('hidden'); }
-function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
-async function takeBackup() {
-    try {
-        const r = await fetch('/api/settings/backup', {method: 'POST'});
-        const res = await r.json();
-        if(r.ok) alert("✅ Yedek başarıyla alındı!\nDosya: " + res.file);
-        else alert("❌ Hata: " + res.error);
-    } catch(e) { alert("Bağlantı Hatası: " + e); }
-}
-async function saveTelegram() {
-    const token = document.getElementById('tg_token').value.trim();
-    const chat = document.getElementById('tg_chat').value.trim();
-    try {
-        const r = await fetch('/api/settings/telegram', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({token: token, chat: chat})
-        });
-        const res = await r.json();
-        alert(res.ok ? "✅ " + res.message : "❌ Hata: " + res.error);
-    } catch(e) { alert("Bağlantı Hatası: " + e); }
-}
 </script>
 
 {% endblock %}

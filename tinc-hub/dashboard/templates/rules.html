@@ -1,0 +1,286 @@
+{% extends 'base.html' %}
+{% block head %}
+<style>
+.rules-container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+.rule-card {
+    background: var(--bg-alt, #1e293b);
+    border: 1px solid var(--border, #334155);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.rule-card.disabled { opacity: 0.5; }
+.rule-info { flex: 1; }
+.rule-name { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
+.rule-desc { font-size: 0.8rem; color: var(--muted, #94a3b8); }
+.rule-actions { display: flex; gap: 8px; align-items: center; }
+.toggle-switch {
+    position: relative; width: 44px; height: 24px;
+    background: #475569; border-radius: 12px; cursor: pointer;
+    transition: background 0.2s;
+}
+.toggle-switch.on { background: #22c55e; }
+.toggle-switch::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; background: white; border-radius: 50%;
+    transition: left 0.2s;
+}
+.toggle-switch.on::after { left: 23px; }
+
+/* Modal */
+.rule-modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.6); z-index: 1000;
+    justify-content: center; align-items: center;
+}
+.rule-modal-overlay.show { display: flex; }
+.rule-modal {
+    background: var(--surface, #1e293b); border-radius: 12px;
+    padding: 24px; width: 500px; max-height: 80vh; overflow-y: auto;
+    border: 1px solid var(--border, #334155);
+}
+.rule-modal h3 { margin-bottom: 16px; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 0.85rem; margin-bottom: 4px; color: var(--muted, #94a3b8); }
+.form-group input, .form-group select {
+    width: 100%; padding: 8px 12px; border-radius: 6px;
+    border: 1px solid var(--border, #334155);
+    background: var(--bg, #0f172a); color: var(--text, #e2e8f0);
+}
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rules-container">
+    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>⚡ Otomasyon Kuralları</h2>
+        <button class="btn btn-primary" onclick="openAddRule()">+ Yeni Kural</button>
+    </div>
+
+    <div id="rules-list">
+        <div style="color: var(--muted); padding: 20px;">Yükleniyor...</div>
+    </div>
+</div>
+
+<!-- Kural Ekle/Düzenle Modal -->
+<div class="rule-modal-overlay" id="ruleModal">
+    <div class="rule-modal">
+        <h3 id="modal-title">Yeni Kural Ekle</h3>
+        <input type="hidden" id="rule-edit-id">
+        
+        <div class="form-group">
+            <label>Kural ID (benzersiz)</label>
+            <input type="text" id="rule-id" placeholder="ornek: disk-uyari">
+        </div>
+        <div class="form-group">
+            <label>Kural Adı</label>
+            <input type="text" id="rule-name" placeholder="Disk Dolunca Uyar">
+        </div>
+        <div class="form-group">
+            <label>Koşul Tipi</label>
+            <select id="rule-cond-type" onchange="updateCondFields()">
+                <option value="metric_threshold">Metrik Eşik (CPU, RAM, Disk vb.)</option>
+                <option value="service_down">Servis Düştüğünde</option>
+            </select>
+        </div>
+        <div id="cond-threshold-fields">
+            <div class="form-group">
+                <label>Metrik Adı</label>
+                <select id="rule-metric">
+                    <option value="cpu_percent">CPU %</option>
+                    <option value="ram_percent">RAM %</option>
+                    <option value="disk_percent">Disk %</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Operatör</label>
+                <select id="rule-operator">
+                    <option value=">">&gt; (büyükse)</option>
+                    <option value="<">&lt; (küçükse)</option>
+                    <option value=">=">&gt;= (büyük eşitse)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Eşik Değeri</label>
+                <input type="number" id="rule-value" placeholder="85">
+            </div>
+        </div>
+        <div id="cond-service-fields" style="display:none;">
+            <div class="form-group">
+                <label>Servis Adı</label>
+                <input type="text" id="rule-service-name" placeholder="plexmediaserver">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Aksiyon Tipi</label>
+            <select id="rule-action-type">
+                <option value="restart_service">Servisi Yeniden Başlat</option>
+                <option value="stop_service">Servisi Durdur</option>
+                <option value="start_service">Servisi Başlat</option>
+                <option value="run_commands">Komut Çalıştır</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Aksiyon Hedefi (servis adı veya komut)</label>
+            <input type="text" id="rule-action-target" placeholder="plexmediaserver veya apt autoremove -y">
+        </div>
+        <div class="form-group">
+            <label>Cooldown (saniye — tekrar tetiklenmeden önce bekleme)</label>
+            <input type="number" id="rule-cooldown" value="300">
+        </div>
+        
+        <div class="modal-actions">
+            <button class="btn btn-primary" onclick="saveRule()">Kaydet</button>
+            <button class="btn" onclick="closeModal()">İptal</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateCondFields() {
+    const type = document.getElementById('rule-cond-type').value;
+    document.getElementById('cond-threshold-fields').style.display = type === 'metric_threshold' ? '' : 'none';
+    document.getElementById('cond-service-fields').style.display = type === 'service_down' ? '' : 'none';
+}
+
+async function loadRules() {
+    try {
+        const r = await fetch('/api/rules');
+        const rules = await r.json();
+        const container = document.getElementById('rules-list');
+        
+        if (rules.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--muted);">Henüz kural tanımlanmamış.<br>Sağ üstteki "Yeni Kural" butonuyla başlayın.</div>';
+            return;
+        }
+        
+        container.innerHTML = rules.map(r => `
+            <div class="rule-card ${r.enabled ? '' : 'disabled'}">
+                <div class="rule-info">
+                    <div class="rule-name">${r.name || r.id}</div>
+                    <div class="rule-desc">
+                        Koşul: <strong>${r.condition?.type}</strong> · 
+                        Aksiyon: <strong>${r.action?.type}</strong> · 
+                        Cooldown: ${r.cooldown || 60}s
+                    </div>
+                </div>
+                <div class="rule-actions">
+                    <div class="toggle-switch ${r.enabled !== false ? 'on' : ''}" 
+                         onclick="toggleRule('${r.id}', ${r.enabled === false})"></div>
+                    <button class="btn btn-sm" onclick="editRule('${r.id}')">✏️</button>
+                    <button class="btn btn-sm" onclick="deleteRule('${r.id}')" style="color:#ef4444;">🗑️</button>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {
+        document.getElementById('rules-list').innerHTML = '<div style="color:red;">Kurallar yüklenemedi: ' + e + '</div>';
+    }
+}
+
+function openAddRule() {
+    document.getElementById('modal-title').textContent = 'Yeni Kural Ekle';
+    document.getElementById('rule-edit-id').value = '';
+    document.getElementById('rule-id').value = '';
+    document.getElementById('rule-id').disabled = false;
+    document.getElementById('rule-name').value = '';
+    document.getElementById('rule-cooldown').value = '300';
+    document.getElementById('ruleModal').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('ruleModal').classList.remove('show');
+}
+
+async function saveRule() {
+    const id = document.getElementById('rule-id').value.trim();
+    const name = document.getElementById('rule-name').value.trim();
+    if (!id || !name) { alert('ID ve isim zorunlu'); return; }
+    
+    const condType = document.getElementById('rule-cond-type').value;
+    let condition = { type: condType };
+    if (condType === 'metric_threshold') {
+        condition.metric = document.getElementById('rule-metric').value;
+        condition.operator = document.getElementById('rule-operator').value;
+        condition.value = parseFloat(document.getElementById('rule-value').value);
+    } else if (condType === 'service_down') {
+        condition.service = document.getElementById('rule-service-name').value;
+    }
+    
+    const actionType = document.getElementById('rule-action-type').value;
+    const target = document.getElementById('rule-action-target').value;
+    let action = { type: actionType };
+    if (actionType === 'run_commands') {
+        action.commands = [target];
+    } else {
+        action.service = target;
+    }
+    
+    const rule = {
+        id, name, enabled: true,
+        condition, action,
+        cooldown: parseInt(document.getElementById('rule-cooldown').value) || 300
+    };
+    
+    const editId = document.getElementById('rule-edit-id').value;
+    const method = editId ? 'PUT' : 'POST';
+    const url = editId ? `/api/rules/${editId}` : '/api/rules';
+    
+    await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(rule) });
+    closeModal();
+    loadRules();
+}
+
+async function deleteRule(id) {
+    if (!confirm(`"${id}" kuralını silmek istediğinize emin misiniz?`)) return;
+    await fetch(`/api/rules/${id}`, { method: 'DELETE' });
+    loadRules();
+}
+
+async function toggleRule(id, enable) {
+    await fetch(`/api/rules/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ enabled: enable })
+    });
+    loadRules();
+}
+
+async function editRule(id) {
+    // Kural verilerini çek ve modal'ı doldur
+    const r = await fetch('/api/rules');
+    const rules = await r.json();
+    const rule = rules.find(r => r.id === id);
+    if (!rule) return;
+    
+    document.getElementById('modal-title').textContent = 'Kuralı Düzenle';
+    document.getElementById('rule-edit-id').value = id;
+    document.getElementById('rule-id').value = id;
+    document.getElementById('rule-id').disabled = true;
+    document.getElementById('rule-name').value = rule.name || '';
+    document.getElementById('rule-cond-type').value = rule.condition?.type || 'metric_threshold';
+    updateCondFields();
+    
+    if (rule.condition?.type === 'metric_threshold') {
+        document.getElementById('rule-metric').value = rule.condition.metric || 'cpu_percent';
+        document.getElementById('rule-operator').value = rule.condition.operator || '>';
+        document.getElementById('rule-value').value = rule.condition.value || '';
+    } else if (rule.condition?.type === 'service_down') {
+        document.getElementById('rule-service-name').value = rule.condition.service || '';
+    }
+    
+    document.getElementById('rule-action-type').value = rule.action?.type || 'restart_service';
+    document.getElementById('rule-action-target').value = rule.action?.service || (rule.action?.commands || [''])[0];
+    document.getElementById('rule-cooldown').value = rule.cooldown || 300;
+    
+    document.getElementById('ruleModal').classList.add('show');
+}
+
+document.addEventListener('DOMContentLoaded', loadRules);
+</script>
+{% endblock %}

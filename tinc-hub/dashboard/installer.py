@@ -15,7 +15,9 @@ def install_app_from_store(store_app_id: str) -> dict:
     try:
         with open(store_file, "r") as f:
             store_data = json.load(f)
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.warning(f"Exception caught: {e}")
         return {"ok": False, "error": "store.json okunamadı."}
         
     app_meta = next((a for a in store_data if a["id"] == store_app_id), None)
@@ -139,9 +141,9 @@ def get_git_info() -> dict:
                         "version": f"v1.{cnt}.{hsh}",
                         "dir": gd
                     }
-        except Exception:
-            pass
-
+        except Exception as e:
+            import logging
+            logging.warning(f"Exception caught: {e}")
     # version.json kontrol et (/opt/tinc-hub/dashboard/version.json)
     vfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version.json")
     if os.path.exists(vfile):
@@ -154,9 +156,9 @@ def get_git_info() -> dict:
                     "version": vdata.get("version", "v1.0.0"),
                     "dir": vdata.get("repo_dir")
                 }
-        except Exception:
-            pass
-
+        except Exception as e:
+            import logging
+            logging.warning(f"Exception caught: {e}")
     return {"count": 1, "hash": "release", "version": "v1.0.0", "dir": None}
 
 

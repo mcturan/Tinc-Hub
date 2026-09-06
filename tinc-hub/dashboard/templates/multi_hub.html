@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="section-header" style="margin-bottom: 20px;">
+    <h2>Multi-Hub Yönetimi</h2>
+    <button onclick="loadSlaves()" class="btn btn-primary">🔄 Yenile</button>
+</div>
+
+<div id="slaves-grid" class="app-grid">
+    <div style="padding: 20px;">Yükleniyor...</div>
+</div>
+
+<script>
+async function loadSlaves() {
+    const grid = document.getElementById('slaves-grid');
+    grid.innerHTML = '<div style="padding: 20px;">Bağlı cihazlar sorgulanıyor...</div>';
+    try {
+        const r = await fetch('/api/remote/slaves');
+        const data = await r.json();
+        
+        if (data.length === 0) {
+            grid.innerHTML = '<div class="info-box">Kayıtlı başka Tinc Hub cihazı bulunamadı. /etc/tinc-hub/config.env dosyasından SLAVE_HUBS ekleyebilirsiniz.</div>';
+            return;
+        }
+        
+        let html = '';
+        data.forEach((item, idx) => {
+            if(item.status === 'ok') {
+                const sys = item.data.system || {};
+                const name = item.data.name || item.slave.name;
+                const apps = item.data.apps || [];
+                let servicesHtml = apps.map((app) => `
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:0.8rem;">
+                        <span>${app.running ? '🟢' : '🔴'} ${app.name}</span>
+                        <div style="display:flex; gap:4px;">
+                            <button class="btn btn-sm" style="font-size:0.7rem; padding:2px 6px;"
+                                    onclick="slaveAction(${idx}, '${app.service}', 'restart')">↻</button>
+                            <button class="btn btn-sm" style="font-size:0.7rem; padding:2px 6px;"
+                                    onclick="slaveAction(${idx}, '${app.service}', '${app.running ? 'stop' : 'start'}')">
+                                ${app.running ? '⏹' : '▶'}
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+                html += `
+                <div class="app-card healthy">
+                    <div class="card-main">
+                        <div class="card-icon">🌐</div>
+                        <div class="card-title">
+                            <div class="card-name">${name}</div>
+                            <div class="card-desc">${item.slave.url}</div>
+                        </div>
+                    </div>
+                    <div class="card-meta-info" style="margin-top: 15px;">
+                        <div>Durum: <span class="status-badge healthy">✅ Bağlı</span></div>
+                        <div style="margin-top: 5px; font-size: 0.8rem;">
+                            CPU: <strong>${sys.cpu_percent || 0}%</strong><br>
+                            RAM: <strong>${sys.ram_used_gb || 0} / ${sys.ram_total_gb || 0} GB</strong><br>
+                            Uygulama: <strong>${apps.length} Adet</strong>
+                        </div>
+                    </div>
+                    <div class="card-actions">
+                        <a href="${item.slave.url}" target="_blank" class="btn btn-sm" style="width:100%; text-align:center;">Paneli Aç ↗</a>
+                        <div style="margin-top: 10px;">
+                            <h4 style="font-size:0.8rem; color:var(--muted); margin-bottom:6px;">Servisler:</h4>
+                            <div class="slave-services" id="services-${idx}">
+                                ${servicesHtml}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                `;
+            } else {
+                html += `
+                <div class="app-card dead">
+                    <div class="card-main">
+                        <div class="card-icon">🌐</div>
+                        <div class="card-title">
+                            <div class="card-name">${item.slave.name}</div>
+                            <div class="card-desc">${item.slave.url}</div>
+                        </div>
+                    </div>
+                    <div class="card-meta-info" style="margin-top: 15px;">
+                        <div>Durum: <span class="status-badge dead">❌ Bağlantı Yok</span></div>
+                        <div style="color: var(--muted); font-size: 0.8rem; margin-top: 5px;">Hata: ${item.error}</div>
+                    </div>
+                </div>
+                `;
+            }
+        });
+        grid.innerHTML = html;
+        
+    } catch(e) {
+        grid.innerHTML = '<div class="info-box error">Hata: ' + e + '</div>';
+    }
+}
+
+async function slaveAction(slaveIdx, service, action) {
+    try {
+        const r = await fetch(`/api/remote/slaves/${slaveIdx}/action`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ action, service })
+        });
+        const data = await r.json();
+        if (data.ok) {
+            loadSlaves(); // Yenile
+        } else {
+            alert('Hata: ' + (data.error || data.stderr || 'Bilinmeyen'));
+        }
+    } catch(e) {
+        alert('Bağlantı hatası: ' + e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadSlaves);
+</script>
+{% endblock %}

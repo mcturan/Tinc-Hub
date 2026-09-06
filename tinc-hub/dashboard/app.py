@@ -5,6 +5,12 @@ Tüm servislerin merkezi kontrol paneli. Port 9010.
 """
 
 import os
+import syslog_server
+import packet_sniffer
+import alarm_manager
+import metrics_collector
+
+
 import sys
 import json
 import logging
@@ -17,11 +23,14 @@ from flask import (Flask, render_template, jsonify, request,
 from dotenv import dotenv_values
 
 # ── Shared modüller ──────────────────────────────────────────────────────────
-sys.path.insert(0, "/opt/tinc-hub/shared")
+SHARED_DIR = os.environ.get("TINC_HUB_SHARED", "/opt/tinc-hub/shared")
+sys.path.insert(0, SHARED_DIR)
 try:
     import db as tinchub_db
     tinchub_db.init_db()
-except Exception:
+except Exception as e:
+    import logging
+    logging.warning(f"Exception caught: {e}")
     tinchub_db = None
 
 from discovery import discover_all, get_service_detail
@@ -35,10 +44,13 @@ from registry import (load_apps, save_apps, get_app, add_app,
 CONFIG_PATH = "/etc/tinc-hub/config.env"
 config = dotenv_values(CONFIG_PATH) if os.path.exists(CONFIG_PATH) else {}
 
+
 PORT     = int(config.get("DASHBOARD_PORT", 9010))
 HOST     = config.get("DASHBOARD_HOST", "0.0.0.0")
 SECRET   = config.get("DASHBOARD_SECRET_KEY", "tinc-hub-tinc-secret-2025")
 PASSWORD = config.get("TINC_HUB_PASSWORD", "").strip()   # boşsa auth yok
+RUN_USER = config.get("RUN_USER", "turan")
+RUN_UID  = config.get("RUN_UID", "1000")
 
 # Initialize users if they don't exist
 init_users(PASSWORD)
@@ -65,7 +77,9 @@ def inject_global_vars():
         from installer import get_git_info
         ver_info = get_git_info()
         return {"app_version": ver_info.get("version", "v1.0.0")}
-    except Exception:
+    except Exception as e:
+        import logging
+        logging.warning(f"Exception caught: {e}")
         return {"app_version": "v1.0.0"}
 
 
@@ -84,764 +98,61 @@ def auth_required(f):
     return decorated
 
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if not PASSWORD:
-        return redirect("/")
-    error = None
-    if request.method == "POST":
-        username = request.form.get("username", "admin")
-        password = request.form.get("password", "")
-        
-        user_data = verify_user(username, password)
-        # Fallback to config PASSWORD for admin if users.json corrupted
-        if username == "admin" and password == PASSWORD:
-            user_data = {"role": "admin"}
-            
-        if user_data:
-            session["authenticated"] = True
-            session["username"] = username
-            session["role"] = user_data.get("role", "viewer")
-            session.permanent = True
-            return redirect(request.args.get("next") or "/")
-        error = "Hatalı kullanıcı adı veya şifre"
-    return render_template("login.html", error=error)
 
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/login" if PASSWORD else "/")
-
-
-# ── Yardımcılar ───────────────────────────────────────────────────────────────
-
-_metrics_history = {}
-
-def _enrich_apps(apps: list[dict]) -> list[dict]:
-    """App listesine sağlık + discovery verisi ekler."""
-    disc = _get_discovery()
-    port_map = disc.get("ports", {})
-    svc_map  = {s["name"]: s for s in disc.get("services", [])}
-
-    for app in apps:
-        app["children"] = [a for a in apps if a.get("parent") == app["id"] or (a.get("parent") and a.get("parent") == app.get("service"))]
-        
-        # Sağlık
-        cached = get_cached_health(app["id"])
-        app["health"] = cached or {"ok": None, "checked_at": None}
-        
-        # Replace {{host}} in URLs
-        try:
-            from flask import request
-            host_ip = request.host.split(':')[0]
-            if app.get("url") and "{{host}}" in app["url"]:
-                app["url"] = app["url"].replace("{{host}}", host_ip)
-            if app.get("internal_url") and "{{host}}" in app["internal_url"]:
-                app["internal_url"] = app["internal_url"].replace("{{host}}", host_ip)
-        except Exception:
-            pass
-
-
-        app["cpu_percent"] = None
-        app["ram_mb"] = None
-        app["metrics_history"] = {}
-
-        # systemd detay
-        svc = app.get("service")
-        if svc:
-            svc_data = svc_map.get(svc) or svc_map.get(svc.replace(".service", ""))
-            if svc_data:
-                app["running"]     = svc_data.get("running", False)
-                app["cpu_percent"] = svc_data.get("cpu_percent")
-                app["ram_mb"]      = svc_data.get("ram_mb")
-                
-                # Min/Max Tracking
-                app_id = app["id"]
-                if app_id not in _metrics_history:
-                    _metrics_history[app_id] = {"cpu_min": app["cpu_percent"], "cpu_max": app["cpu_percent"], "ram_min": app["ram_mb"], "ram_max": app["ram_mb"]}
-                else:
-                    hist = _metrics_history[app_id]
-                    if app["cpu_percent"] is not None:
-                        if hist["cpu_min"] is None or app["cpu_percent"] < hist["cpu_min"]: hist["cpu_min"] = app["cpu_percent"]
-                        if hist["cpu_max"] is None or app["cpu_percent"] > hist["cpu_max"]: hist["cpu_max"] = app["cpu_percent"]
-                    if app["ram_mb"] is not None:
-                        if hist["ram_min"] is None or app["ram_mb"] < hist["ram_min"]: hist["ram_min"] = app["ram_mb"]
-                        if hist["ram_max"] is None or app["ram_mb"] > hist["ram_max"]: hist["ram_max"] = app["ram_mb"]
-                app["metrics_history"] = _metrics_history[app_id]
-
-            app["since"] = svc_data.get("since") if svc_data else None
-            app["pid"]   = svc_data.get("pid") if svc_data else None
-            
-            if not svc_data:
-                # systemctl ile anlık sorgula
-                det = get_service_detail(svc)
-                app["running"] = det.get("active_state") == "active"
-                app["since"]   = det.get("since", "")
-
-        # Port bilgisi discovery'den tamamla
-        if not app.get("port") and svc:
-            det = get_service_detail(svc)
-            pid = det.get("pid")
-            if pid:
-                matched = [p for p, info in port_map.items() if info.get("pid") == pid]
-                if matched:
-                    app["port"] = matched[0]
-
-        # Durum sınıfı
-        ok = app["health"].get("ok")
-        app["status_class"] = ("healthy" if ok is True
-                               else "dead" if ok is False else "unknown")
-
-    return apps
-
-
-# Discovery cache (60 saniyede yenile)
-_disc_cache = {"data": None, "at": None}
-_DISC_TTL = 60
-
-
-def _get_discovery() -> dict:
-    now = datetime.now()
-    if _disc_cache["at"] and (now - _disc_cache["at"]).seconds < _DISC_TTL:
-        return _disc_cache["data"]
-    try:
-        _disc_cache["data"] = discover_all()
-        _disc_cache["at"]   = now
-    except Exception as e:
-        log.error(f"Discovery hatası: {e}")
-        _disc_cache["data"] = {"services": [], "ports": {}, "docker": []}
-        _disc_cache["at"]   = now
-    return _disc_cache["data"]
-
-
-def _format_uptime(since_str: str) -> str:
-    if not since_str:
-        return ""
-    try:
-        # systemd format: "Wed 2026-08-26 09:11:00 +03"
-        for fmt in ("%a %Y-%m-%d %H:%M:%S %z", "%Y-%m-%dT%H:%M:%S"):
-            try:
-                dt = datetime.strptime(since_str[:25].strip(), fmt[:len(since_str[:25].strip())])
-                break
-            except ValueError:
-                continue
-        else:
-            return since_str
-        delta = datetime.now(dt.tzinfo) - dt if dt.tzinfo else datetime.now() - dt
-        d, s = delta.days, delta.seconds
-        h, m = s // 3600, (s % 3600) // 60
-        parts = []
-        if d:    parts.append(f"{d}g")
-        if h:    parts.append(f"{h}s")
-        parts.append(f"{m}d")
-        return " ".join(parts)
-    except Exception:
-        return since_str[:16]
-
-def _now():
-    return datetime.now().strftime("%H:%M:%S")
-
-MOBILE_REQUIRED_VERSION = "1.0.0"
-
-def _ver_to_int(ver: str) -> int:
-    try:
-        parts = ver.replace("v", "").split(".")
-        return int("".join([p.zfill(3) for p in parts]))
-    except:
-        return 0
-
-# ── HTML Sayfalar ─────────────────────────────────────────────────────────────
-
-@app.route("/")
-@auth_required
-def index():
-    # Mobil uygulama versiyon kontrolü
-    app_ver = request.args.get("app_version")
-    if app_ver and _ver_to_int(app_ver) < _ver_to_int(MOBILE_REQUIRED_VERSION):
-        return render_template("mobile_update.html", required=MOBILE_REQUIRED_VERSION, current=app_ver)
-
-    all_apps = load_apps()
-    enriched = _enrich_apps(all_apps)
-    
-    cat_filter = request.args.get("cat", "")
-    categories = get_categories()
-    
-    if cat_filter:
-        display_apps = [a for a in enriched if a.get("category") == cat_filter]
-        pinned = []
-        unpinned = []
-    else:
-        display_apps = []
-        pinned = [a for a in enriched if a.get("pinned")]
-        unpinned = [a for a in enriched if not a.get("pinned")]
-        display_apps.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
-        pinned.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
-        unpinned.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
-        
-    disc = _get_discovery()
-    docker = disc.get("docker", [])
-    known_services = {a.get("service") for a in all_apps if a.get("service")}
-    unknown_services = [s for s in disc.get("services", []) if s["name"] not in known_services]
-    
-    system = _system_summary()
-    
-    hub_id = os.environ.get("HUB_ID", "UNKNOWN")
-    api_token = os.environ.get("API_TOKEN", "")
-
-    return render_template("hub.html",
-        apps=display_apps,
-        pinned=pinned, 
-        unpinned=unpinned,
-        categories=categories,
-        selected_cat=cat_filter,
-        docker=docker,
-        unknown_services=unknown_services,
-        system=system, 
-        now=_now(),
-        format_uptime=_format_uptime,
-        has_auth=bool(PASSWORD),
-        hub_id=hub_id,
-        role=session.get("role", "admin"), api_token=api_token, tg_token=os.environ.get("TELEGRAM_BOT_TOKEN", ""), tg_chat=os.environ.get("TELEGRAM_CHAT_ID", ""))
-
-
-@app.route("/app/<app_id>")
-@auth_required
-def app_detail(app_id):
-    app_data = get_app(app_id)
-    if not app_data:
-        return "Uygulama bulunamadı", 404
-    enriched = _enrich_apps([app_data])[0]
-    # Anlık health check
-    health = check_app(app_data)
-    enriched["health"] = health
-    return render_template("app_detail.html",
-        app=enriched, now=_now(), format_uptime=_format_uptime)
-
-
-@app.route("/logs")
-@auth_required
-def logs_page():
-    apps = load_apps()
-    services = [a for a in apps if a.get("service")]
-    selected = request.args.get("service", "")
-    # Systemd discovery'den de servis ekle
-    disc = _get_discovery()
-    disc_services = [s["name"] for s in disc.get("services", [])]
-    return render_template("logs.html",
-        services=services, disc_services=disc_services,
-        selected=selected, now=_now())
-
-
-@app.route("/settings")
-@auth_required
-def settings_page():
-    apps = load_apps()
-    categories = get_categories()
-    return render_template("settings.html",
-        apps=apps, categories=categories, now=_now(),
-        has_auth=bool(PASSWORD))
-
-
-# ── API: Uygulamalar ─────────────────────────────────────────────────────────
-
-@app.route("/api/apps")
-@auth_required
-def api_apps():
-    apps = _enrich_apps(load_apps())
-    return jsonify(apps)
-
-
-@app.route("/api/app/<app_id>")
-@auth_required
-def api_app(app_id):
-    app_data = get_app(app_id)
-    if not app_data:
-        return jsonify({"error": "Bulunamadı"}), 404
-    return jsonify(_enrich_apps([app_data])[0])
-
-
-@app.route("/api/app/<app_id>/health")
-@auth_required
-def api_health(app_id):
-    app_data = get_app(app_id)
-    if not app_data:
-        return jsonify({"error": "Bulunamadı"}), 404
-    result = check_app(app_data)
-    return jsonify(result)
-
-
-@app.route("/api/app/<app_id>/action", methods=["POST"])
-@auth_required
-def api_action(app_id):
-    """Start / stop / restart"""
-    data = request.get_json() or {}
-    action = data.get("action", "")
-    if action not in ("start", "stop", "restart"):
-        return jsonify({"error": "Geçersiz eylem"}), 400
-
-    app_data = get_app(app_id)
-    if not app_data:
-        return jsonify({"error": "Uygulama bulunamadı"}), 404
-
-    service = app_data.get("service")
-    if not service:
-        return jsonify({"error": "Bu uygulama için servis tanımlı değil"}), 400
-
-    unit = service if service.endswith(".service") else f"{service}.service"
-    try:
-        if app_data.get("is_user_service"):
-            cmd = ["sudo", "-u", "turan", "XDG_RUNTIME_DIR=/run/user/1000", "systemctl", "--user", action, unit]
-        else:
-            cmd = ["systemctl", action, unit]
-            
-        r = subprocess.run(
-            cmd,
-            capture_output=True, text=True, timeout=15
-        )
-        ok = r.returncode == 0
-        msg = r.stdout.strip() or r.stderr.strip() or f"{action} {'başarılı' if ok else 'başarısız'}"
-        log.info(f"Eylem: {action} {unit} → {'OK' if ok else 'FAIL'}")
-        return jsonify({"ok": ok, "message": msg})
-    except Exception as e:
-        return jsonify({"ok": False, "message": str(e)}), 500
-
-
-# ── API: Settings ─────────────────────────────────────────────────────────────
-
-@app.route("/api/settings/apps", methods=["GET"])
-@auth_required
-def api_settings_apps_get():
-    return jsonify(load_apps())
-
-
-@app.route("/api/settings/apps/add", methods=["POST"])
-@auth_required
-def api_add_app():
-    data = request.get_json() or {}
-    if not data.get("name"):
-        return jsonify({"error": "İsim gerekli"}), 400
-    app_data = add_app(data)
-    return jsonify({"ok": True, "app": app_data}), 201
-
-
-@app.route("/api/settings/apps/<app_id>", methods=["PUT"])
-@auth_required
-def api_update_app(app_id):
-    data = request.get_json() or {}
-    updated = update_app(app_id, data)
-    if not updated:
-        return jsonify({"error": "Bulunamadı"}), 404
-    return jsonify({"ok": True, "app": updated})
-
-
-@app.route("/api/settings/apps/<app_id>", methods=["DELETE"])
-@auth_required
-def api_delete_app(app_id):
-    uninstall = request.args.get('uninstall', 'false') == 'true'
-    logs = []
-    
-    if uninstall:
-        import subprocess
-        from registry import load_apps
-        app_data = next((a for a in load_apps() if a.get("id") == app_id), None)
-        if app_data and app_data.get("service"):
-            service = app_data["service"]
-            is_user = app_data.get("is_user_service", False)
-            try:
-                if is_user:
-                    p1 = subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "stop", service], capture_output=True, text=True, timeout=10)
-                    p2 = subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "disable", service], capture_output=True, text=True, timeout=10)
-                    logs.append(str(p1.stdout) + "\n" + str(p1.stderr))
-                    logs.append(str(p2.stdout) + "\n" + str(p2.stderr))
-                else:
-                    p1 = subprocess.run(["sudo", "systemctl", "stop", service], capture_output=True, text=True, timeout=10)
-                    p2 = subprocess.run(["sudo", "systemctl", "disable", service], capture_output=True, text=True, timeout=10)
-                    logs.append(str(p1.stdout) + "\n" + str(p1.stderr))
-                    logs.append(str(p2.stdout) + "\n" + str(p2.stderr))
-            except Exception as e:
-                return jsonify({"ok": False, "error": f"Servis durdurulamadı: {str(e)}"}), 500
-                
-            repo = app_data.get("repo")
-            if repo and (repo.startswith("file://") or repo.startswith("http")):
-                app_name_slug = repo.rstrip('/').split('/')[-1]
-                target_dir = f"/home/turan/101/{app_name_slug}"
-                import os
-                uninstall_script = f"{target_dir}/uninstall.sh"
-                if os.path.exists(uninstall_script):
-                    p3 = subprocess.run(["sudo", "bash", uninstall_script], capture_output=True, text=True)
-                    logs.append(str(p3.stdout) + "\n" + str(p3.stderr))
-                else:
-                    logs.append("\n[UYARI] uninstall.sh bulunamadı! Sadece servis durduruldu, uygulama dosyaları sistemde (apt, snap vb. ile kurulduysa) kalmış olabilir. Tamamen silmek için manuel müdahale gerekebilir.")
-            else:
-                logs.append("\n[UYARI] Bu uygulamanın özel bir kaldırıcı betiği yok. Sadece servis durduruldu. (apt, snap veya manuel kurulduysa dosyalar hala sistemdedir.)")
-                
-    from registry import delete_app
-    ok = delete_app(app_id)
-    return jsonify({"ok": ok, "log": "\n".join(logs)})
-
-@app.route("/api/auditor/scan")
-@auth_required
-def api_auditor_scan():
-    import subprocess
-    from registry import load_apps
-    
-    logs = []
-    logs.append("====== TINC HUB AKILLI DENETÇİ (AI-AUDITOR) ======")
-    logs.append("Sistem analizi başlatıldı...\n")
-    
-    # 1. Disk Kontrolü
-    import shutil
-    disk = shutil.disk_usage("/")
-    disk_percent = disk.used / disk.total * 100
-    if disk_percent > 85:
-        logs.append(f"[UYARI] Disk kullanımınız çok yüksek (%{disk_percent:.1f}).")
-        logs.append("  Öneri: Tinc Hub üzerinden 'ram-cleaner' veya 'disk-sentinel' ajanlarını çalıştırabilirsiniz.")
-        logs.append("  Veya terminalden 'sudo apt autoremove' ile yer açabilirsiniz.\n")
-    else:
-        logs.append(f"[OK] Disk kullanımı sağlıklı (%{disk_percent:.1f}).\n")
-        
-    # 2. Yetim Servis (Orphaned Service) Kontrolü
-    logs.append("Başıboş (Yetim) Tinc / Kole Servisleri Taranıyor...")
-    apps = load_apps()
-    registered_services = [a.get("service") for a in apps if a.get("service")]
-    
-    try:
-        r = subprocess.run(["systemctl", "list-units", "--type=service", "--state=running", "--no-pager", "--no-legend"], capture_output=True, text=True)
-        running_services = []
-        for line in r.stdout.split('\n'):
-            parts = line.split()
-            if len(parts) > 0 and (parts[0].startswith("tinc-") or parts[0].startswith("kole-")):
-                running_services.append(parts[0])
-                
-        orphans = [s for s in running_services if s not in registered_services and s != "tinc-hub.service"]
-        
-        if orphans:
-            logs.append(f"[TESPİT] Dashboard'da olmayan ama arka planda çalışan servisler buldum: {', '.join(orphans)}")
-            logs.append("  Öneri: Bu uygulamaları daha önce silmişsiniz ama servisleri arka planda kalmış olabilir.")
-            logs.append(f"  Temizlemek için terminalde şunu çalıştırın:")
-            for o in orphans:
-                logs.append(f"    sudo systemctl stop {o} && sudo systemctl disable {o}")
-            logs.append("")
-        else:
-            logs.append("[OK] Başıboş Tinc/Kole servisi bulunamadı.\n")
-    except Exception as e:
-        logs.append(f"[HATA] Servis taraması başarısız: {e}\n")
-        
-    # 3. RAM ve Zombi Süreçler
-    import psutil
-    ram = psutil.virtual_memory()
-    if ram.percent > 90:
-        logs.append(f"[UYARI] RAM kullanımı çok yüksek (%{ram.percent:.1f})!")
-        logs.append("  Öneri: RAM Cleaner ajanını kurup otomatik boşaltma sağlayabilirsiniz.\n")
-    else:
-        logs.append(f"[OK] RAM durumu normal (%{ram.percent:.1f}).\n")
-        
-    logs.append("====== DENETİM TAMAMLANDI ======")
-    
-    return jsonify({"ok": True, "log": "\n".join(logs)})
-
-@app.route("/api/docker/<container_id>", methods=["DELETE"])
-@auth_required
-def api_delete_docker(container_id):
-    import subprocess
-    try:
-        r = subprocess.run(["sudo", "docker", "rm", "-f", container_id], capture_output=True, timeout=10, text=True)
-        if r.returncode == 0:
-            return jsonify({"ok": True, "log": "Docker container silindi:\n" + r.stdout + "\n" + r.stderr})
-        else:
-            return jsonify({"ok": False, "error": r.stderr, "log": "HATA OLUŞTU:\n" + r.stderr})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e), "log": str(e)}), 500
-
-
-@app.route("/api/store", methods=["GET"])
-@auth_required
-def api_get_store():
-    import json
-    import os
-    store_file = os.path.join(os.path.dirname(__file__), "store.json")
-    try:
-        with open(store_file, "r") as f:
-            store_apps = json.load(f)
-            
-        # Check which apps are installed
-        from registry import load_apps
-        installed_apps = load_apps()
-        installed_ids = [a.get("id") for a in installed_apps]
-        
-        for app in store_apps:
-            app["is_installed"] = app["id"] in installed_ids
-            
-        return jsonify(store_apps)
-    except Exception as e:
-        return jsonify([])
-
-@app.route("/api/store/install", methods=["POST"])
-@auth_required
-def api_store_install():
-    data = request.get_json()
-    store_app_id = data.get("id")
-    if not store_app_id:
-        return jsonify({"ok": False, "error": "App ID gerekli."}), 400
-        
-    from installer import install_app_from_store
-    res = install_app_from_store(store_app_id)
-    return jsonify(res), (200 if res.get("ok") else 500)
-
-@app.route("/api/settings/apps/<app_id>/update", methods=["POST"])
-@auth_required
-def api_pull_update_app(app_id):
-    from installer import update_app_local
-    data = request.get_json() or {}
-    new_repo = data.get("repo")
-    res = update_app_local(app_id, new_repo)
-    return jsonify(res), (200 if res.get("ok") else 500)
-
-@app.route("/api/settings/apps/<app_id>/pin", methods=["POST"])
-@auth_required
-def api_pin_app(app_id):
-    data = request.get_json() or {}
-    pinned = bool(data.get("pinned", True))
-    updated = update_app(app_id, {"pinned": pinned})
-    return jsonify({"ok": bool(updated)})
-
-
-# ── API: Discovery ───────────────────────────────────────────────────────────
-
-@app.route("/api/discovery")
-@auth_required
-def api_discovery():
-    disc = _get_discovery()
-    return jsonify(disc)
-
-
-@app.route("/api/discovery/refresh", methods=["POST"])
-@auth_required
-def api_discovery_refresh():
-    _disc_cache["at"] = None   # TTL sıfırla
-    disc = _get_discovery()
-    return jsonify({"ok": True, "services": len(disc.get("services", [])),
-                    "ports": len(disc.get("ports", {}))})
-
-
-@app.route("/api/system/version")
-@auth_required
-def api_system_version():
-    from installer import check_system_update
-    res = check_system_update()
-    return jsonify(res)
-
-
-@app.route("/api/system/update", methods=["POST"])
-@auth_required
-def api_system_self_update():
-    from installer import perform_self_update
-    res = perform_self_update()
-    return jsonify(res), (200 if res.get("ok") else 500)
-
-
-# ── API: Sistem Özeti ────────────────────────────────────────────────────────
-
-def _system_summary() -> dict:
-    import shutil
-    try:
-        import psutil
-        ram  = psutil.virtual_memory()
-        swap = psutil.swap_memory()
-        cpu  = psutil.cpu_percent(interval=0.2)
-        disk = shutil.disk_usage("/")
-        return {
-            "cpu_percent":  round(cpu, 1),
-            "ram_percent":  round(ram.percent, 1),
-            "ram_used_gb":  round(ram.used  / 1024**3, 1),
-            "ram_total_gb": round(ram.total / 1024**3, 1),
-            "swap_percent": round(swap.percent, 1),
-            "disk_percent": round(disk.used / disk.total * 100, 1),
-            "disk_used_gb": round(disk.used  / 1024**3, 1),
-            "disk_total_gb":round(disk.total / 1024**3, 1),
-        }
-    except Exception:
-        return {}
-
-
-@app.route("/api/system")
-@auth_required
-def api_system():
-    return jsonify(_system_summary())
-
-
-@app.route("/api/wan")
-@auth_required
-def api_wan():
-    if tinchub_db:
-        history = tinchub_db.get_wan_history(limit=5)
-        latest  = tinchub_db.get_latest_metric("wan-tracker", "wan_ip")
-        return jsonify({"history": history, "current": latest})
-    return jsonify({"history": [], "current": None})
-
-
-# ── SSE: Canlı Log Akışı ─────────────────────────────────────────────────────
-
-@app.route("/api/logs/stream/<path:service_name>")
-@auth_required
-def stream_logs(service_name):
-    """
-    Server-Sent Events ile journalctl -f akışı.
-    Nginx için: proxy_buffering off; X-Accel-Buffering: no
-    """
-    # Güvenlik: sadece harf, rakam, kısa çizgi, @ ve nokta
-    import re as _re
-    if not _re.match(r'^[\w@.\-]+$', service_name):
-        return "Geçersiz servis adı", 400
-
-    lines = int(request.args.get("lines", 100))
-    unit  = service_name if service_name.endswith(".service") else f"{service_name}.service"
-    
-    app_data = next((a for a in load_apps() if a.get("service") == service_name or a.get("service") == unit), None)
-    is_user = app_data.get("is_user_service", False) if app_data else False
-    
-    if is_user:
-        cmd = ["sudo", "-u", "turan", "XDG_RUNTIME_DIR=/run/user/1000", "journalctl", "--user", "-u", unit, "-f", f"-n{lines}", "--no-pager", "--output=short-iso"]
-    else:
-        cmd = ["journalctl", "-u", unit, "-f", f"-n{lines}", "--no-pager", "--output=short-iso"]
-
-    def generate():
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, bufsize=1
-        )
-        try:
-            yield f"data: {json.dumps({'type': 'connected', 'service': service_name})}\n\n"
-            for line in proc.stdout:
-                line = line.rstrip()
-                if line:
-                    payload = json.dumps({"type": "line", "line": line,
-                                          "ts": datetime.now().isoformat()})
-                    yield f"data: {payload}\n\n"
-        except GeneratorExit:
-            pass
-        finally:
-            proc.terminate()
-            proc.wait(timeout=3)
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control":       "no-cache",
-            "X-Accel-Buffering":   "no",
-            "Connection":          "keep-alive",
-        }
-    )
-
-
-@app.route("/api/logs/lines/<path:service_name>")
-@auth_required
-def log_lines(service_name):
-    """Son N log satırını JSON olarak döner (statik, SSE değil)."""
-    import re as _re
-    if not _re.match(r'^[\w@.\-]+$', service_name):
-        return jsonify({"error": "Geçersiz servis adı"}), 400
-    lines = int(request.args.get("n", 200))
-    unit  = service_name if service_name.endswith(".service") else f"{service_name}.service"
-    
-    app_data = next((a for a in load_apps() if a.get("service") == service_name or a.get("service") == unit), None)
-    is_user = app_data.get("is_user_service", False) if app_data else False
-    
-    if is_user:
-        cmd = ["sudo", "-u", "turan", "XDG_RUNTIME_DIR=/run/user/1000", "journalctl", "--user", "-u", unit, f"-n{lines}", "--no-pager", "--output=short-iso"]
-    else:
-        cmd = ["journalctl", "-u", unit, f"-n{lines}", "--no-pager", "--output=short-iso"]
-        
-    r = subprocess.run(
-        cmd,
-        capture_output=True, text=True, timeout=10
-    )
-    return jsonify({"lines": r.stdout.splitlines(), "service": service_name})
-
-
-# ── Yardımcılar ───────────────────────────────────────────────────────────────
-
-def _now() -> str:
-    return datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-
-
-# ── Başlatma ─────────────────────────────────────────────────────────────────
+def register_blueprints():
+    # Register Blueprints
+    from blueprints.pages import bp as pages_bp
+    app.register_blueprint(pages_bp)
+    from blueprints.taskmanager import bp as taskmanager_bp
+    app.register_blueprint(taskmanager_bp)
+    from blueprints.api_apps import bp as api_apps_bp
+    app.register_blueprint(api_apps_bp)
+    from blueprints.api_system import bp as api_system_bp
+    app.register_blueprint(api_system_bp)
+    from blueprints.api_agents import bp as api_agents_bp
+    app.register_blueprint(api_agents_bp)
+    from blueprints.api_store import bp as api_store_bp
+    app.register_blueprint(api_store_bp)
+    from blueprints.api_settings import bp as api_settings_bp
+    app.register_blueprint(api_settings_bp)
+    from blueprints.api_notifications import bp as api_notifications_bp
+    app.register_blueprint(api_notifications_bp)
+    from blueprints.api_rules import bp as api_rules_bp
+    app.register_blueprint(api_rules_bp)
+    from blueprints.api_network import bp as api_network_bp
+    app.register_blueprint(api_network_bp)
+    from blueprints.api_plugins import bp as api_plugins_bp
+    app.register_blueprint(api_plugins_bp)
+    from blueprints.api_remote import bp as api_remote_bp
+    app.register_blueprint(api_remote_bp)
+    from blueprints.api_terminal import bp as api_terminal_bp
+    app.register_blueprint(api_terminal_bp)
+    from blueprints.auth import bp as auth_bp
+    app.register_blueprint(auth_bp)
 
 if __name__ == "__main__":
+    register_blueprints()
     log.info(f"Tinc Hub başlatılıyor → http://{HOST}:{PORT}")
     log.info(f"Kimlik doğrulama: {'AÇIK' if PASSWORD else 'KAPALI (şifresiz)'}")
 
     # Arka plan health checker başlat
+    syslog_server.start_syslog_server()
+    packet_sniffer.t_save = __import__('threading').Thread(target=packet_sniffer.save_stats_loop, daemon=True)
+    packet_sniffer.t_save.start()
+    __import__('threading').Thread(target=packet_sniffer.run_tcpdump, daemon=True).start()
+
+    # Metrik toplayıcı: topology.json'dan IP listesini alarak periyodik ping ölçümü yapar
+    def get_monitored_ips():
+        try:
+            import json
+            topo_file = "/opt/tinc-hub/shared/topology.json"
+            with open(topo_file) as f:
+                topo = json.load(f)
+            return [ip for ip in topo.get("nodes", {}).keys() if ip.count('.') == 3]
+        except Exception:
+            return []
+    metrics_collector.start_metrics_collector(get_monitored_ips)
+
     start_background_checker(load_apps, interval=30)
 
     app.run(host=HOST, port=PORT, debug=False, threaded=True)
-
-
-@app.route("/api/settings/backup", methods=["POST"])
-@auth_required
-def api_backup():
-    import subprocess
-    import datetime
-    try:
-        ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"/var/log/tinc-hub/tinc_hub_backup_{ts}.tar.gz"
-        # /etc/tinc-hub ve /opt/tinc-hub klasorlerini yedekle
-        subprocess.run(["sudo", "tar", "-czf", filename, "/etc/tinc-hub", "/opt/tinc-hub"], check=True)
-        return jsonify({"ok": True, "file": filename})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-
-
-@app.route("/api/mobile/info", methods=["GET"])
-def api_mobile_info():
-    token = request.headers.get("X-Tinc-Token") or request.args.get("token")
-    if token != os.environ.get("API_TOKEN"):
-        return jsonify({"ok": False, "error": "Unauthorized"}), 401
-        
-    return jsonify({
-        "ok": True,
-        "hub_id": os.environ.get("HUB_ID"),
-        "version": "1.0.0",
-        "system": _system_summary()
-    })
-
-
-
-@app.route("/api/settings/telegram", methods=["POST"])
-@auth_required
-def api_save_telegram():
-    data = request.json
-    t_token = data.get("token", "")
-    t_chat = data.get("chat", "")
-    
-    import os
-    env_file = "/etc/tinc-hub/config.env"
-    lines = []
-    if os.path.exists(env_file):
-        with open(env_file, "r") as f:
-            lines = f.readlines()
-            
-    found_token = False
-    found_chat = False
-    
-    with open(env_file, "w") as f:
-        for line in lines:
-            if line.startswith("TELEGRAM_BOT_TOKEN="):
-                f.write(f"TELEGRAM_BOT_TOKEN={t_token}\n")
-                found_token = True
-            elif line.startswith("TELEGRAM_CHAT_ID="):
-                f.write(f"TELEGRAM_CHAT_ID={t_chat}\n")
-                found_chat = True
-            else:
-                f.write(line)
-                
-        if not found_token:
-                f.write(f"TELEGRAM_BOT_TOKEN={t_token}\n")
-        if not found_chat:
-                f.write(f"TELEGRAM_CHAT_ID={t_chat}\n")
-                
-    return jsonify({"ok": True, "message": "Telegram ayarlari kaydedildi. Aktif olmasi için Tinc Hub'i yeniden başlatin."})

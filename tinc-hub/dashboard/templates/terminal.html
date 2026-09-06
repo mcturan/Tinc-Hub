@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block head %}
+<style>
+.term-container {
+    background: #0f172a;
+    border-radius: 10px;
+    padding: 16px;
+    font-family: 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.85rem;
+    height: calc(100vh - 180px);
+    display: flex;
+    flex-direction: column;
+}
+.term-output {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 10px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: #e2e8f0;
+}
+.term-output .stdout { color: #e2e8f0; }
+.term-output .stderr { color: #f87171; }
+.term-output .cmd-line { color: #22c55e; margin-top: 8px; }
+.term-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    border-top: 1px solid #334155;
+    padding-top: 10px;
+}
+.term-prompt { color: #22c55e; font-weight: bold; white-space: nowrap; }
+.term-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #e2e8f0;
+    font-family: inherit;
+    font-size: inherit;
+    outline: none;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <h2>💻 Terminal</h2>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button onclick="runQuick('df -h')" class="btn btn-sm">💾 df</button>
+        <button onclick="runQuick('free -m')" class="btn btn-sm">🧠 RAM</button>
+        <button onclick="runQuick('docker ps')" class="btn btn-sm">🐳 Docker</button>
+        <button onclick="runQuick('systemctl list-units --state=failed')" class="btn btn-sm">❌ Failed</button>
+        <button onclick="runQuick('uptime')" class="btn btn-sm">⏱️ Uptime</button>
+        <button onclick="runQuick('ss -tlnp')" class="btn btn-sm">🔌 Portlar</button>
+        <button onclick="clearOutput()" class="btn btn-sm">🧹 Temizle</button>
+    </div>
+</div>
+
+<div class="term-container">
+    <div class="term-output" id="output">
+        <div style="color:#64748b;">Tinc Hub Terminal — komut yazıp Enter'a basın.</div>
+    </div>
+    <div class="term-input-row">
+        <span class="term-prompt">turan@tinc-hub:~$</span>
+        <input type="text" class="term-input" id="cmd-input" 
+               placeholder="komut yazın..." autofocus
+               onkeydown="if(event.key==='Enter') runCmd()">
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const history = [];
+let histIdx = -1;
+
+async function runCmd() {
+    const input = document.getElementById('cmd-input');
+    const cmd = input.value.trim();
+    if (!cmd) return;
+    
+    history.unshift(cmd);
+    histIdx = -1;
+    input.value = '';
+    
+    appendOutput(`\n$ ${cmd}`, 'cmd-line');
+    
+    try {
+        const r = await fetch('/api/terminal/exec', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({command: cmd})
+        });
+        const data = await r.json();
+        
+        if (data.error) {
+            appendOutput(data.error, 'stderr');
+        } else {
+            if (data.stdout) appendOutput(data.stdout, 'stdout');
+            if (data.stderr) appendOutput(data.stderr, 'stderr');
+        }
+    } catch(e) {
+        appendOutput('Bağlantı hatası: ' + e, 'stderr');
+    }
+}
+
+function runQuick(cmd) {
+    document.getElementById('cmd-input').value = cmd;
+    runCmd();
+}
+
+function appendOutput(text, cls) {
+    const out = document.getElementById('output');
+    const div = document.createElement('div');
+    div.className = cls;
+    div.textContent = text;
+    out.appendChild(div);
+    out.scrollTop = out.scrollHeight;
+}
+
+function clearOutput() {
+    document.getElementById('output').innerHTML = '';
+}
+
+// Komut geçmişi navigasyonu (yukarı/aşağı ok)
+document.getElementById('cmd-input').addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (histIdx < history.length - 1) {
+            histIdx++;
+            e.target.value = history[histIdx];
+        }
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (histIdx > 0) {
+            histIdx--;
+            e.target.value = history[histIdx];
+        } else {
+            histIdx = -1;
+            e.target.value = '';
+        }
+    }
+});
+</script>
+{% endblock %}

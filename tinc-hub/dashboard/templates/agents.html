@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block head %}
+<style>
+/* Add any specific styles for agents here if needed, but mostly relying on hub.html classes */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="section-header" style="margin-bottom: 20px;">
+    <h2>Sistem Ajanları (Agents)</h2>
+</div>
+
+<div class="section">
+    <div class="app-grid" id="agents-grid">
+        {% for agent in agents %}
+        <div class="app-card" onclick="if(!event.target.closest('a') && !event.target.closest('button')) window.location.href='/app/{{ agent.id }}'">
+            <div class="card-main">
+                <div class="card-icon">🤖</div>
+                <div class="card-title">
+                    <div class="card-name">{{ agent.name or agent.id }}</div>
+                    <div class="card-desc">{{ agent.description or 'Sistem ajanı' }}</div>
+                </div>
+            </div>
+            
+            <div class="card-meta-info" style="margin-top: 10px;">
+                <div>Durum: <span class="status-badge" id="status-{{ agent.id }}">Bilinmiyor</span></div>
+                <div style="margin-top: 5px;">
+                    <span id="metric-label-{{ agent.id }}">{{ agent.metric_label }}</span>: 
+                    <strong id="metric-val-{{ agent.id }}">{{ agent.latest_metric or '--' }}</strong>
+                </div>
+                <div style="margin-top: 5px; font-size: 0.75rem; color: var(--muted);">
+                    Son görülme: <span id="seen-{{ agent.id }}">{{ agent.last_seen or '--' }}</span>
+                </div>
+            </div>
+            
+            <div class="card-actions" style="margin-top: 15px;">
+                <a href="/app/{{ agent.id }}" class="btn btn-sm btn-icon" title="Detaylı metrikleri gör">📊 Detay</a>
+                <a href="/logs?service={{ agent.id }}" class="btn btn-sm btn-icon" title="Canlı logları gör">📜 Loglar</a>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">Henüz kayıtlı bir ajan bulunmuyor. Veritabanını kontrol edin.</div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="section" style="margin-top: 40px;">
+    <h2>Son Olaylar (Recent Events)</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Zaman</th>
+                    <th>Ajan</th>
+                    <th>Seviye</th>
+                    <th>Mesaj</th>
+                </tr>
+            </thead>
+            <tbody id="events-table-body">
+                {% for event in events %}
+                <tr>
+                    <td style="white-space: nowrap;">{{ event.timestamp }}</td>
+                    <td><strong>{{ event.agent_id }}</strong></td>
+                    <td>
+                        <span class="badge" style="
+                            background-color: {% if event.level == 'ERROR' %}#ef4444{% elif event.level == 'WARN' %}#f59e0b{% else %}#3b82f6{% endif %};
+                            color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
+                            {{ event.level }}
+                        </span>
+                    </td>
+                    <td>{{ event.message }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 15px;">Son 24 saat içinde kaydedilmiş bir olay bulunamadı.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function timeAgo(dateString) {
+    if (!dateString) return '--';
+    // dateString format in DB is typically YYYY-MM-DD HH:MM:SS or ISO
+    const date = new Date(dateString.replace(' ', 'T'));
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (isNaN(diffMins)) return String(dateString);
+    if (diffMins < 1) return 'az önce';
+    if (diffMins < 60) return `${diffMins} dk önce`;
+    const diffHrs = Math.floor(diffMins / 60);
+    if (diffHrs < 24) return `${diffHrs} saat önce`;
+    return `${Math.floor(diffHrs / 24)} gün önce`;
+}
+
+function updateAgentStatus(agentId, lastSeenStr) {
+    const statusEl = document.getElementById(`status-${agentId}`);
+    if (!statusEl || !lastSeenStr) return;
+    
+    const lastSeen = new Date(lastSeenStr.replace(' ', 'T'));
+    const now = new Date();
+    const diffMins = (now - lastSeen) / 60000;
+    
+    if (isNaN(diffMins)) {
+        statusEl.className = 'status-badge';
+        statusEl.textContent = 'Bilinmiyor';
+        return;
+    }
+    
+    if (diffMins <= 5) {
+        statusEl.className = 'status-badge healthy';
+        statusEl.textContent = '🟢 Aktif';
+    } else {
+        statusEl.className = 'status-badge dead';
+        statusEl.textContent = '🔴 Pasif';
+    }
+}
+
+async function fetchAgentData() {
+    try {
+        const r = await fetch('/api/agents');
+        const agents = await r.json();
+        
+        agents.forEach(agent => {
+            const seenEl = document.getElementById(`seen-${agent.id}`);
+            if (seenEl) seenEl.textContent = timeAgo(agent.last_seen);
+            
+            updateAgentStatus(agent.id, agent.last_seen);
+            
+            const metricValEl = document.getElementById(`metric-val-${agent.id}`);
+            if (metricValEl && agent.latest_metric !== null) {
+                metricValEl.textContent = agent.latest_metric;
+            }
+            const metricLabelEl = document.getElementById(`metric-label-${agent.id}`);
+            if (metricLabelEl && agent.metric_label) {
+                metricLabelEl.textContent = agent.metric_label;
+            }
+        });
+    } catch(e) {
+        console.error("Agent verisi alınamadı:", e);
+    }
+}
+
+// Initial status check on page load
+{% for agent in agents %}
+updateAgentStatus('{{ agent.id }}', '{{ agent.last_seen }}');
+document.getElementById('seen-{{ agent.id }}').textContent = timeAgo('{{ agent.last_seen }}');
+{% endfor %}
+
+// Auto refresh every 10 seconds
+setInterval(fetchAgentData, 10000);
+</script>
+{% endblock %}

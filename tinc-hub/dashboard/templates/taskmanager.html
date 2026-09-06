@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+.tm-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+.tm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+.tm-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+.system-stats {
+    display: flex;
+    gap: 1.5rem;
+}
+.stat-box {
+    background: var(--bg-alt);
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    min-width: 150px;
+}
+.stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+.stat-value {
+    font-size: 1.25rem;
+    font-weight: bold;
+}
+.stat-bar-bg {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 0.5rem;
+    overflow: hidden;
+}
+.stat-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s ease;
+}
+
+.tm-controls {
+    display: flex;
+    margin-bottom: 1rem;
+    gap: 1rem;
+}
+.tm-search {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-alt);
+    color: var(--text);
+}
+.tm-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-alt);
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+.tm-table th {
+    text-align: left;
+    padding: 1rem;
+    background: rgba(255,255,255,0.05);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+}
+.tm-table th:hover {
+    background: rgba(255,255,255,0.1);
+}
+.tm-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+.tm-table tbody tr {
+    transition: background-color 0.2s ease;
+}
+.tm-table tbody tr.running {
+    background-color: rgba(46, 204, 113, 0.05);
+}
+.tm-table tbody tr.stopped {
+    background-color: rgba(231, 76, 60, 0.05);
+}
+.tm-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.process-icon {
+    font-size: 1.25rem;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+}
+.btn-action {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.85rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    margin-right: 0.5rem;
+}
+.btn-action:hover {
+    background: var(--border);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tm-container">
+    <div class="tm-header">
+        <div class="tm-title">Görev Yöneticisi</div>
+        <div class="system-stats">
+            <div class="stat-box">
+                <div class="stat-label">CPU KULLANIMI</div>
+                <div class="stat-value" id="sys-cpu">0%</div>
+                <div class="stat-bar-bg"><div class="stat-bar-fill" id="sys-cpu-bar" style="width: 0%"></div></div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">RAM KULLANIMI</div>
+                <div class="stat-value" id="sys-ram">0%</div>
+                <div class="stat-bar-bg"><div class="stat-bar-fill" id="sys-ram-bar" style="width: 0%"></div></div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">DİSK KULLANIMI</div>
+                <div class="stat-value" id="sys-disk">0%</div>
+                <div class="stat-bar-bg"><div class="stat-bar-fill" id="sys-disk-bar" style="width: 0%"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tm-controls">
+        <input type="text" id="tm-search" class="tm-search" placeholder="İsim veya servis ara...">
+    </div>
+
+    <table class="tm-table" id="tm-table">
+        <thead>
+            <tr>
+                <th data-sort="icon">İkon</th>
+                <th data-sort="name">İsim</th>
+                <th data-sort="type">Tip</th>
+                <th data-sort="pid">PID</th>
+                <th data-sort="cpu_percent">CPU %</th>
+                <th data-sort="ram_mb">RAM (MB)</th>
+                <th data-sort="since">Uptime</th>
+                <th>Eylemler</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Satırlar JavaScript ile doldurulacak -->
+        </tbody>
+    </table>
+</div>
+
+<script>
+let sortColumn = 'name';
+let sortDesc = false;
+let currentData = [];
+
+function updateSystemStats(system) {
+    document.getElementById('sys-cpu').textContent = system.cpu_percent + '%';
+    document.getElementById('sys-cpu-bar').style.width = system.cpu_percent + '%';
+    
+    document.getElementById('sys-ram').textContent = system.ram_percent + '%';
+    document.getElementById('sys-ram-bar').style.width = system.ram_percent + '%';
+    
+    document.getElementById('sys-disk').textContent = system.disk_percent + '%';
+    document.getElementById('sys-disk-bar').style.width = system.disk_percent + '%';
+}
+
+function handleAction(service, type, action, isUser) {
+    if(!confirm(`${service} servisini ${action} yapmak istediğinize emin misiniz?`)) return;
+    
+    fetch('/api/manage', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            service: service,
+            action: action,
+            is_user: isUser
+        })
+    }).then(r => r.json()).then(data => {
+        if(data.status === 'success') {
+            fetchData();
+        } else {
+            alert('Hata: ' + data.error);
+        }
+    }).catch(err => {
+        alert('Hata: ' + err);
+    });
+}
+
+function renderTable() {
+    const tbody = document.querySelector('#tm-table tbody');
+    const searchTerm = document.getElementById('tm-search').value.toLowerCase();
+    
+    let filteredData = currentData.filter(item => 
+        item.name.toLowerCase().includes(searchTerm) || 
+        item.service.toLowerCase().includes(searchTerm)
+    );
+    
+    filteredData.sort((a, b) => {
+        let valA = a[sortColumn];
+        let valB = b[sortColumn];
+        
+        if (valA === null) valA = '';
+        if (valB === null) valB = '';
+        
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        
+        if (valA < valB) return sortDesc ? 1 : -1;
+        if (valA > valB) return sortDesc ? -1 : 1;
+        return 0;
+    });
+
+    tbody.innerHTML = '';
+    
+    filteredData.forEach(proc => {
+        const tr = document.createElement('tr');
+        tr.className = proc.running ? 'running' : 'stopped';
+        
+        const isUserStr = proc.is_user_service ? 'true' : 'false';
+        const cpuStr = proc.cpu_percent !== null ? proc.cpu_percent.toFixed(1) : '-';
+        const ramStr = proc.ram_mb !== null ? proc.ram_mb.toFixed(1) : '-';
+        const pidStr = proc.pid || '-';
+        
+        let actions = '';
+        if (proc.type === 'systemd') {
+            actions = `
+                <button class="btn-action" onclick="handleAction('${proc.service}', 'systemd', 'restart', ${isUserStr})">Restart</button>
+                <button class="btn-action" onclick="handleAction('${proc.service}', 'systemd', 'stop', ${isUserStr})">Stop</button>
+            `;
+        }
+        
+        tr.innerHTML = `
+            <td><span class="process-icon">${proc.icon}</span></td>
+            <td><strong>${proc.name}</strong><br><small style="color:var(--text-muted)">${proc.service}</small></td>
+            <td>${proc.type}</td>
+            <td>${pidStr}</td>
+            <td>${cpuStr}</td>
+            <td>${ramStr}</td>
+            <td>${proc.since}</td>
+            <td>${actions}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function fetchData() {
+    fetch('/api/taskmanager')
+        .then(res => res.json())
+        .then(data => {
+            currentData = data.processes;
+            updateSystemStats(data.system);
+            renderTable();
+        })
+        .catch(err => console.error('Task manager API error:', err));
+}
+
+document.querySelectorAll('#tm-table th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+        const col = th.dataset.sort;
+        if (sortColumn === col) {
+            sortDesc = !sortDesc;
+        } else {
+            sortColumn = col;
+            sortDesc = false;
+        }
+        renderTable();
+    });
+});
+
+document.getElementById('tm-search').addEventListener('input', renderTable);
+
+fetchData();
+setInterval(fetchData, 3000);
+</script>
+{% endblock %}

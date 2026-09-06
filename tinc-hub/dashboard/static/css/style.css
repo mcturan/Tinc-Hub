@@ -690,3 +690,35 @@ footer {
     cursor: not-allowed;
     filter: grayscale(100%);
 }
+
+/* Notification Center */
+.notification-bell {
+    position: relative;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 5px 10px;
+}
+.badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #ef4444;
+    color: white;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    font-weight: bold;
+}
+.notif-panel {
+    position: absolute;
+    right: 20px;
+    top: 60px;
+    width: 380px;
+    max-height: 500px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    z-index: 1000;
+}

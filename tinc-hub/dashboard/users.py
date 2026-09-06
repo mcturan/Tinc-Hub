@@ -1,11 +1,11 @@
 import json
 import os
-import hashlib
+import bcrypt
 
 USERS_FILE = "/etc/tinc-hub/users.json"
 
 def get_hash(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 def init_users(default_password: str):
     if not os.path.exists("/etc/tinc-hub"):
@@ -26,13 +26,15 @@ def load_users() -> dict:
         try:
             with open(USERS_FILE, "r") as f:
                 return json.load(f)
-        except:
+        except Exception as e:
+            import logging
+            logging.warning(f"Exception caught: {e}")
             return {}
     return {}
 
 def verify_user(username, password) -> dict:
     users = load_users()
     u = users.get(username)
-    if u and u.get("password") == get_hash(password):
+    if u and bcrypt.checkpw(password.encode(), u.get("password", "").encode()):
         return u
     return None

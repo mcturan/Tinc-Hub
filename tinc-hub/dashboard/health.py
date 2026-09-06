@@ -7,8 +7,16 @@ Her uygulama için HTTP ping veya systemd durumunu kontrol eder.
 
 import subprocess
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 import os
+
+from dotenv import dotenv_values
+import os
+_config = dotenv_values("/etc/tinc-hub/config.env") if os.path.exists("/etc/tinc-hub/config.env") else {}
+RUN_USER = _config.get("RUN_USER", "turan")
+RUN_UID = _config.get("RUN_UID", "1000")
 import threading
 import time
 from datetime import datetime
@@ -22,9 +30,9 @@ def send_telegram_alert(msg: str):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     try:
         requests.post(url, json={"chat_id": TELEGRAM_CHAT, "text": f"🚨 [TINC HUB ALERT]\n{msg}"}, timeout=5)
-    except:
-        pass
-
+    except Exception as e:
+        import logging
+        logging.warning(f"Exception caught: {e}")
 # Son sağlık durumları cache (thread-safe)
 _health_cache: dict = {}
 _cache_lock = threading.Lock()
@@ -61,8 +69,8 @@ def systemd_check(service_name: str, is_user: bool = False) -> dict:
         unit = service_name if service_name.endswith(".service") else f"{service_name}.service"
         cmd = ["systemctl", "is-active", unit]
         if is_user:
-            # sudo -u turan XDG_RUNTIME_DIR=/run/user/1000 systemctl --user is-active
-            cmd = ["sudo", "XDG_RUNTIME_DIR=/run/user/1000", "-u", "turan", "systemctl", "--user", "is-active", unit]
+            # sudo -u RUN_USER XDG_RUNTIME_DIR=/run/user/RUN_UID systemctl --user is-active
+            cmd = ["sudo", f"XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "-u", RUN_USER, "systemctl", "--user", "is-active", unit]
             
         r = subprocess.run(
             cmd,
@@ -173,10 +181,60 @@ def start_background_checker(get_apps_fn, interval: int = CHECK_INTERVAL):
                             
                     prev_state[app_id] = result["ok"]
                     update_cache(app_id, result)
-            except Exception:
-                pass
+            except Exception as e:
+                import logging
+                logging.warning(f"Exception caught: {e}")
             time.sleep(interval)
 
     t = threading.Thread(target=_loop, daemon=True, name="health-checker")
     t.start()
+
+    def _metrics_loop():
+        import psutil, shutil, sys, os
+        SHARED_DIR = os.environ.get("TINC_HUB_SHARED", "/opt/tinc-hub/shared")
+        if SHARED_DIR not in sys.path: sys.path.insert(0, SHARED_DIR)
+        try:
+            import db as tinchub_db
+        except Exception: tinchub_db = None
+        
+        while True:
+            try:
+                cpu = psutil.cpu_percent(interval=1)
+                ram = psutil.virtual_memory().percent
+                disk = shutil.disk_usage("/").used / shutil.disk_usage("/").total * 100
+                if tinchub_db:
+                    tinchub_db.write_metric("system", "cpu_percent", value=round(cpu, 1))
+                    tinchub_db.write_metric("system", "ram_percent", value=round(ram, 1))
+                    tinchub_db.write_metric("system", "disk_percent", value=round(disk, 1))
+                    tinchub_db.cleanup_old_metrics(days=30)
+            except Exception:
+                pass
+                
+            try:
+                import sys, os
+                SHARED_DIR = os.environ.get("TINC_HUB_SHARED", "/opt/tinc-hub/shared")
+                if SHARED_DIR not in sys.path: sys.path.insert(0, SHARED_DIR)
+                from rules_engine import engine
+                
+                metrics = {
+                    'cpu_percent': cpu,
+                    'ram_percent': ram,
+                    'disk_percent': disk
+                }
+                
+                services_dict = {}
+                apps_list = get_apps_fn()
+                for a in apps_list:
+                    if a.get('service'):
+                        health = get_cached_health(a['id'])
+                        services_dict[a['service']] = health['ok'] if health else False
+                        
+                engine.evaluate_all(metrics, services_dict)
+            except Exception:
+                pass
+                
+            time.sleep(30)
+            
+    threading.Thread(target=_metrics_loop, daemon=True, name="system-metrics-writer").start()
+
     return t

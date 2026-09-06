@@ -9,6 +9,62 @@
     <title>Tinc Hub</title>
     <link rel="stylesheet" href="/static/css/style.css">
     {% block head %}{% endblock %}
+    <style>
+    .notification-bell {
+        position: relative;
+        cursor: pointer;
+        font-size: 1.2rem;
+        padding: 5px 10px;
+        user-select: none;
+    }
+    .badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #ef4444;
+        color: white;
+        border-radius: 50%;
+        font-size: 0.65rem;
+        padding: 2px 6px;
+        font-weight: bold;
+    }
+    .badge.hidden { display: none; }
+    .notif-panel {
+        position: absolute;
+        right: 20px;
+        top: 55px;
+        width: 380px;
+        max-height: 450px;
+        overflow-y: auto;
+        background: var(--surface, #1e293b);
+        border: 1px solid var(--border, #334155);
+        border-radius: 10px;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        z-index: 1000;
+    }
+    .notif-panel.hidden { display: none; }
+    .notif-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border, #334155);
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .notif-item {
+        display: flex;
+        gap: 10px;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border, #334155);
+        font-size: 0.85rem;
+    }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-icon { font-size: 1rem; flex-shrink: 0; margin-top: 2px; }
+    .notif-msg { margin-bottom: 3px; }
+    .notif-meta { font-size: 0.75rem; color: var(--muted, #64748b); }
+    .notif-empty { padding: 20px; text-align: center; color: var(--muted, #64748b); }
+    .notif-error { border-left: 3px solid #ef4444; }
+    .notif-warn { border-left: 3px solid #eab308; }
+    .notif-info { border-left: 3px solid #3b82f6; }
+    </style>
 </head>
 <body>
     <header>
@@ -20,9 +76,17 @@
             <nav>
                 <a href="/" class="{% if request.path == '/' %}active{% endif %}">Hub</a>
                 <a href="/logs" class="{% if request.path.startswith('/logs') %}active{% endif %}">Loglar</a>
+                <a href="/taskmanager" class="{% if request.path.startswith('/taskmanager') %}active{% endif %}">Görev Yöneticisi</a>
+                <a href="/rules" class="{% if request.path.startswith('/rules') %}active{% endif %}">Otomasyon</a>
+                <a href="/network" class="{% if request.path.startswith('/network') %}active{% endif %}">Ağ Haritası</a>
+                <a href="/multi" class="{% if request.path.startswith('/multi') %}active{% endif %}">Makineler</a>
+                <a href="/agents" class="{% if request.path.startswith('/agents') %}active{% endif %}">Ajanlar</a>
                 <a href="/settings" class="{% if request.path.startswith('/settings') %}active{% endif %}">Ayarlar</a>
             </nav>
             <div class="header-actions">
+                <div class="notification-bell" onclick="toggleNotifications()">
+                    🔔 <span id="notif-badge" class="badge hidden">0</span>
+                </div>
                 <div class="header-time">{{ now }}</div>
                 {% if has_auth %}
                 <a href="/logout" class="btn btn-sm">Çıkış</a>
@@ -74,7 +138,77 @@
         </div>
     </div>
     
+    <!-- Notification Panel -->
+    <div id="notifPanel" class="notif-panel hidden">
+        <div class="notif-header">
+            <span>🔔 Bildirimler</span>
+        </div>
+        <div id="notif-list">
+            <div class="notif-empty">Yükleniyor...</div>
+        </div>
+    </div>
+
     <script>
+    function toggleNotifications() {
+        const panel = document.getElementById('notifPanel');
+        if (!panel) return;
+        panel.classList.toggle('hidden');
+        if (!panel.classList.contains('hidden')) {
+            loadNotifications();
+        }
+    }
+
+    async function loadNotifications() {
+        try {
+            const r = await fetch('/api/notifications');
+            const data = await r.json();
+            const list = document.getElementById('notif-list');
+            if (data.length === 0) {
+                list.innerHTML = '<div class="notif-empty">Bildirim yok</div>';
+                return;
+            }
+            list.innerHTML = data.map(n => {
+                const levelClass = n.level === 'ERROR' ? 'notif-error' :
+                                   n.level === 'WARN' ? 'notif-warn' : 'notif-info';
+                const icon = n.level === 'ERROR' ? '🔴' : n.level === 'WARN' ? '🟡' : '🔵';
+                return `<div class="notif-item ${levelClass}">
+                    <div class="notif-icon">${icon}</div>
+                    <div class="notif-body">
+                        <div class="notif-msg">${n.message || n.msg || ''}</div>
+                        <div class="notif-meta">${n.agent_id || ''} · ${n.created_at || ''}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            console.error('Bildirim yüklenemedi:', e);
+        }
+    }
+
+    async function checkNotifications() {
+        try {
+            const r = await fetch('/api/notifications/count');
+            const d = await r.json();
+            const badge = document.getElementById('notif-badge');
+            if (d.count > 0) {
+                badge.textContent = d.count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        } catch(e) {}
+    }
+    setInterval(checkNotifications, 15000);
+    document.addEventListener('DOMContentLoaded', checkNotifications);
+
+    // Panel dışına tıklayınca kapat
+    document.addEventListener('click', function(e) {
+        const panel = document.getElementById('notifPanel');
+        const bell = document.querySelector('.notification-bell');
+        if (panel && !panel.contains(e.target) && !bell.contains(e.target)) {
+            panel.classList.add('hidden');
+        }
+    });
+
     let currentDeleteId = null;
     let currentDeleteType = null; // 'app' or 'docker'
 
