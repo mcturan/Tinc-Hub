@@ -43,19 +43,74 @@
 
 <!-- AI & Donanım Tanıma Ayarları -->
 <div class="settings-section" style="margin-top: 30px;">
-    <h3>🤖 Yapay Zeka (AI) Donanım Tanıma</h3>
-    <p style="font-size:0.85rem; color:var(--muted); margin-bottom:12px;">
-        Ağ haritasına yeni cihaz eklerken veya marka/model ararken Google Gemini AI ile otomatik datasheet ve port özellikleri taranır.
-    </p>
-    <div style="background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px;">Google Gemini API Key:</label>
-        <div style="display:flex; gap:8px;">
-            <input type="password" id="gemini-api-key" placeholder="AIzaSy..." 
-                   style="flex:1; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
-            <button class="btn btn-primary" onclick="saveGeminiApiKey()">Kaydet</button>
-        </div>
-        <div id="gemini-key-status" style="font-size:0.8rem; margin-top:6px; color:var(--muted);">API anahtarı girildiğinde haritadaki cihaz arama AI destekli çalışır.</div>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:8px;">
+        <h3 style="margin:0;">🤖 Yapay Zeka (AI) API Ayarları</h3>
+        <button class="btn btn-sm" onclick="testAiConnection()" id="btn-test-ai" style="display:flex; align-items:center; gap:5px;">
+            🔬 Bağlantıyı Test Et
+        </button>
     </div>
+    <p style="font-size:0.85rem; color:var(--muted); margin-bottom:16px;">
+        Ağ haritasına yeni cihaz eklerken veya marka/model ararken Google Gemini veya OpenAI ile otomatik datasheet ve port özellikleri taranır. Biri hata verirse diğeri fallback olarak devreye girer.
+    </p>
+    
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:16px;">
+        <!-- Google Gemini Card -->
+        <div style="background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <strong style="display:flex; align-items:center; gap:6px;">
+                        <span>🔵 Google Gemini</span>
+                        <span style="font-size:0.75rem; color:var(--muted); font-weight:normal;">(gemini-1.5-flash)</span>
+                    </strong>
+                    <span id="gemini-status-badge" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; background:rgba(100,116,139,0.2); color:var(--muted);">Kontrol ediliyor...</span>
+                </div>
+                
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="password" id="gemini-api-key" placeholder="AIzaSy..." 
+                           style="flex:1; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--card-bg, #fff); color:var(--text);">
+                    <button class="btn btn-primary" onclick="saveApiKey('gemini')">Kaydet</button>
+                </div>
+            </div>
+            
+            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); font-size:0.8rem; display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:var(--muted);">Ücretsiz API key edin:</span>
+                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" 
+                   style="color:#3b82f6; text-decoration:none; font-weight:500; display:inline-flex; align-items:center; gap:4px;">
+                    📎 aistudio.google.com/apikey ↗
+                </a>
+            </div>
+        </div>
+
+        <!-- OpenAI / ChatGPT Card -->
+        <div style="background: var(--bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border); display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <strong style="display:flex; align-items:center; gap:6px;">
+                        <span>🟢 OpenAI / ChatGPT</span>
+                        <span style="font-size:0.75rem; color:var(--muted); font-weight:normal;">(gpt-4o-mini)</span>
+                    </strong>
+                    <span id="openai-status-badge" style="font-size:0.75rem; padding:2px 8px; border-radius:12px; background:rgba(100,116,139,0.2); color:var(--muted);">Kontrol ediliyor...</span>
+                </div>
+                
+                <div style="display:flex; gap:8px; margin-bottom:8px;">
+                    <input type="password" id="openai-api-key" placeholder="sk-proj-..." 
+                           style="flex:1; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--card-bg, #fff); color:var(--text);">
+                    <button class="btn btn-primary" onclick="saveApiKey('openai')">Kaydet</button>
+                </div>
+            </div>
+            
+            <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); font-size:0.8rem; display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:var(--muted);">API key edin:</span>
+                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" 
+                   style="color:#10b981; text-decoration:none; font-weight:500; display:inline-flex; align-items:center; gap:4px;">
+                    📎 platform.openai.com/api-keys ↗
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Test Result Box -->
+    <div id="ai-test-results" style="display:none; margin-top:14px; padding:12px; border-radius:6px; background:var(--bg); border:1px solid var(--border); font-size:0.85rem;"></div>
 </div>
 
 <!-- Yüklü Pluginler -->
@@ -184,35 +239,105 @@ async function uninstallPlugin(id) {
     }
 }
 
-async function saveGeminiApiKey() {
-    const key = document.getElementById('gemini-api-key').value.trim();
-    const statusEl = document.getElementById('gemini-key-status');
-    if(!key) {
-        alert("Lütfen geçerli bir Gemini API anahtarı girin.");
+async function loadAiSettings() {
+    try {
+        const r = await fetch('/api/settings/ai');
+        const d = await r.json();
+        
+        const gemBadge = document.getElementById('gemini-status-badge');
+        const gemInput = document.getElementById('gemini-api-key');
+        if (d.gemini_configured) {
+            gemBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+            gemBadge.style.color = '#10b981';
+            gemBadge.textContent = '✅ Ayarlandı (' + d.gemini_masked + ')';
+        } else {
+            gemBadge.style.background = 'rgba(100, 116, 139, 0.2)';
+            gemBadge.style.color = 'var(--muted)';
+            gemBadge.textContent = '⚪ Tanımlanmadı';
+        }
+
+        const oaiBadge = document.getElementById('openai-status-badge');
+        const oaiInput = document.getElementById('openai-api-key');
+        if (d.openai_configured) {
+            oaiBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+            oaiBadge.style.color = '#10b981';
+            oaiBadge.textContent = '✅ Ayarlandı (' + d.openai_masked + ')';
+        } else {
+            oaiBadge.style.background = 'rgba(100, 116, 139, 0.2)';
+            oaiBadge.style.color = 'var(--muted)';
+            oaiBadge.textContent = '⚪ Tanımlanmadı';
+        }
+    } catch (e) {
+        console.error("AI ayarları yüklenemedi:", e);
+    }
+}
+
+async function saveApiKey(provider) {
+    const inputId = provider === 'gemini' ? 'gemini-api-key' : 'openai-api-key';
+    const key = document.getElementById(inputId).value.trim();
+    if (!key) {
+        alert("Lütfen bir API anahtarı girin.");
         return;
     }
-    statusEl.innerHTML = `<span style="color:var(--muted);">Kaydediliyor...</span>`;
+
+    const payload = {};
+    if (provider === 'gemini') payload.gemini_api_key = key;
+    if (provider === 'openai') payload.openai_api_key = key;
+
     try {
         const r = await fetch('/api/settings/ai', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ gemini_api_key: key })
+            body: JSON.stringify(payload)
         });
         const d = await r.json();
-        if(d.ok) {
-            statusEl.innerHTML = `<span style="color:#10b981; font-weight:bold;">✓ ${d.message}</span>`;
-            alert("✅ Gemini API anahtarı başarıyla kaydedildi!");
+        if (d.ok) {
+            alert(`✅ ${provider === 'gemini' ? 'Google Gemini' : 'OpenAI'} API anahtarı kaydedildi!`);
+            document.getElementById(inputId).value = '';
+            loadAiSettings();
         } else {
-            statusEl.innerHTML = `<span style="color:#ef4444;">❌ Hata: ${d.error || 'Kaydedilemedi'}</span>`;
+            alert("❌ Hata: " + (d.error || 'Kaydedilemedi'));
         }
-    } catch(e) {
-        statusEl.innerHTML = `<span style="color:#ef4444;">❌ Bağlantı hatası: ${e}</span>`;
+    } catch (e) {
+        alert("❌ Bağlantı hatası: " + e);
+    }
+}
+
+async function testAiConnection() {
+    const btn = document.getElementById('btn-test-ai');
+    const resultBox = document.getElementById('ai-test-results');
+    btn.disabled = true;
+    btn.textContent = '⏳ Test Ediliyor...';
+    resultBox.style.display = 'block';
+    resultBox.innerHTML = '<span style="color:var(--muted);">API sağlayıcıları test ediliyor...</span>';
+
+    try {
+        const r = await fetch('/api/settings/ai/test', {method: 'POST'});
+        const d = await r.json();
+        if (d.ok && d.results) {
+            let html = '<div style="font-weight:600; margin-bottom:8px;">🔬 Test Sonuçları:</div><div style="display:flex; flex-direction:column; gap:6px;">';
+            for (const item of d.results) {
+                const icon = item.success ? '✅' : '❌';
+                const color = item.success ? '#10b981' : '#ef4444';
+                html += `<div><strong>${item.provider}:</strong> <span style="color:${color};">${icon} ${item.message}</span></div>`;
+            }
+            html += '</div>';
+            resultBox.innerHTML = html;
+        } else {
+            resultBox.innerHTML = `<span style="color:#ef4444;">❌ Test başarısız oldu.</span>`;
+        }
+    } catch (e) {
+        resultBox.innerHTML = `<span style="color:#ef4444;">❌ Bağlantı hatası: ${e}</span>`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔬 Bağlantıyı Test Et';
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     checkAppUpdate(false);
     loadPlugins();
+    loadAiSettings();
 });
 </script>
 {% endblock %}
