@@ -22,7 +22,13 @@ def login():
             session["username"] = username
             session["role"] = user_data.get("role", "viewer")
             session.permanent = True
-            return redirect(request.args.get("next") or "/")
+
+            from urllib.parse import urlparse
+            next_url = request.args.get("next", "/")
+            parsed = urlparse(next_url)
+            if parsed.netloc and parsed.netloc != request.host:
+                next_url = "/"
+            return redirect(next_url)
         error = "Hatalı kullanıcı adı veya şifre"
     return render_template("login.html", error=error)
 

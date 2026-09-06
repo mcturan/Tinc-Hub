@@ -28,8 +28,13 @@ def install_app_from_store(store_app_id: str) -> dict:
     if not repo_url:
         return {"ok": False, "error": "Uygulamanın repo adresi yok."}
         
+    from dotenv import dotenv_values
+    config = dotenv_values("/etc/tinc-hub/config.env") if os.path.exists("/etc/tinc-hub/config.env") else {}
+    run_user = config.get("RUN_USER", os.environ.get("USER", "turan"))
+    repo_base_dir = config.get("REPO_BASE_DIR", f"/home/{run_user}/101")
+    
     app_name_slug = repo_url.rstrip('/').split('/')[-1]
-    target_dir = f"/home/turan/101/{app_name_slug}"
+    target_dir = f"{repo_base_dir}/{app_name_slug}"
     
     if os.path.exists(target_dir):
         r = subprocess.run(["git", "-C", target_dir, "pull"], capture_output=True, text=True)
@@ -92,8 +97,13 @@ def update_app_local(app_id: str, new_repo: str = None) -> dict:
     if not repo_url:
         return {"ok": False, "error": "Repo adresi yok."}
         
+    from dotenv import dotenv_values
+    config = dotenv_values("/etc/tinc-hub/config.env") if os.path.exists("/etc/tinc-hub/config.env") else {}
+    run_user = config.get("RUN_USER", os.environ.get("USER", "turan"))
+    repo_base_dir = config.get("REPO_BASE_DIR", f"/home/{run_user}/101")
+
     app_name_slug = repo_url.rstrip('/').split('/')[-1]
-    target_dir = f"/home/turan/101/{app_name_slug}"
+    target_dir = f"{repo_base_dir}/{app_name_slug}"
     
     if not os.path.exists(target_dir):
         r = subprocess.run(["git", "clone", repo_url, target_dir], capture_output=True, text=True)

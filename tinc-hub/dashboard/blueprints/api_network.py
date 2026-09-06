@@ -879,3 +879,38 @@ def lookup_device_specs():
 
     return jsonify({'success': True, 'data': result})
 
+
+@bp.route('/ping', methods=['POST'])
+@auth_required
+def api_network_ping():
+    data = request.get_json() or {}
+    ip = data.get('ip', '')
+    if not re.match(r'^\d{1,3}(\.\d{1,3}){3}$', ip):
+        return jsonify({'success': False, 'error': 'Geçersiz IP'}), 400
+    try:
+        r = subprocess.run(['ping', '-c', '4', '-W', '1', ip], 
+                          capture_output=True, text=True, timeout=10)
+        return jsonify({'success': True, 'output': r.stdout + r.stderr, 'reachable': r.returncode == 0})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/nmap', methods=['POST'])
+@auth_required
+def api_network_nmap():
+    import shutil
+    data = request.get_json() or {}
+    ip = data.get('ip', '')
+    if not re.match(r'^\d{1,3}(\.\d{1,3}){3}$', ip):
+        return jsonify({'success': False, 'error': 'Geçersiz IP'}), 400
+    if not shutil.which('nmap'):
+        return jsonify({'success': False, 'error': 'nmap kurulu değil. sudo apt install nmap'}), 400
+    try:
+        r = subprocess.run(['nmap', '-T3', '--top-ports', '20', '--open', ip],
+                          capture_output=True, text=True, timeout=30)
+        return jsonify({'success': True, 'output': r.stdout})
+    except subprocess.TimeoutExpired:
+        return jsonify({'success': False, 'error': 'Nmap zaman aşımı (30s)'}), 408
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+

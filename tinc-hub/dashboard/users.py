@@ -15,8 +15,7 @@ def init_users(default_password: str):
         # Default users
         pw_hash = get_hash(default_password) if default_password else ""
         default_users = {
-            "admin": {"password": pw_hash, "role": "admin"},
-            "misafir": {"password": get_hash("1234"), "role": "viewer"}
+            "admin": {"password": pw_hash, "role": "admin"}
         }
         with open(USERS_FILE, "w") as f:
             json.dump(default_users, f, indent=4)

@@ -5,7 +5,7 @@
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
 
-<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script src="/static/js/vis-network.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
@@ -545,7 +545,13 @@
                 </div>
             </div>
             <div class="form-group"><label>Kullanıcı Adı</label><input type="text" id="node-user" placeholder="root"></div>
-            <div class="form-group"><label>Şifre</label><input type="password" id="node-pass" placeholder="***"></div>
+            <div class="form-group">
+                <label style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Şifre</span>
+                    <span style="font-size:10px; color:#f59e0b;"><i class="fas fa-shield-alt"></i> Yalnızca aktif oturumda kullanılır, kaydedilmez</span>
+                </label>
+                <input type="password" id="node-pass" placeholder="***">
+            </div>
             <div class="form-group"><label>Cihaz Notları</label><textarea id="node-notes" placeholder="Örn: 2. port arızalı, 15 Eylül bakım..." style="width:100%; background:#ffffff; color:#212529; border:1px solid #cbd5e1; border-radius:4px; padding:6px; font-size:12px; height:50px; resize:vertical;"></textarea></div>
             <div style="font-size: 0.85em; color: var(--text-muted); margin-bottom:10px;" id="node-mac-info"></div>
             <div id="node-services-result" style="display:none; margin-bottom:10px; padding:8px; border-radius:4px; font-size:12px; background:#f8fafc; border:1px solid #cbd5e1; color:#334155;"></div>
@@ -789,7 +795,7 @@
             </div>
             <div class="form-group" style="margin-bottom:0;">
                 <label style="font-size:11px;">Model No</label>
-                <input type="text" id="new-node-model" placeholder="Örn: VMG3312, 260 G2" style="font-size:12px; padding:6px;">
+                <input type="text" id="new-node-model" placeholder="Örn: VMG3312, 260 G2" style="font-size:12px; padding:6px;" onblur="lookupAndFillNewNodeSpecs()">
             </div>
         </div>
 
@@ -1344,6 +1350,35 @@ let currentFilter = 'all';
 let deletedNodes = [];
 let customShapes = []; // [{id, type: 'rect'|'circle', label, color, x, y, width, height, radius}]
 
+// ── Otomatik Kayıt (Debounced Autosave) ──────────────────────────────────────
+let autosaveTimer = null;
+let isInitialLoading = true;
+function scheduleAutosave() {
+    if (isInitialLoading) return;
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => {
+        saveTopology(true); // skipUndo=true, undo stack'i kirletmesin
+        showToast("💾 Otomatik kaydedildi", 1500);
+    }, 5000); // 5 saniye hareketsizlik sonrası kaydet
+}
+
+// ── Port Doluluk Kontrolü (Port Exhaustion Check) ────────────────────────────
+function checkPortExhaustion(nodeId, excludeEdgeId = null) {
+    const node = nodesData.get(nodeId);
+    if (!node || node.port_count === undefined) return false;
+    const lanPortCount = parseInt(node.port_count);
+    if (isNaN(lanPortCount) || lanPortCount <= 0) return false;
+    
+    const connectedEdges = edgesData.get().filter(e => 
+        (e.from === nodeId || e.to === nodeId) && e.id !== excludeEdgeId
+    );
+    if (connectedEdges.length >= lanPortCount) {
+        showToast(`⚠️ "${node.rawLabel || node.label || node.id}" cihazının tüm ${lanPortCount} LAN portu dolu! Yeni kablo eklenemez.`, 4000);
+        return true; // dolu
+    }
+    return false;
+}
+
 // ── 10 Adımlı Geri Alma (Undo History Stack) ──────────────────────────────────
 const MAX_UNDO_STEPS = 10;
 let undoStack = [];
@@ -1611,6 +1646,14 @@ async function fetchDeviceSpecs(modelInputId, labelInputId, typeSelectId, portSp
     } catch(e) {
         showToast("Özellik sorgulanırken bağlantı hatası oluştu.", 2500);
     }
+}
+
+// Modal için Marka ve Model ile otomatik donanım tanıma
+function lookupAndFillNewNodeSpecs() {
+    const brand = (document.getElementById('new-node-brand')?.value || '').trim();
+    const model = (document.getElementById('new-node-model')?.value || '').trim();
+    if (!model) return;
+    fetchDeviceSpecs('new-node-model', 'new-node-label', 'new-node-type', 'new-node-port-speed', 'new-node-port-count', 'new-node-poe');
 }
 
 // 🩺 Canlı Ağ Doktoru Kural Motoru (Zero-Overhead Passive Diagnostic)
@@ -2169,6 +2212,17 @@ async function loadTopology() {
         if (!network) initNetwork(container);
         updateIdleStats();
         runNetworkDoctorAnalysis();
+        
+        // İlk yükleme tamamlandıktan sonra otomatik kayıt dinleyicilerini etkinleştir
+        setTimeout(() => {
+            isInitialLoading = false;
+            nodesData.on('update', scheduleAutosave);
+            nodesData.on('add', scheduleAutosave);
+            nodesData.on('remove', scheduleAutosave);
+            edgesData.on('update', scheduleAutosave);
+            edgesData.on('add', scheduleAutosave);
+            edgesData.on('remove', scheduleAutosave);
+        }, 1500);
     } catch(e) { if(!network) container.innerHTML = '<div style="color:red;">Hata: ' + e + '</div>'; }
 }
 
@@ -2354,6 +2408,18 @@ function initNetwork(container) {
                 const isWireless = (toNode && (toNode.deviceType === 'phone' || toNode.deviceType === 'laptop')) || 
                                    (fromNode && (fromNode.deviceType === 'phone' || fromNode.deviceType === 'laptop'));
                 
+                // 🔌 PORT DOLULUK KONTROLÜ
+                if (!isWireless) {
+                    if (checkPortExhaustion(edgeSourceNode)) {
+                        edgeSourceNode = null;
+                        return;
+                    }
+                    if (!isTargetShape && checkPortExhaustion(targetId)) {
+                        edgeSourceNode = null;
+                        return;
+                    }
+                }
+
                 // ⚡ AUTO-NEGOTIATION (Otomatik Hız Anlaşması): Hız iki portun en düşüğüne eşitlenir!
                 const negResult = autoNegotiateSpeed(fromNode, toNode);
                 const cableSpeed = negResult.speed;
@@ -3619,9 +3685,46 @@ async function ctxAction(action) {
         saveTopology();
         return;
     }
-    if (action === 'ping') { showToast(`Ping başlatılıyor: ${contextNodeId}...`); setTimeout(()=>showToast(`Yanıt: 64 bytes from ${contextNodeId}: icmp_seq=1 ttl=64 time=2.1ms`, 4000), 1000); }
+    if (action === 'ping') { 
+        showToast(`📡 Ping başlatılıyor: ${contextNodeId}...`, 3000);
+        try {
+            const r = await fetch('/api/network/ping', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ip: contextNodeId })
+            });
+            const data = await r.json();
+            if (data.success) {
+                const status = data.reachable ? '✅ Cihaz Erişilebilir' : '❌ Yanıt Yok';
+                alert(`Ping Sonucu (${contextNodeId}) - ${status}:\n\n${data.output}`);
+            } else {
+                showToast(`❌ Ping hatası: ${data.error}`, 4000);
+            }
+        } catch(e) {
+            showToast(`❌ Ping isteğinde hata: ${e.message}`, 4000);
+        }
+        return;
+    }
     if (action === 'wol') { showToast(`Magic Packet (WOL) gönderildi: ${contextNodeId}`); }
-    if (action === 'nmap') { showToast(`Nmap Taraması başlatıldı...`); setTimeout(()=>showToast(`Açık Portlar: 22(SSH), 80(HTTP), 443(HTTPS)`, 5000), 2000); }
+    if (action === 'nmap') { 
+        showToast(`🔍 Nmap Port Taraması başlatıldı: ${contextNodeId}... (birkaç saniye sürebilir)`, 5000);
+        try {
+            const r = await fetch('/api/network/nmap', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ip: contextNodeId })
+            });
+            const data = await r.json();
+            if (data.success) {
+                alert(`Nmap Tarama Sonucu (${contextNodeId}):\n\n${data.output || 'Açık port bulunamadı.'}`);
+            } else {
+                showToast(`❌ Nmap hatası: ${data.error}`, 5000);
+            }
+        } catch(e) {
+            showToast(`❌ Nmap isteğinde hata: ${e.message}`, 4000);
+        }
+        return;
+    }
     if (action === 'backup') {
         showToast(`Yedekleme başlatıldı: ${node.label}...`, 0);
         try {
@@ -3672,15 +3775,16 @@ function setFilter(filterName, btnElement) {
 function exportTopology() {
     const canvas = document.querySelector('#network-map canvas');
     if (!canvas) return;
-    const link = document.createElement('a');
-    link.download = 'tinc_hub_network_map.png';
-    // Fill background with white before export to avoid transparent dark modes looking bad
+    const isDark = document.body.classList.contains('dark-mode');
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = canvas.width; tempCanvas.height = canvas.height;
     const tCtx = tempCanvas.getContext('2d');
-    tCtx.fillStyle = '#f8f9fa'; tCtx.fillRect(0,0,tempCanvas.width, tempCanvas.height);
+    tCtx.fillStyle = isDark ? '#0b0f19' : '#ffffff'; // dark/light arka plan
+    tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
     tCtx.drawImage(canvas, 0, 0);
-    link.href = tempCanvas.toDataURL("image/png");
+    const link = document.createElement('a');
+    link.download = `tinc_hub_network_${new Date().toISOString().slice(0,10)}.png`;
+    link.href = tempCanvas.toDataURL('image/png');
     link.click();
     showToast("📸 Harita PNG olarak indirildi!");
 }
@@ -4224,13 +4328,16 @@ async function saveTopology(skipUndo = false) {
     const nodesToSave = [];
     nodesData.forEach(node => {
         const pos = nodePositions[node.id];
-        // username, password, gateway, dns, roles dahil tüm alanları kaydet
+        // username, gateway, dns, roles dahil alanları kaydet (şifreler güvenlik gereği diske plaintext yazılmaz)
         nodesToSave.push({ 
             id: node.id, label: node.label, rawLabel: node.rawLabel || node.label, x: pos?pos.x:0, y: pos?pos.y:0, 
             type: node.type, deviceType: node.deviceType, ext_ip: node.ext_ip, 
             gateway: node.gateway || '', dns: node.dns || '', roles: node.roles || [],
-            groupName: node.groupName, shapeFolderId: node.shapeFolderId || '', username: node.username || '', password: node.password || '',
-            notes: node.notes || '', moveLocked: !!node.moveLocked
+            groupName: node.groupName, shapeFolderId: node.shapeFolderId || '', username: node.username || '',
+            notes: node.notes || '', moveLocked: !!node.moveLocked,
+            model: node.model || '', brand: node.brand || '',
+            port_speed: node.port_speed || '', port_count: node.port_count !== undefined ? node.port_count : undefined,
+            wan_port: node.wan_port || '', wifi_type: node.wifi_type || '', poe: node.poe !== undefined ? !!node.poe : undefined
         });
     });
     // auto-edge-* ile başlayan otomatik kablolar kaydedilmez; sadece elle çizilenleri kaydet

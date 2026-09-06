@@ -4,7 +4,7 @@ from app import *
 bp = Blueprint('api_settings', __name__)
 
 @bp.route("/api/settings/backup", methods=["POST"])
-@auth_required
+@admin_required
 def api_backup():
     import datetime
     try:
@@ -20,7 +20,7 @@ def api_backup():
 
 
 @bp.route("/api/settings/telegram", methods=["POST"])
-@auth_required
+@admin_required
 def api_save_telegram():
     data = request.json
     t_token = data.get("token", "")

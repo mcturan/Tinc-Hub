@@ -16,22 +16,34 @@ stats = {
     "rogue_dhcp": []   # Ağda IP dağıtan yabancı (Rogue) cihazlar
 }
 
-KNOWN_GATEWAY = "192.168.1.1"  # İdealde bu topology'den dinamik çekilmelidir
+_stats_lock = threading.Lock()
+
+def get_known_gateway():
+    try:
+        with open("/opt/tinc-hub/shared/topology.json") as f:
+            topo = json.load(f)
+        for node in topo.get("nodes", []):
+            if isinstance(node, dict) and (node.get("id", "").endswith(".1") or "gateway" in (node.get("roles") or [])):
+                return node["id"]
+    except Exception:
+        pass
+    return os.environ.get("KNOWN_GATEWAY", "192.168.1.1")
+
+KNOWN_GATEWAY = get_known_gateway()
 
 def save_stats_loop():
     """Her 5 saniyede bir istatistikleri diske yazar, Dashboard (API) buradan okur."""
     while True:
         try:
             os.makedirs(os.path.dirname(STATS_FILE), exist_ok=True)
-            # Hafızanın şişmemesi için DNS listesini son 50 kayıtla sınırla
-            if len(stats["dns_queries"]) > 50:
-                stats["dns_queries"] = stats["dns_queries"][-50:]
-                
-            # Top talkers listesinde gereksiz ip'leri silip en yüksek 20'yi tutabiliriz, 
-            # ancak POC (Proof of Concept) için bırakıyoruz.
+            with _stats_lock:
+                # Hafızanın şişmemesi için DNS listesini son 50 kayıtla sınırla
+                if len(stats["dns_queries"]) > 50:
+                    stats["dns_queries"] = stats["dns_queries"][-50:]
+                stats_copy = json.loads(json.dumps(stats))  # deep copy
             
             with open(STATS_FILE, "w") as f:
-                json.dump(stats, f)
+                json.dump(stats_copy, f)
         except Exception as e:
             print(f"Stats save error: {e}")
         time.sleep(5)
@@ -59,38 +71,39 @@ def run_tcpdump():
             dst_ip = match.group(3)
             dst_port = match.group(4)
             
-            # --- 1. TOP TALKERS KONTROLÜ ---
-            # IP adreslerinin veri miktarını sayıyoruz (Basit paket sayısı)
-            stats["top_talkers"][src_ip] = stats["top_talkers"].get(src_ip, 0) + 1
-            stats["top_talkers"][dst_ip] = stats["top_talkers"].get(dst_ip, 0) + 1
-            
-            # --- 2. PROTOKOL ANALİZİ KONTROLÜ ---
-            # Gidilen portlara göre internetin ne amaçla kullanıldığını saptıyoruz
-            if dst_port == '80' or src_port == '80':
-                stats["protocols"]["HTTP (80)"] += 1
-            elif dst_port == '443' or src_port == '443':
-                stats["protocols"]["HTTPS (443)"] += 1
-            elif dst_port == '53' or src_port == '53':
-                stats["protocols"]["DNS (53)"] += 1
-                # --- 3. DNS SNOOPING (Hangi Siteye Giriliyor?) KONTROLÜ ---
-                dns_match = dns_pattern.search(line)
-                if dns_match and dst_port == '53': # Sadece giden istekler
-                    domain = dns_match.group(1).rstrip('.')
-                    stats["dns_queries"].append({
-                        "time": time.strftime("%H:%M:%S"),
-                        "ip": src_ip,
-                        "domain": domain
-                    })
-            elif dst_port == '22' or src_port == '22':
-                stats["protocols"]["SSH (22)"] += 1
-            elif dst_port == '67' or dst_port == '68':
-                # --- 4. ROGUE DHCP TESPİTİ KONTROLÜ ---
-                # Eğer cihaz ağa IP dağıtıyorsa (DHCP Reply) ve bu bizim Gateway değilse!
-                if dhcp_pattern.search(line) and src_ip != KNOWN_GATEWAY:
-                    if src_ip not in stats["rogue_dhcp"]:
-                        stats["rogue_dhcp"].append(src_ip)
-            else:
-                stats["protocols"]["DİĞER"] += 1
+            with _stats_lock:
+                # --- 1. TOP TALKERS KONTROLÜ ---
+                # IP adreslerinin veri miktarını sayıyoruz (Basit paket sayısı)
+                stats["top_talkers"][src_ip] = stats["top_talkers"].get(src_ip, 0) + 1
+                stats["top_talkers"][dst_ip] = stats["top_talkers"].get(dst_ip, 0) + 1
+                
+                # --- 2. PROTOKOL ANALİZİ KONTROLÜ ---
+                # Gidilen portlara göre internetin ne amaçla kullanıldığını saptıyoruz
+                if dst_port == '80' or src_port == '80':
+                    stats["protocols"]["HTTP (80)"] += 1
+                elif dst_port == '443' or src_port == '443':
+                    stats["protocols"]["HTTPS (443)"] += 1
+                elif dst_port == '53' or src_port == '53':
+                    stats["protocols"]["DNS (53)"] += 1
+                    # --- 3. DNS SNOOPING (Hangi Siteye Giriliyor?) KONTROLÜ ---
+                    dns_match = dns_pattern.search(line)
+                    if dns_match and dst_port == '53': # Sadece giden istekler
+                        domain = dns_match.group(1).rstrip('.')
+                        stats["dns_queries"].append({
+                            "time": time.strftime("%H:%M:%S"),
+                            "ip": src_ip,
+                            "domain": domain
+                        })
+                elif dst_port == '22' or src_port == '22':
+                    stats["protocols"]["SSH (22)"] += 1
+                elif dst_port == '67' or dst_port == '68':
+                    # --- 4. ROGUE DHCP TESPİTİ KONTROLÜ ---
+                    # Eğer cihaz ağa IP dağıtıyorsa (DHCP Reply) ve bu bizim Gateway değilse!
+                    if dhcp_pattern.search(line) and src_ip != KNOWN_GATEWAY:
+                        if src_ip not in stats["rogue_dhcp"]:
+                            stats["rogue_dhcp"].append(src_ip)
+                else:
+                    stats["protocols"]["DİĞER"] += 1
 
 if __name__ == "__main__":
     t_save = threading.Thread(target=save_stats_loop, daemon=True)

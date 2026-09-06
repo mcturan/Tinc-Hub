@@ -34,7 +34,7 @@ def api_health(app_id):
 
 
 @bp.route("/api/app/<app_id>/action", methods=["POST"])
-@auth_required
+@admin_required
 def api_action(app_id):
     """Start / stop / restart"""
     data = request.get_json() or {}
@@ -53,7 +53,7 @@ def api_action(app_id):
     unit = service if service.endswith(".service") else f"{service}.service"
     try:
         if app_data.get("is_user_service"):
-            cmd = ["sudo", "-u", RUN_USER, "XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "systemctl", "--user", action, unit]
+            cmd = ["sudo", "-u", RUN_USER, f"XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "systemctl", "--user", action, unit]
         else:
             cmd = ["systemctl", action, unit]
             
@@ -80,7 +80,7 @@ def api_settings_apps_get():
 
 
 @bp.route("/api/settings/apps/add", methods=["POST"])
-@auth_required
+@admin_required
 def api_add_app():
     data = request.get_json() or {}
     if not data.get("name"):
@@ -91,7 +91,7 @@ def api_add_app():
 
 
 @bp.route("/api/settings/apps/<app_id>", methods=["PUT"])
-@auth_required
+@admin_required
 def api_update_app(app_id):
     data = request.get_json() or {}
     updated = update_app(app_id, data)
@@ -102,7 +102,7 @@ def api_update_app(app_id):
 
 
 @bp.route("/api/settings/apps/<app_id>", methods=["DELETE"])
-@auth_required
+@admin_required
 def api_delete_app(app_id):
     uninstall = request.args.get('uninstall', 'false') == 'true'
     logs = []
@@ -114,8 +114,8 @@ def api_delete_app(app_id):
             is_user = app_data.get("is_user_service", False)
             try:
                 if is_user:
-                    p1 = subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "-u", RUN_USER, "systemctl", "--user", "stop", service], capture_output=True, text=True, timeout=10)
-                    p2 = subprocess.run(["sudo", "XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "-u", RUN_USER, "systemctl", "--user", "disable", service], capture_output=True, text=True, timeout=10)
+                    p1 = subprocess.run(["sudo", f"XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "-u", RUN_USER, "systemctl", "--user", "stop", service], capture_output=True, text=True, timeout=10)
+                    p2 = subprocess.run(["sudo", f"XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "-u", RUN_USER, "systemctl", "--user", "disable", service], capture_output=True, text=True, timeout=10)
                     logs.append(str(p1.stdout) + "\n" + str(p1.stderr))
                     logs.append(str(p2.stdout) + "\n" + str(p2.stderr))
                 else:
@@ -129,7 +129,8 @@ def api_delete_app(app_id):
             repo = app_data.get("repo")
             if repo and (repo.startswith("file://") or repo.startswith("http")):
                 app_name_slug = repo.rstrip('/').split('/')[-1]
-                target_dir = f"/home/turan/101/{app_name_slug}"
+                repo_base = config.get("REPO_BASE_DIR", f"/home/{RUN_USER}/101")
+                target_dir = f"{repo_base}/{app_name_slug}"
                 import os
                 uninstall_script = f"{target_dir}/uninstall.sh"
                 if os.path.exists(uninstall_script):
@@ -145,7 +146,7 @@ def api_delete_app(app_id):
 
 
 @bp.route("/api/settings/apps/<app_id>/update", methods=["POST"])
-@auth_required
+@admin_required
 def api_pull_update_app(app_id):
     from installer import update_app_local
     data = request.get_json() or {}

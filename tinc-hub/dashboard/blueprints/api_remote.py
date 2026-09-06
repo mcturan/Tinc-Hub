@@ -64,7 +64,10 @@ def api_remote_slaves():
 def api_remote_action():
     """Uzak master'ın bu slave üzerinde servis yönetmesi için."""
     token = request.headers.get('X-Hub-Token')
-    if config.get('HUB_API_TOKEN') and token != config.get('HUB_API_TOKEN'):
+    hub_token = config.get('HUB_API_TOKEN', '')
+    if not hub_token:
+        return jsonify({'error': 'Bu endpoint devre dışı. config.env dosyasına HUB_API_TOKEN ekleyin.'}), 403
+    if token != hub_token:
         return jsonify({'error': 'Unauthorized'}), 401
     
     data = request.get_json()

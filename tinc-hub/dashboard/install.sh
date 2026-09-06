@@ -50,6 +50,10 @@ if [ -d "$SCRIPT_DIR/blueprints" ]; then
 fi
 cp -r "$SCRIPT_DIR/templates/"* "$INSTALL_DIR/templates/"
 cp -r "$SCRIPT_DIR/static/"* "$INSTALL_DIR/static/" 2>/dev/null || true
+if [ ! -f "$INSTALL_DIR/static/js/vis-network.min.js" ]; then
+    mkdir -p "$INSTALL_DIR/static/js"
+    curl -sL "https://unpkg.com/vis-network/standalone/umd/vis-network.min.js" -o "$INSTALL_DIR/static/js/vis-network.min.js" || true
+fi
 chmod +x "$INSTALL_DIR/"*.py
 
 # Git sürüm bilgisini kaydet
@@ -74,6 +78,17 @@ if [[ ! -f /etc/tinc-hub/config.env ]]; then
     cp "$SCRIPT_DIR/../shared/config.env.template" /etc/tinc-hub/config.env
     warn "Config dosyası oluşturuldu: /etc/tinc-hub/config.env"
     warn "Lütfen ROUTER_PASS ve diğer değerleri düzenleyin!"
+fi
+
+# Otomatik secret key üret
+if ! grep -q "^DASHBOARD_SECRET_KEY=" /etc/tinc-hub/config.env || grep -q "tinc-hub-tinc-secret-2025" /etc/tinc-hub/config.env; then
+    NEW_SECRET=$(openssl rand -hex 32)
+    if grep -q "^DASHBOARD_SECRET_KEY=" /etc/tinc-hub/config.env; then
+        sed -i "s/^DASHBOARD_SECRET_KEY=.*/DASHBOARD_SECRET_KEY=${NEW_SECRET}/" /etc/tinc-hub/config.env
+    else
+        echo "DASHBOARD_SECRET_KEY=${NEW_SECRET}" >> /etc/tinc-hub/config.env
+    fi
+    info "Yeni güvenli SECRET_KEY üretildi."
 fi
 
 # 7. Port 9010 kontrolü

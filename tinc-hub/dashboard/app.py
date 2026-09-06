@@ -98,6 +98,19 @@ def auth_required(f):
     return decorated
 
 
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not PASSWORD:
+            return f(*args, **kwargs)
+        if not session.get("authenticated"):
+            return jsonify({"error": "Kimlik doğrulama gerekli"}), 401
+        if session.get("role") != "admin":
+            return jsonify({"error": "Bu işlem için admin yetkisi gerekli"}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
 
 def register_blueprints():
     # Register Blueprints

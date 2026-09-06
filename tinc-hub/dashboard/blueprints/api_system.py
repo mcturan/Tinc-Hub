@@ -106,7 +106,7 @@ def api_system_version():
 
 
 @bp.route("/api/system/update", methods=["POST"])
-@auth_required
+@admin_required
 def api_system_self_update():
     from installer import perform_self_update
     res = perform_self_update()
@@ -201,7 +201,7 @@ def stream_logs(service_name):
     is_user = app_data.get("is_user_service", False) if app_data else False
     
     if is_user:
-        cmd = ["sudo", "-u", RUN_USER, "XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "journalctl", "--user", "-u", unit, "-f", f"-n{lines}", "--no-pager", "--output=short-iso"]
+        cmd = ["sudo", "-u", RUN_USER, f"XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "journalctl", "--user", "-u", unit, "-f", f"-n{lines}", "--no-pager", "--output=short-iso"]
     else:
         cmd = ["journalctl", "-u", unit, "-f", f"-n{lines}", "--no-pager", "--output=short-iso"]
 
@@ -251,7 +251,7 @@ def log_lines(service_name):
     is_user = app_data.get("is_user_service", False) if app_data else False
     
     if is_user:
-        cmd = ["sudo", "-u", RUN_USER, "XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "journalctl", "--user", "-u", unit, f"-n{lines}", "--no-pager", "--output=short-iso"]
+        cmd = ["sudo", "-u", RUN_USER, f"XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "journalctl", "--user", "-u", unit, f"-n{lines}", "--no-pager", "--output=short-iso"]
     else:
         cmd = ["journalctl", "-u", unit, f"-n{lines}", "--no-pager", "--output=short-iso"]
         
