@@ -41,6 +41,23 @@
     </div>
 </div>
 
+<!-- AI & Donanım Tanıma Ayarları -->
+<div class="settings-section" style="margin-top: 30px;">
+    <h3>🤖 Yapay Zeka (AI) Donanım Tanıma</h3>
+    <p style="font-size:0.85rem; color:var(--muted); margin-bottom:12px;">
+        Ağ haritasına yeni cihaz eklerken veya marka/model ararken Google Gemini AI ile otomatik datasheet ve port özellikleri taranır.
+    </p>
+    <div style="background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
+        <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px;">Google Gemini API Key:</label>
+        <div style="display:flex; gap:8px;">
+            <input type="password" id="gemini-api-key" placeholder="AIzaSy..." 
+                   style="flex:1; padding:8px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+            <button class="btn btn-primary" onclick="saveGeminiApiKey()">Kaydet</button>
+        </div>
+        <div id="gemini-key-status" style="font-size:0.8rem; margin-top:6px; color:var(--muted);">API anahtarı girildiğinde haritadaki cihaz arama AI destekli çalışır.</div>
+    </div>
+</div>
+
 <!-- Yüklü Pluginler -->
 <div class="settings-section" style="margin-top: 30px;">
     <h3>🧩 Yüklü Pluginler</h3>
@@ -164,6 +181,32 @@ async function uninstallPlugin(id) {
         loadPlugins();
     } else {
         alert('Hata: ' + data.error);
+    }
+}
+
+async function saveGeminiApiKey() {
+    const key = document.getElementById('gemini-api-key').value.trim();
+    const statusEl = document.getElementById('gemini-key-status');
+    if(!key) {
+        alert("Lütfen geçerli bir Gemini API anahtarı girin.");
+        return;
+    }
+    statusEl.innerHTML = `<span style="color:var(--muted);">Kaydediliyor...</span>`;
+    try {
+        const r = await fetch('/api/settings/ai', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ gemini_api_key: key })
+        });
+        const d = await r.json();
+        if(d.ok) {
+            statusEl.innerHTML = `<span style="color:#10b981; font-weight:bold;">✓ ${d.message}</span>`;
+            alert("✅ Gemini API anahtarı başarıyla kaydedildi!");
+        } else {
+            statusEl.innerHTML = `<span style="color:#ef4444;">❌ Hata: ${d.error || 'Kaydedilemedi'}</span>`;
+        }
+    } catch(e) {
+        statusEl.innerHTML = `<span style="color:#ef4444;">❌ Bağlantı hatası: ${e}</span>`;
     }
 }
 

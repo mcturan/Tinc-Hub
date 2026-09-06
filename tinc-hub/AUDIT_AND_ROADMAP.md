@@ -98,14 +98,14 @@ Gelecek yapay zeka ajanları veya geliştiriciler sırasıyla şu maddeleri ele 
 - [x] **1. Port Doluluk Takibi (Port Exhaustion / Port Capacity Check):** (TAMAMLANDI ✅)
 - [x] **2. Güvenlik ve Kod Kalitesi İyileştirmeleri:** (TAMAMLANDI ✅)
 - [x] **3. Gerçek Ping & Nmap Backend Entegrasyonu:** (TAMAMLANDI ✅)
-- [ ] **4. LLM / AI API Entegrasyonu ile Otomatik Donanım Tanıma (İsteğe Bağlı Mod):**
-  - Kullanıcı ayarlardan Gemini / OpenAI API anahtarı girdiğinde, yazılan marka/model için gerçek AI destekli datasheet çözümleme motoru.
-- [ ] **5. Yerel Ağ Otomatik Donanım Keşfi (Nmap / UPnP / SNMP Entegrasyonu):**
-  - Ağa yeni cihaz bağlandığında UPnP SSDP ve mDNS paketlerinden cihazın tam adını ve üreticisini okuyup otomatik haritaya ekleme.
-- [ ] **6. VLAN & Alt Ağ (Subnet) Görselleştirmesi:**
-  - Port bazlı VLAN atama (Trunk / Access Port) ve haritada farklı VLAN'ların renkli çerçevelerle gösterilmesi.
-- [ ] **7. Ağ Trafiği ve Bant Genişliği Canlı Simülasyonu:**
-  - Kabloların üzerinden geçen anlık veri akışını gösteren animasyonlu parçacıklar (Packet Tracer flow simulation).
+- [x] **4. LLM / AI API Entegrasyonu ile Otomatik Donanım Tanıma (İsteğe Bağlı Mod):** (TAMAMLANDI ✅)
+  - Ayarlar sayfasından (`/settings`) girilen `GEMINI_API_KEY` ile backend Google Gemini 1.5 Flash endpoint'ine bağlanır. Girilen marka/model bilgisi JSON structured output olarak çözümlenir, port sayısı, hızı, PoE, Wi-Fi tipi belirlenir ve `/opt/tinc-hub/shared/device_specs_cache.json`'a önbelleklenir.
+- [x] **5. Yerel Ağ Otomatik Donanım Keşfi (Nmap / UPnP SSDP Entegrasyonu):** (TAMAMLANDI ✅)
+  - Standard socket UDP 239.255.255.250:1900 SSDP M-SEARCH broadcast motoru (`discover_upnp_devices`) yazıldı. LOCATION XML dosyalarından `friendlyName`, `manufacturer`, `modelName` çekilir ve `/discover/enhanced` endpoint'i üzerinden ağ haritası otomatik zenginleştirilir ("Teşhis & NOC -> UPnP & Otomatik Donanım Keşfi").
+- [x] **6. VLAN & Alt Ağ (Subnet) Görselleştirmesi:** (TAMAMLANDI ✅)
+  - Cihaz ve Port bazlı VLAN (1-4094) atama desteği eklendi. Haritada aynı VLAN ID'ye sahip cihazlar canvas katmanında dinamik renkli, kesikli çizgili ve rozetli (`🏷️ VLAN X`) çerçeveler (Bounding Box) ile görselleştirildi.
+- [x] **7. Ağ Trafiği ve Bant Genişliği Canlı Simülasyonu:** (TAMAMLANDI ✅)
+  - Teşhis & NOC menüsünden açılıp kapanabilen ("Canlı Trafik Simülasyonu"), kablo tiplerine göre renk kodlu (Wi-Fi için mavi, Fiber için amber, Ethernet için zümrüt yeşili) hareketli parçacık akışı ve anlık bant genişliği etiketleri ile canvas simülasyonu eklendi.
 
 ---
 

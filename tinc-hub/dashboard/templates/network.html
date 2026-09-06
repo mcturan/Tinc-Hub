@@ -287,6 +287,9 @@
                     <a class="tb-dropdown-item" href="javascript:void(0)" onclick="closeAllDropdowns(); showIpMap();">
                         <i class="fas fa-th" style="color:#10b981;"></i> IP Alt Ağ Tablosu
                     </a>
+                    <a class="tb-dropdown-item" href="javascript:void(0)" onclick="closeAllDropdowns(); runEnhancedDiscover();">
+                        <i class="fas fa-search-plus" style="color:#10b981;"></i> UPnP & Otomatik Donanım Keşfi
+                    </a>
                     <a class="tb-dropdown-item" href="javascript:void(0)" onclick="closeAllDropdowns(); runLldpDiscover();">
                         <i class="fas fa-project-diagram" style="color:#06b6d4;"></i> LLDP / ARP Keşfi
                     </a>
@@ -539,9 +542,15 @@
                 </div>
 
                 <!-- PoE Desteği -->
-                <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-top:4px; margin-bottom:8px;">
                     <input type="checkbox" id="node-poe" style="width:14px; height:14px;">
                     <label for="node-poe" style="margin:0; font-size:11px; cursor:pointer; color:#334155;">⚡ PoE Desteği (Power over Ethernet)</label>
+                </div>
+
+                <!-- VLAN / Alt Ağ Seçimi -->
+                <div class="form-group" style="margin-bottom:0; border-top:1px dashed #e2e8f0; padding-top:6px;">
+                    <label style="font-size:10px; color:#64748b;">🏷️ VLAN / Alt Ağ ID (Örn: 10, 20, 30)</label>
+                    <input type="number" id="node-vlan" min="1" max="4094" placeholder="VLAN Yok" style="font-size:11px; padding:4px 6px;">
                 </div>
             </div>
             <div class="form-group"><label>Kullanıcı Adı</label><input type="text" id="node-user" placeholder="root"></div>
@@ -870,9 +879,15 @@
             </div>
 
             <!-- PoE Desteği -->
-            <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-top:4px; margin-bottom:8px;">
                 <input type="checkbox" id="new-node-poe" style="width:15px; height:15px;">
                 <label for="new-node-poe" style="margin:0; font-size:11px; cursor:pointer; color:#334155;">⚡ PoE (Power over Ethernet) Desteği</label>
+            </div>
+
+            <!-- VLAN ID -->
+            <div class="form-group" style="margin-bottom:0; border-top:1px dashed #e2e8f0; padding-top:6px;">
+                <label style="font-size:11px; color:#64748b;">🏷️ VLAN / Alt Ağ ID (Örn: 10, 20)</label>
+                <input type="number" id="new-node-vlan" min="1" max="4094" placeholder="VLAN Yok" style="font-size:12px; padding:6px;">
             </div>
         </div>
 
@@ -2047,6 +2062,8 @@ function populateNodeDetailsInSidebar(node) {
     if (wifiEl) wifiEl.value = node.wifi_type || ((node.deviceType === 'router' || node.deviceType === 'modem') ? 'dual' : 'none');
     const poeEl = document.getElementById('node-poe');
     if (poeEl) poeEl.checked = !!node.poe;
+    const vlanEl = document.getElementById('node-vlan');
+    if (vlanEl) vlanEl.value = node.vlan || '';
 
     document.getElementById('node-mac-info').innerHTML = `<strong>MAC:</strong> ${node.mac || 'Bilinmiyor'}<br><strong>Üretici:</strong> ${node.vendor || 'Bilinmiyor'}`;
     const isLocked = !!(node.moveLocked || (node.fixed && (node.fixed.x || node.fixed === true)));
@@ -2148,6 +2165,7 @@ async function loadTopology() {
                 wan_port: d.wan_port || ((dType === 'router' || dType === 'modem') ? '1g' : 'none'),
                 wifi_type: d.wifi_type || ((dType === 'router' || dType === 'modem') ? 'dual' : 'none'),
                 poe: d.poe !== undefined ? !!d.poe : (dType === 'camera'),
+                vlan: d.vlan ? parseInt(d.vlan) : null,
                 moveLocked: !!d.moveLocked,
                 fixed: d.moveLocked ? { x: true, y: true } : (d.fixed || false)
             });
@@ -2874,8 +2892,68 @@ function drawGroups(ctx) {
         ctx.restore();
     }
 
-    // ── Özel Çizilen Şekiller (Kutular & Daireler / Klasörler / Sanal Switch) ──
+    // ── VLAN & Alt Ağ (Subnet) Görselleştirmesi ──
     const allPositions = network.getPositions();
+    const vlanGroups = {};
+    nodesData.forEach(n => {
+        const vlanId = n.vlan ? parseInt(n.vlan) : null;
+        if (vlanId && allPositions[n.id]) {
+            if (!vlanGroups[vlanId]) vlanGroups[vlanId] = [];
+            vlanGroups[vlanId].push({ id: n.id, pos: allPositions[n.id], node: n });
+        }
+    });
+
+    const vlanColors = [
+        '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#14b8a6', '#f97316'
+    ];
+
+    Object.entries(vlanGroups).forEach(([vId, members]) => {
+        if (members.length === 0) return;
+        const colorIdx = (parseInt(vId) || 1) % vlanColors.length;
+        const vColor = vlanColors[colorIdx];
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        members.forEach(m => {
+            minX = Math.min(minX, m.pos.x);
+            maxX = Math.max(maxX, m.pos.x);
+            minY = Math.min(minY, m.pos.y);
+            maxY = Math.max(maxY, m.pos.y);
+        });
+
+        const pad = 45;
+        const bX = minX - pad;
+        const bY = minY - pad;
+        const bW = (maxX - minX) + (pad * 2);
+        const bH = (maxY - minY) + (pad * 2);
+
+        ctx.save();
+        ctx.fillStyle = vColor + '18';
+        ctx.strokeStyle = vColor;
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([6, 4]);
+
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(bX, bY, bW, bH, 12);
+        else ctx.rect(bX, bY, bW, bH);
+        ctx.fill();
+        ctx.stroke();
+
+        // VLAN Başlık Etiketi
+        ctx.setLineDash([]);
+        ctx.font = "bold 11px sans-serif";
+        const tagText = `🏷️ VLAN ${vId}`;
+        const tagW = ctx.measureText(tagText).width;
+        ctx.fillStyle = vColor;
+        if (ctx.roundRect) ctx.roundRect(bX + 8, bY - 11, tagW + 14, 20, 4);
+        else ctx.rect(bX + 8, bY - 11, tagW + 14, 20);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(tagText, bX + 15, bY + 3);
+        ctx.restore();
+    });
+
+    // ── Özel Çizilen Şekiller (Kutular & Daireler / Klasörler / Sanal Switch) ──
     customShapes.forEach((s, sIdx) => {
         const color = s.color || '#3b82f6';
         const isSelected = (selectedShapeId === s.id);
@@ -4126,7 +4204,8 @@ function saveNodeDetails() {
         port_count: document.getElementById('node-port-count') ? parseInt(document.getElementById('node-port-count').value) || 0 : (existingNode.port_count || 1),
         wan_port: document.getElementById('node-wan-port') ? document.getElementById('node-wan-port').value : (existingNode.wan_port || 'none'),
         wifi_type: document.getElementById('node-wifi-type') ? document.getElementById('node-wifi-type').value : (existingNode.wifi_type || 'none'),
-        poe: document.getElementById('node-poe') ? document.getElementById('node-poe').checked : !!existingNode.poe
+        poe: document.getElementById('node-poe') ? document.getElementById('node-poe').checked : !!existingNode.poe,
+        vlan: document.getElementById('node-vlan') && document.getElementById('node-vlan').value ? parseInt(document.getElementById('node-vlan').value) : null
     };
 
     const isLocked = document.getElementById('node-move-lock') ? document.getElementById('node-move-lock').checked : !!existingNode.moveLocked;
@@ -4337,7 +4416,8 @@ async function saveTopology(skipUndo = false) {
             notes: node.notes || '', moveLocked: !!node.moveLocked,
             model: node.model || '', brand: node.brand || '',
             port_speed: node.port_speed || '', port_count: node.port_count !== undefined ? node.port_count : undefined,
-            wan_port: node.wan_port || '', wifi_type: node.wifi_type || '', poe: node.poe !== undefined ? !!node.poe : undefined
+            wan_port: node.wan_port || '', wifi_type: node.wifi_type || '', poe: node.poe !== undefined ? !!node.poe : undefined,
+            vlan: node.vlan ? parseInt(node.vlan) : null
         });
     });
     // auto-edge-* ile başlayan otomatik kablolar kaydedilmez; sadece elle çizilenleri kaydet
@@ -4390,8 +4470,8 @@ function submitNewNode() {
     const iconObj = getIconShape(dType);
     const modelVal = document.getElementById('new-node-model') ? document.getElementById('new-node-model').value.trim() : '';
     const speedVal = document.getElementById('new-node-port-speed') ? document.getElementById('new-node-port-speed').value : (DEFAULT_DEVICE_PORT_SPEEDS[dType] || '1 Gbps');
-    const countVal = document.getElementById('new-node-port-count') ? parseInt(document.getElementById('new-node-port-count').value) || 1 : 1;
     const poeVal = document.getElementById('new-node-poe') ? document.getElementById('new-node-poe').checked : false;
+    const vlanVal = document.getElementById('new-node-vlan') && document.getElementById('new-node-vlan').value ? parseInt(document.getElementById('new-node-vlan').value) : null;
 
     const brandVal = document.getElementById('new-node-brand') ? document.getElementById('new-node-brand').value.trim() : '';
     const wanVal = document.getElementById('new-node-wan-port') ? document.getElementById('new-node-wan-port').value : 'none';
@@ -4413,6 +4493,7 @@ function submitNewNode() {
         wan_port: wanVal,
         wifi_type: wifiVal,
         poe: poeVal,
+        vlan: vlanVal,
         type: 'manual',
         x: 0,
         y: 0
@@ -4422,6 +4503,7 @@ function submitNewNode() {
     if (document.getElementById('new-node-model')) document.getElementById('new-node-model').value = '';
     if (document.getElementById('new-node-label')) document.getElementById('new-node-label').value = '';
     if (document.getElementById('new-node-id')) document.getElementById('new-node-id').value = '';
+    if (document.getElementById('new-node-vlan')) document.getElementById('new-node-vlan').value = '';
 
     saveTopology();
     runNetworkDoctorAnalysis();
@@ -4685,6 +4767,54 @@ async function runLldpDiscover() {
         }
     } catch(e) {
         showToast('❌ LLDP keşfinde hata oluştu', 2500);
+    }
+}
+
+// ── UPnP / SSDP & Gelişmiş Donanım Keşfi ──────────────────────────────────────
+async function runEnhancedDiscover() {
+    showToast('📡 UPnP ve yerel ağ cihazları taranıyor...', 3000);
+    try {
+        const r = await fetch('/api/network/discover/enhanced');
+        const data = await r.json();
+        if (data.success && data.devices && data.devices.length > 0) {
+            let updatedCount = 0;
+            data.devices.forEach(d => {
+                const existing = nodesData.get(d.ip);
+                if (existing) {
+                    const updates = { id: d.ip };
+                    let changed = false;
+                    if (d.vendor && !existing.brand) { updates.brand = d.vendor; changed = true; }
+                    if (d.model && !existing.model) { updates.model = d.model; changed = true; }
+                    if (d.hostname && (!existing.rawLabel || existing.rawLabel === d.ip)) {
+                        updates.rawLabel = d.hostname;
+                        updates.label = buildNodeLabel(d.hostname, existing.roles || []);
+                        changed = true;
+                    }
+                    if (d.deviceType && d.deviceType !== 'generic' && existing.deviceType === 'generic') {
+                        updates.deviceType = d.deviceType;
+                        const iconObj = getIconShape(d.deviceType);
+                        updates.shape = iconObj.shape;
+                        updates.icon = iconObj.icon;
+                        changed = true;
+                    }
+                    if (changed) {
+                        nodesData.update(updates);
+                        updatedCount++;
+                    }
+                }
+            });
+            if (updatedCount > 0) {
+                saveTopology();
+                if (network) network.redraw();
+                showToast(`✅ ${updatedCount} cihazın marka ve model bilgisi UPnP ile güncellendi!`, 4000);
+            } else {
+                showToast(`ℹ️ Ağdaki ${data.devices.length} cihaz zaten güncel ve tanımlı.`, 3000);
+            }
+        } else {
+            showToast('ℹ️ UPnP yanıtı veren yeni cihaz bulunamadı.', 3000);
+        }
+    } catch(e) {
+        showToast('❌ UPnP cihaz keşfinde hata: ' + e.message, 3000);
     }
 }
 

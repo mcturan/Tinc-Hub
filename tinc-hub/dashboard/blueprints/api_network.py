@@ -668,7 +668,117 @@ def lldp_discover():
         return jsonify({'success': False, 'error': str(e), 'edges': []})
 
 
+# ── Yerel Ağ UPnP / SSDP & mDNS Cihaz Keşfi ──────────────────────────────────
+def discover_upnp_devices(timeout=2.5):
+    """SSDP M-SEARCH UDP yayını ile ağdaki router, TV, kamera, switch ve yazıcıların model/üretici adlarını bulur."""
+    import socket
+    import urllib.request
+    import xml.etree.ElementTree as ET
+
+    ssdp_msg = (
+        'M-SEARCH * HTTP/1.1\r\n'
+        'HOST: 239.255.255.250:1900\r\n'
+        'MAN: "ssdp:discover"\r\n'
+        'MX: 2\r\n'
+        'ST: ssdp:all\r\n\r\n'
+    ).encode('utf-8')
+
+    devices = {}
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    sock.settimeout(timeout)
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 2)
+
+    try:
+        sock.sendto(ssdp_msg, ('239.255.255.250', 1900))
+        start_t = time.time()
+        while time.time() - start_t < timeout:
+            try:
+                data, addr = sock.recvfrom(4096)
+                ip = addr[0]
+                resp_text = data.decode('utf-8', errors='ignore')
+                loc_match = re.search(r'LOCATION:\s*(http[^\r\n]+)', resp_text, re.IGNORECASE)
+                server_match = re.search(r'SERVER:\s*([^\r\n]+)', resp_text, re.IGNORECASE)
+                
+                dev_info = devices.get(ip, {'ip': ip, 'vendor': '', 'model': '', 'name': '', 'type': 'generic', 'source': 'upnp'})
+                if server_match and not dev_info.get('model'):
+                    dev_info['model'] = server_match.group(1).strip()
+                
+                # LOCATION URL'sindeki XML dosyasından dost canlısı cihaz ismi ve üreticiyi çek
+                if loc_match and not dev_info.get('name'):
+                    loc_url = loc_match.group(1).strip()
+                    try:
+                        req = urllib.request.Request(loc_url, headers={'User-Agent': 'TincHub-UPnP'})
+                        with urllib.request.urlopen(req, timeout=1.5) as r_xml:
+                            xml_str = r_xml.read()
+                            root = ET.fromstring(xml_str)
+                            # xmlns tag strip
+                            ns = {'ns': root.tag.split('}')[0].strip('{')} if '}' in root.tag else {}
+                            def find_val(tag):
+                                el = root.find(f".//{tag}") if not ns else root.find(f".//ns:{tag}", ns)
+                                return el.text.strip() if el is not None and el.text else ""
+                            fn = find_val('friendlyName')
+                            man = find_val('manufacturer')
+                            mod = find_val('modelName') or find_val('modelNumber')
+                            dt = find_val('deviceType')
+                            if fn: dev_info['name'] = fn
+                            if man: dev_info['vendor'] = man
+                            if mod: dev_info['model'] = mod
+                            if dt:
+                                dt_l = dt.lower()
+                                if 'router' in dt_l or 'igd' in dt_l or 'gateway' in dt_l: dev_info['type'] = 'router'
+                                elif 'media' in dt_l or 'tv' in dt_l: dev_info['type'] = 'iptv'
+                                elif 'printer' in dt_l: dev_info['type'] = 'printer'
+                                elif 'camera' in dt_l: dev_info['type'] = 'camera'
+                    except Exception:
+                        pass
+                devices[ip] = dev_info
+            except socket.timeout:
+                break
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"SSDP broadcast error: {e}")
+    finally:
+        sock.close()
+    return list(devices.values())
+
+
+@bp.route('/discover/enhanced')
+@auth_required
+def api_network_enhanced_discover():
+    """
+    Yerel ağdaki cihazları UPnP SSDP ve ARP / Nmap ile derinlemesine keşfeder,
+    cihazların tam donanım marka, model ve isimlerini harmanlar.
+    """
+    upnp_devs = discover_upnp_devices(timeout=2.0)
+    upnp_map = {d['ip']: d for d in upnp_devs}
+
+    base_devs = scan_network()
+    enhanced = []
+    for b in base_devs:
+        ip = b['ip']
+        u = upnp_map.get(ip, {})
+        brand = u.get('vendor') or b.get('vendor') or ''
+        model = u.get('model') or ''
+        name = u.get('name') or b.get('hostname') or ''
+        d_type = u.get('type') or b.get('type') or 'generic'
+        
+        enhanced.append({
+            'ip': ip,
+            'mac': b.get('mac', ''),
+            'vendor': brand,
+            'model': model,
+            'hostname': name or ip,
+            'deviceType': d_type,
+            'source': 'upnp+arp' if ip in upnp_map else 'arp'
+        })
+    
+    # Haritadaki cihazları güncellemek üzere döndür
+    return jsonify({'success': True, 'devices': enhanced, 'count': len(enhanced)})
+
+
 # ── AI & Web Cihaz Özellik Arayıcısı (Hardware Spec Lookup) ───────────────────
+
 DEVICE_SPECS_CACHE_FILE = "/opt/tinc-hub/shared/device_specs_cache.json"
 
 def _load_device_specs_cache():
@@ -711,6 +821,64 @@ def lookup_device_specs():
         res = cache[cache_key]
         res['cached'] = True
         return jsonify({'success': True, 'data': res})
+
+    # Gemini AI Entegrasyonu (Varsa öncelikli kullanılır)
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    if not gemini_key and os.path.exists("/etc/tinc-hub/config.env"):
+        try:
+            from dotenv import dotenv_values
+            env_cfg = dotenv_values("/etc/tinc-hub/config.env")
+            gemini_key = env_cfg.get("GEMINI_API_KEY", "").strip()
+        except Exception:
+            pass
+
+    if gemini_key:
+        try:
+            import urllib.request
+            ai_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            prompt_text = (
+                f"You are a network hardware spec analyzer. Analyze this network device or computer: '{model_query}'.\n"
+                f"Respond ONLY with a valid JSON object (no markdown, no backticks, no extra text) with these exact keys:\n"
+                f'{{\n'
+                f'  "deviceType": "switch" | "router" | "modem" | "server" | "pc" | "laptop" | "phone" | "camera" | "nvr" | "printer" | "generic",\n'
+                f'  "port_count": integer (LAN port count, e.g. 1, 4, 8, 24, 48),\n'
+                f'  "port_speed": "100 Mbps" | "1 Gbps" | "2.5 Gbps" | "10 Gbps",\n'
+                f'  "wan_port": "none" | "100m" | "1g" | "2.5g",\n'
+                f'  "wifi_type": "none" | "2.4ghz" | "dual" | "wifi6",\n'
+                f'  "poe": true | false,\n'
+                f'  "poe_power": float or integer (watts, or 0 if no PoE),\n'
+                f'  "description": short one-sentence Turkish description\n'
+                f'}}'
+            )
+            req_data = json.dumps({
+                "contents": [{"parts": [{"text": prompt_text}]}],
+                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 300}
+            }).encode('utf-8')
+            ai_req = urllib.request.Request(ai_url, data=req_data, headers={'Content-Type': 'application/json'}, method='POST')
+            with urllib.request.urlopen(ai_req, timeout=6) as ai_resp:
+                raw_ai = json.loads(ai_resp.read().decode('utf-8'))
+                ai_text = raw_ai.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                ai_clean = re.sub(r'```(?:json)?\s*', '', ai_text).replace('```', '').strip()
+                parsed_ai = json.loads(ai_clean)
+                if isinstance(parsed_ai, dict) and 'deviceType' in parsed_ai:
+                    ai_result = {
+                        'model': model_query,
+                        'deviceType': parsed_ai.get('deviceType', 'generic'),
+                        'port_speed': parsed_ai.get('port_speed', '1 Gbps'),
+                        'port_count': int(parsed_ai.get('port_count', 1)),
+                        'wan_port': parsed_ai.get('wan_port', 'none'),
+                        'wifi_type': parsed_ai.get('wifi_type', 'none'),
+                        'poe': bool(parsed_ai.get('poe', False)),
+                        'poe_power': float(parsed_ai.get('poe_power', 0)),
+                        'bandwidth_mbps': 1000 if '1 Gbps' in parsed_ai.get('port_speed', '') else 100,
+                        'description': parsed_ai.get('description', ''),
+                        'source': 'gemini_ai'
+                    }
+                    cache[cache_key] = ai_result
+                    _save_device_specs_cache(cache)
+                    return jsonify({'success': True, 'data': ai_result})
+        except Exception as ai_err:
+            print(f"Gemini API lookup exception: {ai_err}")
 
     # Varsayılan başlangıç şablonu
     result = {

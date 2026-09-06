@@ -52,9 +52,30 @@ def api_save_telegram():
         if not found_chat:
                 f.write(f"TELEGRAM_CHAT_ID={t_chat}\n")
                 
-    return jsonify({"ok": True, "message": "Telegram ayarlari kaydedildi. Aktif olmasi için Tinc Hub'i yeniden başlatin."})
+    return jsonify({"ok": True, "message": "Telegram ayarları kaydedildi. Aktif olması için Tinc Hub'ı yeniden başlatın."})
 
-
-# ── Başlatma ─────────────────────────────────────────────────────────────────
-
-
+@bp.route("/api/settings/ai", methods=["POST"])
+@admin_required
+def api_save_ai():
+    data = request.json or {}
+    gemini_key = data.get("gemini_api_key", "").strip()
+    
+    import os
+    env_file = "/etc/tinc-hub/config.env"
+    lines = []
+    if os.path.exists(env_file):
+        with open(env_file, "r") as f:
+            lines = f.readlines()
+            
+    found_key = False
+    with open(env_file, "w") as f:
+        for line in lines:
+            if line.startswith("GEMINI_API_KEY="):
+                f.write(f"GEMINI_API_KEY={gemini_key}\n")
+                found_key = True
+            else:
+                f.write(line)
+        if not found_key:
+            f.write(f"GEMINI_API_KEY={gemini_key}\n")
+            
+    return jsonify({"ok": True, "message": "AI API anahtarı başarıyla kaydedildi."})
