@@ -463,16 +463,26 @@
                     <span class="role-badge" data-role="vpn" onclick="toggleRoleBadge(this)"><i class="fas fa-lock"></i> VPN Hub</span>
                 </div>
             </div>
-            <!-- 🏷️ Donanım Marka & Model (Manuel Giriş) -->
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:8px;">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label style="font-size:11px;">Marka</label>
-                    <input type="text" id="node-brand" placeholder="Örn: Zyxel, Cisco, HP" style="font-size:11px; padding:4px 6px;">
+            <!-- 🏷️ Donanım Marka & Model (AI Destekli Arama) -->
+            <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:8px 10px; margin-bottom:10px;">
+                <div style="font-size:11px; font-weight:700; color:#0369a1; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
+                    <span><i class="fas fa-microchip"></i> Donanım Marka & Model</span>
+                    <span style="font-size:10px; color:#0284c7; font-weight:600;"><i class="fas fa-sparkles"></i> AI Arama</span>
                 </div>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label style="font-size:11px;">Model No</label>
-                    <input type="text" id="node-model" placeholder="Örn: VMG3312, 260 G2" style="font-size:11px; padding:4px 6px;">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:6px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:10px; color:#0369a1;">Marka</label>
+                        <input type="text" id="node-brand" placeholder="Örn: Zyxel, Cisco, Dahua" style="font-size:11px; padding:4px 6px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); lookupSpecsForCurrentNode();}">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="font-size:10px; color:#0369a1;">Model No</label>
+                        <input type="text" id="node-model" placeholder="Örn: VMG3312, 2960-X" style="font-size:11px; padding:4px 6px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); lookupSpecsForCurrentNode();}">
+                    </div>
                 </div>
+                <button type="button" class="btn btn-outline" id="btn-ai-lookup-sidebar" onclick="lookupSpecsForCurrentNode()" style="width:100%; font-size:11px; padding:5px 8px; background:#ffffff; border-color:#0284c7; color:#0284c7; display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <i class="fas fa-robot"></i> <span id="btn-ai-lookup-sidebar-text">AI ile Donanım Özelliklerini Bul & Doldur</span>
+                </button>
+                <div id="node-ai-spec-badge" style="display:none; margin-top:6px; font-size:11px; padding:6px 8px; border-radius:4px; background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; line-height:1.4;"></div>
             </div>
 
             <div class="form-group"><label>Etiket / Hostname</label><input type="text" id="node-label"></div>
@@ -797,16 +807,26 @@
     <div class="custom-modal" style="width: 480px;">
         <h3><i class="fas fa-plus"></i> Yeni Cihaz Ekle</h3>
 
-        <!-- 🏷️ Donanım Marka & Model (Manuel Giriş) -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">
-            <div class="form-group" style="margin-bottom:0;">
-                <label style="font-size:11px;">Marka</label>
-                <input type="text" id="new-node-brand" placeholder="Örn: Zyxel, Cisco, HP" style="font-size:12px; padding:6px;">
+        <!-- 🏷️ Donanım Marka & Model (AI Destekli Arama) -->
+        <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; padding:8px 10px; margin-bottom:10px;">
+            <div style="font-size:11px; font-weight:700; color:#0369a1; margin-bottom:6px; display:flex; align-items:center; justify-content:space-between;">
+                <span><i class="fas fa-microchip"></i> Donanım Marka & Model</span>
+                <span style="font-size:10px; color:#0284c7; font-weight:600;"><i class="fas fa-sparkles"></i> AI Arama</span>
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-                <label style="font-size:11px;">Model No</label>
-                <input type="text" id="new-node-model" placeholder="Örn: VMG3312, 260 G2" style="font-size:12px; padding:6px;" onblur="lookupAndFillNewNodeSpecs()">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-bottom:6px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:10px; color:#0369a1;">Marka</label>
+                    <input type="text" id="new-node-brand" placeholder="Örn: Zyxel, Cisco, Dahua" style="font-size:12px; padding:6px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); lookupAndFillNewNodeSpecs();}">
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label style="font-size:10px; color:#0369a1;">Model No</label>
+                    <input type="text" id="new-node-model" placeholder="Örn: VMG3312, 2960-X" style="font-size:12px; padding:6px;" onkeydown="if(event.key==='Enter'){event.preventDefault(); lookupAndFillNewNodeSpecs();}">
+                </div>
             </div>
+            <button type="button" class="btn btn-outline" id="btn-ai-lookup-modal" onclick="lookupAndFillNewNodeSpecs()" style="width:100%; font-size:11px; padding:5px 8px; background:#ffffff; border-color:#0284c7; color:#0284c7; display:flex; align-items:center; justify-content:center; gap:6px;">
+                <i class="fas fa-robot"></i> <span id="btn-ai-lookup-modal-text">AI ile Donanım Özelliklerini Bul & Doldur</span>
+            </button>
+            <div id="new-node-spec-desc" style="display:none; margin-top:6px; font-size:11px; padding:6px 8px; border-radius:4px; background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; line-height:1.4;"></div>
         </div>
 
         <div class="form-group"><label>Cihaz Adı / Etiketi</label><input type="text" id="new-node-label"></div>
@@ -817,19 +837,19 @@
         </div>
         <div class="form-group"><label>Cihaz Türü</label>
             <select id="new-node-type" onchange="onDeviceTypeChangedAutoSetPort('new-node-type', 'new-node-port-speed', 'new-node-port-count')">
-                    <option value="isp">☁️ İSS / İnternet (WAN)</option>
-                    <option value="modem">🌍 Modem</option>
-                    <option value="router">🖧 Router</option>
+                    <option value="generic" selected>📦 Diğer / Genel Cihaz</option>
                     <option value="switch">🔌 Switch</option>
+                    <option value="router">🖧 Router</option>
+                    <option value="modem">🌍 Modem</option>
                     <option value="server">🗄️ Sunucu</option>
                     <option value="pc">🖥️ Masaüstü PC</option>
                     <option value="laptop">💻 Laptop</option>
                     <option value="phone">📱 Telefon</option>
-                    <option value="iptv">📺 IPTV / Smart TV</option>
                     <option value="camera">📷 IP Kamera</option>
                     <option value="nvr">📼 NVR (Kamera Kayıt)</option>
                     <option value="printer">🖨️ Yazıcı</option>
-                    <option value="generic">📦 Diğer</option>
+                    <option value="iptv">📺 IPTV / Smart TV</option>
+                    <option value="isp">☁️ İSS / İnternet (WAN)</option>
             </select>
         </div>
 
@@ -1742,16 +1762,13 @@ function onDeviceTypeChangedAutoSetPort(typeSelectId, speedSelectId, countInputI
 }
 
 // 🌐 Web & AI Cihaz Özellik Getiricisi (Online Lookup)
-async function fetchDeviceSpecs(modelInputId, labelInputId, typeSelectId, portSpeedId, portCountId, poeCheckId) {
-    const modelInput = document.getElementById(modelInputId);
-    if (!modelInput) return;
-    const query = modelInput.value.trim();
+async function fetchDeviceSpecsByQuery(query, labelInputId, typeSelectId, portSpeedId, portCountId, poeCheckId, wanSelectId, wifiSelectId, descElId) {
     if (!query) {
         showToast("⚠️ Lütfen aratmak istediğiniz cihaz modelini girin (Örn: Dahua IPC-HFW, Cisco 2960).", 3000);
-        return;
+        return null;
     }
 
-    showToast(`🌐 "${query}" özellikleri aranıyor...`, 2000);
+    showToast(`🤖 "${query}" özellikleri Gemini AI ile aranıyor...`, 2000);
     try {
         const r = await fetch(`/api/network/device/lookup?q=${encodeURIComponent(query)}`);
         const res = await r.json();
@@ -1759,7 +1776,9 @@ async function fetchDeviceSpecs(modelInputId, labelInputId, typeSelectId, portSp
             const data = res.data;
             if (labelInputId) {
                 const lEl = document.getElementById(labelInputId);
-                if (lEl && !lEl.value) lEl.value = data.model;
+                if (lEl && (!lEl.value || lEl.value.startsWith('cihaz-') || lEl.value === 'Yeni Cihaz')) {
+                    lEl.value = data.model || query;
+                }
             }
             if (typeSelectId && data.deviceType) {
                 const tEl = document.getElementById(typeSelectId);
@@ -1769,7 +1788,7 @@ async function fetchDeviceSpecs(modelInputId, labelInputId, typeSelectId, portSp
                 const sEl = document.getElementById(portSpeedId);
                 if (sEl) sEl.value = data.port_speed;
             }
-            if (portCountId && data.port_count) {
+            if (portCountId && data.port_count !== undefined) {
                 const cEl = document.getElementById(portCountId);
                 if (cEl) cEl.value = data.port_count;
             }
@@ -1777,28 +1796,145 @@ async function fetchDeviceSpecs(modelInputId, labelInputId, typeSelectId, portSp
                 const pEl = document.getElementById(poeCheckId);
                 if (pEl) pEl.checked = !!data.poe;
             }
-
-            const descEl = document.getElementById('new-node-spec-desc');
-            if (descEl) {
-                descEl.style.display = 'block';
-                descEl.innerHTML = `✅ <b>Bulundu:</b> ${data.deviceType.toUpperCase()} | Port: ${data.port_count}x ${data.port_speed} ${data.poe ? '| ⚡ PoE: ' + (data.poe_power || 'Var') + 'W' : ''} ${data.cached ? '(Önbellekten)' : ''}`;
+            if (wanSelectId && data.wan_port) {
+                const wEl = document.getElementById(wanSelectId);
+                if (wEl) wEl.value = data.wan_port;
+            }
+            if (wifiSelectId && data.wifi_type) {
+                const wfEl = document.getElementById(wifiSelectId);
+                if (wfEl) wfEl.value = data.wifi_type;
             }
 
-            showToast(`✅ "${data.model}" teknik özellikleri başarıyla tanımlandı!`, 3500);
+            if (descElId) {
+                const descEl = document.getElementById(descElId);
+                if (descEl) {
+                    descEl.style.display = 'block';
+                    descEl.innerHTML = `
+                        <div style="font-weight:700; color:#0369a1; margin-bottom:2px;">
+                            ✅ AI Tespit Etti: <span style="text-transform:uppercase;">${data.deviceType}</span>
+                        </div>
+                        <div>LAN: <b>${data.port_count}x ${data.port_speed}</b> ${data.poe ? ' | ⚡ PoE: <b>' + (data.poe_power ? data.poe_power + 'W' : 'Var') + '</b>' : ''} ${data.wan_port !== 'none' ? ' | 🌐 WAN: ' + data.wan_port : ''} ${data.wifi_type !== 'none' ? ' | 📶 Wi-Fi: ' + data.wifi_type : ''}</div>
+                        ${data.description ? `<div style="font-size:10px; color:#475569; margin-top:3px; font-style:italic;">${escapeHtml(data.description)}</div>` : ''}
+                    `;
+                }
+            }
+
+            return data;
         } else {
             showToast("ℹ️ Cihaz için kesin datasheet bulunamadı, genel ayarlar korundu.", 3000);
+            return null;
         }
     } catch(e) {
-        showToast("Özellik sorgulanırken bağlantı hatası oluştu.", 2500);
+        showToast("Özellik sorgulanırken bağlantı hatası oluştu: " + e.message, 2500);
+        return null;
     }
+}
+
+async function fetchDeviceSpecs(modelInputId, labelInputId, typeSelectId, portSpeedId, portCountId, poeCheckId) {
+    const modelInput = document.getElementById(modelInputId);
+    if (!modelInput) return;
+    const query = modelInput.value.trim();
+    return fetchDeviceSpecsByQuery(query, labelInputId, typeSelectId, portSpeedId, portCountId, poeCheckId, 'new-node-wan-port', 'new-node-wifi-type', 'new-node-spec-desc');
 }
 
 // Modal için Marka ve Model ile otomatik donanım tanıma
 function lookupAndFillNewNodeSpecs() {
     const brand = (document.getElementById('new-node-brand')?.value || '').trim();
     const model = (document.getElementById('new-node-model')?.value || '').trim();
-    if (!model) return;
-    fetchDeviceSpecs('new-node-model', 'new-node-label', 'new-node-type', 'new-node-port-speed', 'new-node-port-count', 'new-node-poe');
+    const query = `${brand} ${model}`.trim();
+    if (!query) {
+        showToast("⚠️ Lütfen marka veya model girin.", 2500);
+        return;
+    }
+    const btn = document.getElementById('btn-ai-lookup-modal-text');
+    if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Aranıyor...';
+
+    fetchDeviceSpecsByQuery(query, 'new-node-label', 'new-node-type', 'new-node-port-speed', 'new-node-port-count', 'new-node-poe', 'new-node-wan-port', 'new-node-wifi-type', 'new-node-spec-desc')
+        .then(data => {
+            if (data) showToast(`✅ "${query}" özellikleri tanımlandı!`, 3500);
+        })
+        .finally(() => {
+            if (btn) btn.innerText = 'AI ile Donanım Özelliklerini Bul & Doldur';
+        });
+}
+
+// Sağ Panel (Seçili Cihaz) için Marka & Model AI ile arama ve otomatik doldurma
+async function lookupSpecsForCurrentNode() {
+    const brandInput = document.getElementById('node-brand');
+    const modelInput = document.getElementById('node-model');
+    const brand = (brandInput ? brandInput.value : '').trim();
+    const model = (modelInput ? modelInput.value : '').trim();
+    const query = `${brand} ${model}`.trim();
+
+    if (!query) {
+        showToast("⚠️ Lütfen marka ve model bilgisini girin (Örn: Cisco 2960 veya Zyxel VMG3312).", 3000);
+        if (modelInput) modelInput.focus();
+        return;
+    }
+
+    const btn = document.getElementById('btn-ai-lookup-sidebar');
+    const btnText = document.getElementById('btn-ai-lookup-sidebar-text');
+    const badge = document.getElementById('node-ai-spec-badge');
+
+    if (btn) btn.disabled = true;
+    if (btnText) btnText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yapay zeka inceliyor...';
+
+    try {
+        const data = await fetchDeviceSpecsByQuery(
+            query,
+            'node-label',
+            'node-icon',
+            'node-port-speed',
+            'node-port-count',
+            'node-poe',
+            'node-wan-port',
+            'node-wifi-type',
+            'node-ai-spec-badge'
+        );
+
+        if (data) {
+            // Açıklama / Notlar alanına da ekle
+            if (data.description) {
+                const notesEl = document.getElementById('node-notes');
+                if (notesEl) {
+                    if (!notesEl.value || notesEl.value.trim() === '') {
+                        notesEl.value = data.description;
+                    } else if (!notesEl.value.includes(data.description)) {
+                        notesEl.value = data.description + '\n' + notesEl.value;
+                    }
+                    highlightField(notesEl);
+                }
+            }
+
+            // Alanları görsel olarak parlat
+            highlightField(document.getElementById('node-icon'));
+            highlightField(document.getElementById('node-port-count'));
+            highlightField(document.getElementById('node-port-speed'));
+            highlightField(document.getElementById('node-wan-port'));
+            highlightField(document.getElementById('node-wifi-type'));
+            highlightField(document.getElementById('node-label'));
+
+            showToast(`✅ "${query}" özellikleri bulundu ve forma aktarıldı! "Güncelle" butonuna basarak haritaya kaydedebilirsiniz.`, 4000);
+        }
+    } catch (e) {
+        showToast("❌ Hata: " + e.message, 3000);
+    } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = 'AI ile Donanım Özelliklerini Bul & Doldur';
+    }
+}
+
+function highlightField(el) {
+    if (!el) return;
+    const origBorder = el.style.borderColor;
+    const origBg = el.style.backgroundColor;
+    el.style.transition = 'all 0.3s ease';
+    el.style.borderColor = '#0284c7';
+    el.style.backgroundColor = '#f0f9ff';
+    setTimeout(() => {
+        el.style.borderColor = origBorder;
+        el.style.backgroundColor = origBg;
+    }, 1500);
 }
 
 // 🩺 Canlı Ağ Doktoru Kural Motoru (Zero-Overhead Passive Diagnostic)
@@ -4585,6 +4721,7 @@ function submitNewNode() {
     const iconObj = getIconShape(dType);
     const modelVal = document.getElementById('new-node-model') ? document.getElementById('new-node-model').value.trim() : '';
     const speedVal = document.getElementById('new-node-port-speed') ? document.getElementById('new-node-port-speed').value : (DEFAULT_DEVICE_PORT_SPEEDS[dType] || '1 Gbps');
+    const countVal = document.getElementById('new-node-port-count') ? (parseInt(document.getElementById('new-node-port-count').value) || 1) : 1;
     const poeVal = document.getElementById('new-node-poe') ? document.getElementById('new-node-poe').checked : false;
     const vlanVal = document.getElementById('new-node-vlan') && document.getElementById('new-node-vlan').value ? parseInt(document.getElementById('new-node-vlan').value) : null;
 
