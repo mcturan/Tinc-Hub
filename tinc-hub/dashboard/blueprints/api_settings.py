@@ -154,19 +154,26 @@ def api_test_ai():
 
     # Test Gemini
     if gemini_key:
-        try:
-            ai_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
-            req_data = json.dumps({
-                "contents": [{"parts": [{"text": test_prompt.replace("NAME", "Gemini")}]}],
-                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100}
-            }).encode('utf-8')
-            ai_req = urllib.request.Request(ai_url, data=req_data, headers={'Content-Type': 'application/json'}, method='POST')
-            with urllib.request.urlopen(ai_req, timeout=5) as resp:
-                data = json.loads(resp.read().decode('utf-8'))
-                text = data.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                results.append({"provider": "Google Gemini", "success": True, "message": "Bağlantı başarılı (gemini-1.5-flash)"})
-        except Exception as e:
-            results.append({"provider": "Google Gemini", "success": False, "message": f"Hata: {e}"})
+        gemini_models = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-1.5-flash"]
+        gemini_ok = False
+        last_err = ""
+        for gm in gemini_models:
+            try:
+                ai_url = f"https://generativelanguage.googleapis.com/v1beta/models/{gm}:generateContent?key={gemini_key}"
+                req_data = json.dumps({
+                    "contents": [{"parts": [{"text": test_prompt.replace("NAME", "Gemini")}]}],
+                    "generationConfig": {"temperature": 0.1, "maxOutputTokens": 100}
+                }).encode('utf-8')
+                ai_req = urllib.request.Request(ai_url, data=req_data, headers={'Content-Type': 'application/json'}, method='POST')
+                with urllib.request.urlopen(ai_req, timeout=6) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    results.append({"provider": "Google Gemini", "success": True, "message": f"Bağlantı başarılı ({gm})"})
+                    gemini_ok = True
+                    break
+            except Exception as e:
+                last_err = str(e)
+        if not gemini_ok:
+            results.append({"provider": "Google Gemini", "success": False, "message": f"Hata: {last_err}"})
     else:
         results.append({"provider": "Google Gemini", "success": False, "message": "API Key tanımlı değil"})
 

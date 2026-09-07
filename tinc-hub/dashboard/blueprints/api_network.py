@@ -833,52 +833,55 @@ def lookup_device_specs():
             pass
 
     if gemini_key:
-        try:
-            import urllib.request
-            ai_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
-            prompt_text = (
-                f"You are a network hardware spec analyzer. Analyze this network device or computer: '{model_query}'.\n"
-                f"Respond ONLY with a valid JSON object (no markdown, no backticks, no extra text) with these exact keys:\n"
-                f'{{\n'
-                f'  "deviceType": "switch" | "router" | "modem" | "server" | "pc" | "laptop" | "phone" | "camera" | "nvr" | "printer" | "generic",\n'
-                f'  "port_count": integer (LAN port count, e.g. 1, 4, 8, 24, 48),\n'
-                f'  "port_speed": "100 Mbps" | "1 Gbps" | "2.5 Gbps" | "10 Gbps",\n'
-                f'  "wan_port": "none" | "100m" | "1g" | "2.5g",\n'
-                f'  "wifi_type": "none" | "2.4ghz" | "dual" | "wifi6",\n'
-                f'  "poe": true | false,\n'
-                f'  "poe_power": float or integer (watts, or 0 if no PoE),\n'
-                f'  "description": short one-sentence Turkish description\n'
-                f'}}'
-            )
-            req_data = json.dumps({
-                "contents": [{"parts": [{"text": prompt_text}]}],
-                "generationConfig": {"temperature": 0.1, "maxOutputTokens": 300}
-            }).encode('utf-8')
-            ai_req = urllib.request.Request(ai_url, data=req_data, headers={'Content-Type': 'application/json'}, method='POST')
-            with urllib.request.urlopen(ai_req, timeout=6) as ai_resp:
-                raw_ai = json.loads(ai_resp.read().decode('utf-8'))
-                ai_text = raw_ai.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-                ai_clean = re.sub(r'```(?:json)?\s*', '', ai_text).replace('```', '').strip()
-                parsed_ai = json.loads(ai_clean)
-                if isinstance(parsed_ai, dict) and 'deviceType' in parsed_ai:
-                    ai_result = {
-                        'model': model_query,
-                        'deviceType': parsed_ai.get('deviceType', 'generic'),
-                        'port_speed': parsed_ai.get('port_speed', '1 Gbps'),
-                        'port_count': int(parsed_ai.get('port_count', 1)),
-                        'wan_port': parsed_ai.get('wan_port', 'none'),
-                        'wifi_type': parsed_ai.get('wifi_type', 'none'),
-                        'poe': bool(parsed_ai.get('poe', False)),
-                        'poe_power': float(parsed_ai.get('poe_power', 0)),
-                        'bandwidth_mbps': 1000 if '1 Gbps' in parsed_ai.get('port_speed', '') else 100,
-                        'description': parsed_ai.get('description', ''),
-                        'source': 'gemini_ai'
-                    }
-                    cache[cache_key] = ai_result
-                    _save_device_specs_cache(cache)
-                    return jsonify({'success': True, 'data': ai_result})
-        except Exception as ai_err:
-            print(f"Gemini API lookup exception: {ai_err}")
+        prompt_text = (
+            f"You are a network hardware spec analyzer. Analyze this network device or computer: '{model_query}'.\n"
+            f"Respond ONLY with a valid JSON object (no markdown, no backticks, no extra text) with these exact keys:\n"
+            f'{{\n'
+            f'  "deviceType": "switch" | "router" | "modem" | "server" | "pc" | "laptop" | "phone" | "camera" | "nvr" | "printer" | "generic",\n'
+            f'  "port_count": integer (LAN port count, e.g. 1, 4, 8, 24, 48),\n'
+            f'  "port_speed": "100 Mbps" | "1 Gbps" | "2.5 Gbps" | "10 Gbps",\n'
+            f'  "wan_port": "none" | "100m" | "1g" | "2.5g",\n'
+            f'  "wifi_type": "none" | "2.4ghz" | "dual" | "wifi6",\n'
+            f'  "poe": true | false,\n'
+            f'  "poe_power": float or integer (watts, or 0 if no PoE),\n'
+            f'  "description": short one-sentence Turkish description\n'
+            f'}}'
+        )
+        req_data = json.dumps({
+            "contents": [{"parts": [{"text": prompt_text}]}],
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 300}
+        }).encode('utf-8')
+        
+        gemini_models = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-1.5-flash"]
+        for gm in gemini_models:
+            try:
+                import urllib.request
+                ai_url = f"https://generativelanguage.googleapis.com/v1beta/models/{gm}:generateContent?key={gemini_key}"
+                ai_req = urllib.request.Request(ai_url, data=req_data, headers={'Content-Type': 'application/json'}, method='POST')
+                with urllib.request.urlopen(ai_req, timeout=6) as ai_resp:
+                    raw_ai = json.loads(ai_resp.read().decode('utf-8'))
+                    ai_text = raw_ai.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                    ai_clean = re.sub(r'```(?:json)?\s*', '', ai_text).replace('```', '').strip()
+                    parsed_ai = json.loads(ai_clean)
+                    if isinstance(parsed_ai, dict) and 'deviceType' in parsed_ai:
+                        ai_result = {
+                            'model': model_query,
+                            'deviceType': parsed_ai.get('deviceType', 'generic'),
+                            'port_speed': parsed_ai.get('port_speed', '1 Gbps'),
+                            'port_count': int(parsed_ai.get('port_count', 1)),
+                            'wan_port': parsed_ai.get('wan_port', 'none'),
+                            'wifi_type': parsed_ai.get('wifi_type', 'none'),
+                            'poe': bool(parsed_ai.get('poe', False)),
+                            'poe_power': float(parsed_ai.get('poe_power', 0)),
+                            'bandwidth_mbps': 1000 if '1 Gbps' in parsed_ai.get('port_speed', '') else 100,
+                            'description': parsed_ai.get('description', ''),
+                            'source': f'gemini_ai ({gm})'
+                        }
+                        cache[cache_key] = ai_result
+                        _save_device_specs_cache(cache)
+                        return jsonify({'success': True, 'data': ai_result})
+            except Exception as ai_err:
+                print(f"Gemini API lookup ({gm}) exception: {ai_err}")
 
     # OpenAI / ChatGPT Fallback Entegrasyonu
     openai_key = os.environ.get("OPENAI_API_KEY", "")
