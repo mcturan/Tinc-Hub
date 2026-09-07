@@ -1129,22 +1129,268 @@ def api_network_ping():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+
+def _parse_nmap_ports(output):
+    ports = []
+    if not output:
+        return ports
+    for line in output.splitlines():
+        line = line.strip()
+        m = re.match(r'^(\d+/(?:tcp|udp))\s+(\w+)\s+(\S+)\s*(.*)$', line)
+        if m:
+            ports.append({
+                'port': m.group(1),
+                'state': m.group(2),
+                'service': m.group(3),
+                'version': m.group(4).strip()
+            })
+    return ports
+
+
+def _heuristic_nmap_analysis(ip, hostname, ports):
+    """API anahtarı bulunamadığında veya servis ulaşılamadığında çalışan kural tabanlı yerel analiz motoru"""
+    if not ports:
+        return {
+            "risk_level": "GÜVENLİ",
+            "summary": f"{hostname or ip} üzerinde taranan portlar arasında açık veya dinleyen servis tespit edilmedi. Cihaz dış erişime kapalıdır.",
+            "findings": [],
+            "recommendations": [
+                "Cihaz dış taramalara karşı kapalı durumda.",
+                "Eğer üzerinde çalışan servisler varsa yerel güvenlik duvarı (Firewall) başarıyla koruyor demektir."
+            ],
+            "quick_commands": [],
+            "provider": "Yerel Kural Tabanlı Teşhis Motoru"
+        }
+
+    findings = []
+    highest_severity = "DÜŞÜK"
+    recommendations = []
+    quick_commands = []
+
+    port_rules = {
+        '23': ('KRİTİK', 'Telnet (Şifresiz Protokol)', 'Telnet trafiği şifrelenmez; şifreler ve veriler düz metin olarak ağda izlenebilir.', 'Telnet servisini kapatın ve SSHv2 kullanımına geçin.', 'sudo systemctl stop telnetd && sudo systemctl disable telnetd'),
+        '21': ('YÜKSEK', 'FTP (Şifresiz Dosya Transferi)', 'FTP kimlik doğrulaması ve veri aktarımı şifresizdir.', 'Güvenli dosya aktarımı için SFTP veya FTPS protokolünü tercih edin.', 'sudo ufw deny 21/tcp'),
+        '445': ('YÜKSEK', 'SMB / Active Directory', 'SMB dosya paylaşımı yerel ağda açık. Fidye yazılımları ve EternalBlue benzeri saldırılar için öncelikli hedeftir.', 'SMB servisini yalnızca güvenilen yerel ağ alt ağlarına (LAN) sınırlandırın, internete asla açmayın.', 'sudo ufw deny 445/tcp'),
+        '139': ('ORTA', 'NetBIOS Session', 'NetBIOS üzerinden sistem adı ve kullanıcı bilgileri sızabilir.', 'NetBIOS over TCP/IP özelliğini devre dışı bırakın veya portu kısıtlayın.', 'sudo ufw deny 139/tcp'),
+        '3389': ('YÜKSEK', 'RDP (Uzak Masaüstü)', 'RDP servisi kaba kuvvet (brute-force) saldırılarına ve kimlik bilgisi hırsızlığına maruz kalabilir.', 'RDP portunu internete doğrudan açmayın, VPN üzerinden erişim sağlayın veya NLA zorunlu kılın.', 'sudo ufw deny 3389/tcp'),
+        '80': ('ORTA', 'HTTP (Şifresiz Web)', 'Web trafiği düz metin olarak iletilmektedir.', 'SSL/TLS sertifikası (Let\'s Encrypt) kurarak HTTPS (port 443) yönlendirmesi yapın.', 'sudo certbot --nginx'),
+        '22': ('DÜŞÜK', 'SSH (Güvenli Kabuk)', 'SSH servisi açık. Doğru yapılandırıldığında güvenlidir ancak internete açıksa brute-force hedefi olabilir.', 'Parola ile girişi kapatıp SSH anahtarı kullanın ve Fail2ban kurun.', 'sudo ufw limit 22/tcp'),
+        '3306': ('YÜKSEK', 'MySQL Veritabanı', 'Veritabanı portu ağa dinliyor. Doğrudan uzaktan erişim veri sızıntısı riski taşır.', 'Veritabanını yalnızca localhost (127.0.0.1) soketine bağlayın (`bind-address = 127.0.0.1`).', 'sudo ufw deny 3306/tcp'),
+        '5432': ('YÜKSEK', 'PostgreSQL Veritabanı', 'PostgreSQL veritabanı portu dinliyor.', 'pg_hba.conf üzerinden sadece izin verilen IP adreslerine erişim tanıyın.', 'sudo ufw deny 5432/tcp'),
+        '6379': ('KRİTİK', 'Redis Veritabanı', 'Redis varsayılan olarak kimlik doğrulamasız çalışır ve uzaktan kod çalıştırmaya (RCE) yol açabilir.', 'Redis `protected-mode yes` ve parola koruması yapılandırın, dış ağa kapatın.', 'sudo ufw deny 6379/tcp'),
+        '27017': ('KRİTİK', 'MongoDB', 'MongoDB veritabanı portu açık.', 'Kimlik doğrulama zorunlu kılınmalı ve dış ağa kapatılmalıdır.', 'sudo ufw deny 27017/tcp'),
+        '8080': ('ORTA', 'Web Proxy / Alternatif HTTP', 'Alternatif web yönetim veya geliştirme arayüzü açık.', 'Varsayılan şifreleri değiştirin ve gereksizse erişimi sınırlayın.', 'sudo ufw deny 8080/tcp'),
+        '53': ('BİLGİ', 'DNS Servisi', 'DNS çözümleyici portu aktif.', 'DNS Amplification saldırılarına karşı yetkisiz Recursive sorguları engelleyin.', '')
+    }
+
+    severity_order = {'BİLGİ': 0, 'DÜŞÜK': 1, 'ORTA': 2, 'YÜKSEK': 3, 'KRİTİK': 4}
+
+    for p in ports:
+        port_num = p['port'].split('/')[0]
+        rule = port_rules.get(port_num)
+        if rule:
+            sev, name, risk, rec, cmd = rule
+            findings.append({
+                'port': p['port'],
+                'service': f"{p['service']} ({p.get('version', '')})".strip(),
+                'severity': sev,
+                'risk': risk,
+                'recommendation': rec
+            })
+            if cmd:
+                quick_commands.append({'title': f"{port_num} ({name.split()[0]}) Portunu Kapat/Kısıtla", 'command': cmd})
+            if severity_order.get(sev, 0) > severity_order.get(highest_severity, 0):
+                highest_severity = sev
+        else:
+            findings.append({
+                'port': p['port'],
+                'service': f"{p['service']} ({p.get('version', '')})".strip(),
+                'severity': 'BİLGİ',
+                'risk': 'Servis çalışıyor ve yanıt veriyor.',
+                'recommendation': 'Servis sürümünün güncel olduğundan ve kimlik doğrulamasının aktif olduğundan emin olun.'
+            })
+
+    if highest_severity in ('KRİTİK', 'YÜKSEK'):
+        recommendations.append("Kritik ve yüksek riskli portlar güvenlik duvarı (Firewall) arkasına alınmalı veya devre dışı bırakılmalıdır.")
+    recommendations.append("Açık servislerin yazılım sürümleri düzenli olarak güvenlik güncellemeleriyle yenilenmelidir.")
+    recommendations.append("Uzak yönetim portları için parola yerine anahtar veya çift faktörlü doğrulama (2FA) kullanılmalıdır.")
+
+    summary = f"{hostname or ip} üzerinde {len(ports)} adet açık port tespit edildi. Genel risk seviyesi: {highest_severity}."
+
+    return {
+        "risk_level": highest_severity,
+        "summary": summary,
+        "findings": findings,
+        "recommendations": recommendations,
+        "quick_commands": quick_commands,
+        "provider": "Yerel Kural Tabanlı Teşhis Motoru"
+    }
+
+
+def _analyze_nmap_with_ai(ip, hostname, ports, raw_output):
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    if (not gemini_key or not openai_key) and os.path.exists("/etc/tinc-hub/config.env"):
+        try:
+            from dotenv import dotenv_values
+            env_cfg = dotenv_values("/etc/tinc-hub/config.env")
+            if not gemini_key:
+                gemini_key = env_cfg.get("GEMINI_API_KEY", "").strip()
+            if not openai_key:
+                openai_key = env_cfg.get("OPENAI_API_KEY", "").strip()
+        except Exception:
+            pass
+
+    prompt_text = (
+        f"Sen bir Kıdemli Ağ Güvenliği ve NOC/SOC Uzmanısın. "
+        f"Aşağıdaki Nmap port taraması sonucunu incele ve ağ yöneticisi için TÜRKÇE, anlaşılır, somut ve aksiyon alınabilir bir güvenlik denetim raporu hazırla.\n\n"
+        f"Hedef Cihaz: {hostname or 'Bilinmiyor'} ({ip})\n"
+        f"Bulunan Açık Portlar: {json.dumps(ports, ensure_ascii=False)}\n"
+        f"Ham Nmap Çıktısı:\n{raw_output}\n\n"
+        f"YANITINI SADECE VE SADECE AŞAĞIDAKİ JSON FORMATINDA VER (Markdown formatı, backtick veya fazladan metin yazma):\n"
+        f"{{\n"
+        f'  "risk_level": "KRİTİK" | "YÜKSEK" | "ORTA" | "DÜŞÜK" | "GÜVENLİ",\n'
+        f'  "summary": "1-2 cümlelik net genel güvenlik durumu özeti",\n'
+        f'  "findings": [\n'
+        f'    {{\n'
+        f'      "port": "port/protokol (örn: 23/tcp)",\n'
+        f'      "service": "servis adı ve sürümü",\n'
+        f'      "severity": "KRİTİK" | "YÜKSEK" | "ORTA" | "DÜŞÜK" | "BİLGİ",\n'
+        f'      "risk": "Risk ve olası tehdit açıklaması",\n'
+        f'      "recommendation": "Nasıl düzeltilir / sıkılaştırılır"\n'
+        f'    }}\n'
+        f'  ],\n'
+        f'  "recommendations": [\n'
+        f'    "Ağ yöneticisi için somut tavsiye 1",\n'
+        f'    "Ağ yöneticisi için somut tavsiye 2"\n'
+        f'  ],\n'
+        f'  "quick_commands": [\n'
+        f'    {{\n'
+        f'      "title": "İşlem başlığı (örn: UFW ile Portu Kapat)",\n'
+        f'      "command": "terminal komutu (örn: sudo ufw deny 23/tcp)"\n'
+        f'    }}\n'
+        f'  ]\n'
+        f"}}"
+    )
+
+    # 1. Google Gemini
+    if gemini_key:
+        gemini_models = ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-2.5-flash-lite", "gemini-1.5-flash"]
+        for gm in gemini_models:
+            try:
+                import urllib.request
+                ai_url = f"https://generativelanguage.googleapis.com/v1beta/models/{gm}:generateContent?key={gemini_key}"
+                req_data = json.dumps({
+                    "contents": [{"parts": [{"text": prompt_text}]}],
+                    "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1200}
+                }).encode('utf-8')
+                ai_req = urllib.request.Request(ai_url, data=req_data, headers={'Content-Type': 'application/json'}, method='POST')
+                with urllib.request.urlopen(ai_req, timeout=12) as ai_resp:
+                    raw_ai = json.loads(ai_resp.read().decode('utf-8'))
+                    ai_text = raw_ai.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+                    ai_clean = re.sub(r'```(?:json)?\s*', '', ai_text).replace('```', '').strip()
+                    parsed = json.loads(ai_clean)
+                    if isinstance(parsed, dict) and 'risk_level' in parsed:
+                        parsed['provider'] = f"Google Gemini ({gm})"
+                        return parsed
+            except Exception as e:
+                print(f"Gemini Nmap analysis error ({gm}): {e}")
+
+    # 2. OpenAI Fallback
+    if openai_key:
+        try:
+            import urllib.request
+            ai_url = "https://api.openai.com/v1/chat/completions"
+            req_data = json.dumps({
+                "model": "gpt-4o-mini",
+                "messages": [{"role": "user", "content": prompt_text}],
+                "temperature": 0.2,
+                "max_tokens": 1200
+            }).encode('utf-8')
+            ai_req = urllib.request.Request(ai_url, data=req_data, headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {openai_key}'
+            }, method='POST')
+            with urllib.request.urlopen(ai_req, timeout=12) as ai_resp:
+                raw_ai = json.loads(ai_resp.read().decode('utf-8'))
+                ai_text = raw_ai.get('choices', [{}])[0].get('message', {}).get('content', '')
+                ai_clean = re.sub(r'```(?:json)?\s*', '', ai_text).replace('```', '').strip()
+                parsed = json.loads(ai_clean)
+                if isinstance(parsed, dict) and 'risk_level' in parsed:
+                    parsed['provider'] = "OpenAI (gpt-4o-mini)"
+                    return parsed
+        except Exception as e:
+            print(f"OpenAI Nmap analysis error: {e}")
+
+    # 3. Fallback Heuristic
+    return _heuristic_nmap_analysis(ip, hostname, ports)
+
+
 @bp.route('/nmap', methods=['POST'])
 @auth_required
 def api_network_nmap():
     import shutil
     data = request.get_json() or {}
     ip = data.get('ip', '')
+    hostname = data.get('hostname', '')
+    with_ai = bool(data.get('with_ai', False))
+
     if not re.match(r'^\d{1,3}(\.\d{1,3}){3}$', ip):
         return jsonify({'success': False, 'error': 'Geçersiz IP'}), 400
     if not shutil.which('nmap'):
         return jsonify({'success': False, 'error': 'nmap kurulu değil. sudo apt install nmap'}), 400
+
+    stdout_output = ""
     try:
-        r = subprocess.run(['nmap', '-T3', '--top-ports', '20', '--open', ip],
-                          capture_output=True, text=True, timeout=30)
-        return jsonify({'success': True, 'output': r.stdout})
+        # Hızlı servis ve sürüm tespiti (-sV --version-light)
+        cmd = ['nmap', '-T4', '-sV', '--version-light', '--top-ports', '30', '--open', ip]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+        stdout_output = r.stdout
     except subprocess.TimeoutExpired:
-        return jsonify({'success': False, 'error': 'Nmap zaman aşımı (30s)'}), 408
+        try:
+            # Fallback: Temel port taraması
+            cmd_fb = ['nmap', '-T4', '--top-ports', '25', '--open', ip]
+            r = subprocess.run(cmd_fb, capture_output=True, text=True, timeout=10)
+            stdout_output = r.stdout
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Nmap zaman aşımı: {e}'}), 408
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+    parsed_ports = _parse_nmap_ports(stdout_output)
+    response_data = {
+        'success': True,
+        'output': stdout_output,
+        'ports': parsed_ports,
+        'ip': ip,
+        'hostname': hostname
+    }
+
+    if with_ai:
+        response_data['analysis'] = _analyze_nmap_with_ai(ip, hostname, parsed_ports, stdout_output)
+
+    return jsonify(response_data)
+
+
+@bp.route('/nmap_analyze', methods=['POST'])
+@auth_required
+def api_network_nmap_analyze():
+    data = request.get_json() or {}
+    ip = data.get('ip', '')
+    hostname = data.get('hostname', '')
+    raw_output = data.get('output', '')
+    ports = data.get('ports', None)
+
+    if not re.match(r'^\d{1,3}(\.\d{1,3}){3}$', ip):
+        return jsonify({'success': False, 'error': 'Geçersiz IP'}), 400
+
+    if ports is None:
+        ports = _parse_nmap_ports(raw_output)
+
+    try:
+        analysis = _analyze_nmap_with_ai(ip, hostname, ports, raw_output)
+        return jsonify({'success': True, 'analysis': analysis})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 

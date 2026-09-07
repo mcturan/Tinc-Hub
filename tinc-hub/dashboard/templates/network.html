@@ -367,7 +367,7 @@
             <li onclick="ctxAction('ssh')"><i class="fas fa-terminal"></i> Web SSH Bağlan</li>
             <li onclick="ctxAction('trace_from')"><i class="fas fa-route" style="color:#0891b2;"></i> Buradan Yol Analizi Başlat</li>
             <li onclick="ctxAction('ping')"><i class="fas fa-satellite-dish"></i> Sürekli Ping At</li>
-            <li onclick="ctxAction('nmap')"><i class="fas fa-search"></i> Port Tara (Nmap)</li>
+            <li onclick="ctxAction('nmap')"><i class="fas fa-shield-alt" style="color:#6366f1;"></i> Port Tara & Güvenlik Raporu (Nmap + AI)</li>
             <li onclick="ctxAction('toggle_lock')" id="ctx-lock-btn"><i class="fas fa-lock" style="color:#64748b;"></i> Konumu Kilitle / Çöz</li>
 
             <hr style="margin:5px 0;">
@@ -573,8 +573,9 @@
             </div>
             
             <div style="display:flex; gap:6px; margin-bottom:10px;">
-                <button class="btn btn-outline" style="flex:1; font-size:12px; border-color:#10b981; color:#10b981;" onclick="checkNodeServices()"><i class="fas fa-heartbeat"></i> Servis Tara</button>
-                <button class="btn btn-primary" style="flex:1" onclick="saveNodeDetails()"><i class="fas fa-check"></i> Güncelle</button>
+                <button class="btn btn-outline" style="flex:1; font-size:11px; padding:6px 4px; border-color:#10b981; color:#10b981;" onclick="checkNodeServices()"><i class="fas fa-heartbeat"></i> Servis Tara</button>
+                <button class="btn btn-outline" style="flex:1; font-size:11px; padding:6px 4px; border-color:#6366f1; color:#6366f1;" onclick="openNmapModal(selectedNodeId, document.getElementById('node-label').value)"><i class="fas fa-shield-alt"></i> Nmap & AI</button>
+                <button class="btn btn-primary" style="flex:1; font-size:11px; padding:6px 4px;" onclick="saveNodeDetails()"><i class="fas fa-check"></i> Güncelle</button>
             </div>
             <br><br>
             <button class="btn btn-danger" style="width:100%" onclick="deleteSelectedNode()"><i class="fas fa-trash"></i> Sil</button>
@@ -1093,6 +1094,135 @@
             Yükleniyor...
         </div>
         <button class="btn btn-outline" onclick="document.getElementById('syslogModal').style.display='none'" style="width:100%; margin-top:15px;">Kapat</button>
+    </div>
+</div>
+
+<!-- Nmap & AI Güvenlik Raporu Modalı -->
+<div id="nmapModal" class="modal-overlay" style="display:none;">
+    <div class="custom-modal" style="width:820px; max-width:96vw; max-height:92vh; display:flex; flex-direction:column; padding:20px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.3); border-radius:12px;">
+        <!-- Header -->
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #e2e8f0; padding-bottom:12px; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:40px; height:40px; border-radius:10px; background:linear-gradient(135deg, #6366f1, #4f46e5); display:flex; align-items:center; justify-content:center; color:#fff; font-size:18px; box-shadow:0 4px 6px -1px rgba(99,102,241,0.3);">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div>
+                    <h3 style="margin:0; font-size:16px; font-weight:700; color:#1e293b; display:flex; align-items:center; gap:8px;">
+                        Nmap Port Taraması & Güvenlik Raporu
+                    </h3>
+                    <div style="font-size:12px; color:#64748b; margin-top:2px;">
+                        Hedef: <strong id="nmap-target-label" style="color:#0284c7;">-</strong> (<span id="nmap-target-ip" style="font-family:monospace; font-weight:600;">-</span>)
+                    </div>
+                </div>
+            </div>
+            <button onclick="closeNmapModal()" style="background:none; border:none; color:#94a3b8; font-size:22px; cursor:pointer; line-height:1; padding:4px 8px; border-radius:6px;">✕</button>
+        </div>
+
+        <!-- Status & Risk Banner -->
+        <div id="nmap-status-bar" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:8px 14px; margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <div id="nmap-progress-text" style="display:flex; align-items:center; gap:8px; font-size:12px; color:#475569;">
+                <i class="fas fa-spinner fa-spin" id="nmap-spinner" style="color:#6366f1;"></i>
+                <span id="nmap-status-desc">Tarama başlatılıyor...</span>
+            </div>
+            <div id="nmap-badges-container" style="display:none; align-items:center; gap:8px;">
+                <span id="nmap-ports-count-badge" style="background:#e0f2fe; color:#0369a1; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">0 Port</span>
+                <span id="nmap-risk-badge" style="font-size:11px; font-weight:700; padding:3px 10px; border-radius:6px; text-transform:uppercase;">-</span>
+                <span id="nmap-provider-badge" style="background:#f1f5f9; color:#475569; font-size:10px; padding:3px 8px; border-radius:6px; border:1px solid #cbd5e1;">-</span>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div style="display:flex; gap:6px; border-bottom:1px solid #e2e8f0; margin-bottom:12px;">
+            <button id="nmap-tab-btn-ai" onclick="switchNmapTab('ai')" style="padding:8px 14px; font-size:12px; font-weight:600; background:none; border:none; border-bottom:2px solid #6366f1; color:#6366f1; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <i class="fas fa-robot"></i> AI Güvenlik Raporu
+            </button>
+            <button id="nmap-tab-btn-ports" onclick="switchNmapTab('ports')" style="padding:8px 14px; font-size:12px; font-weight:600; background:none; border:none; border-bottom:2px solid transparent; color:#64748b; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <i class="fas fa-network-wired"></i> Açık Portlar & Servisler
+            </button>
+            <button id="nmap-tab-btn-raw" onclick="switchNmapTab('raw')" style="padding:8px 14px; font-size:12px; font-weight:600; background:none; border:none; border-bottom:2px solid transparent; color:#64748b; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <i class="fas fa-terminal"></i> Ham Terminal Çıktısı
+            </button>
+        </div>
+
+        <!-- Modal Tab Contents (Scrollable) -->
+        <div style="flex:1; overflow-y:auto; min-height:260px; max-height:480px; padding-right:4px;">
+            
+            <!-- Tab 1: AI Analiz -->
+            <div id="nmap-tab-ai">
+                <div id="nmap-ai-loading" style="text-align:center; padding:40px 10px; color:#64748b;">
+                    <i class="fas fa-brain fa-fade" style="font-size:36px; color:#6366f1; margin-bottom:12px;"></i>
+                    <div style="font-weight:600; font-size:14px; color:#1e293b;">Yapay Zeka Portları ve Zafiyetleri İnceliyor...</div>
+                    <div style="font-size:12px; color:#94a3b8; margin-top:4px;">Nmap servis sürümleri ve güvenlik riskleri analiz ediliyor.</div>
+                </div>
+
+                <div id="nmap-ai-content" style="display:none;">
+                    <!-- Özet Kartı -->
+                    <div style="background:#f8fafc; border-left:4px solid #6366f1; border-radius:0 8px 8px 0; padding:12px 14px; margin-bottom:14px; border:1px solid #e2e8f0; border-left-width:4px;">
+                        <div style="font-weight:700; font-size:11px; color:#6366f1; margin-bottom:4px; display:flex; align-items:center; gap:6px; letter-spacing:0.5px;">
+                            <i class="fas fa-clipboard-check"></i> GENEL TEŞHİS & ÖZET
+                        </div>
+                        <div id="nmap-ai-summary" style="font-size:13px; color:#1e293b; line-height:1.5;"></div>
+                    </div>
+
+                    <!-- Tespit Edilen Riskler / Zafiyetler -->
+                    <div style="margin-bottom:14px;">
+                        <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-triangle-exclamation" style="color:#eab308;"></i> Tespit Edilen Riskler ve Açıklamalar
+                        </div>
+                        <div id="nmap-ai-findings" style="display:flex; flex-direction:column; gap:8px;"></div>
+                    </div>
+
+                    <!-- Somut Tavsiyeler & Aksiyon Maddeleri -->
+                    <div style="margin-bottom:14px;">
+                        <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-list-check" style="color:#10b981;"></i> Güvenlik İyileştirme Tavsiyeleri
+                        </div>
+                        <ul id="nmap-ai-recommendations" style="margin:0; padding-left:18px; font-size:12px; color:#334155; line-height:1.6;"></ul>
+                    </div>
+
+                    <!-- Hızlı Güvenlik Komutları -->
+                    <div id="nmap-ai-commands-section" style="margin-bottom:10px;">
+                        <div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                            <i class="fas fa-terminal" style="color:#0ea5e9;"></i> Hızlı Güvenlik Komutları (Kopyala & Uygula)
+                        </div>
+                        <div id="nmap-ai-commands" style="display:flex; flex-direction:column; gap:6px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Açık Portlar Tablosu -->
+            <div id="nmap-tab-ports" style="display:none;">
+                <div id="nmap-ports-table-container" style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+                        <thead>
+                            <tr style="background:#f1f5f9; border-bottom:1px solid #cbd5e1; color:#475569;">
+                                <th style="padding:8px 12px;">Port / Protokol</th>
+                                <th style="padding:8px 12px;">Durum</th>
+                                <th style="padding:8px 12px;">Servis Adı</th>
+                                <th style="padding:8px 12px;">Sürüm Bilgisi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nmap-ports-table-body">
+                            <tr><td colspan="4" style="text-align:center; padding:15px; color:#94a3b8;">Veri yok.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Ham Çıktı -->
+            <div id="nmap-tab-raw" style="display:none;">
+                <pre id="nmap-raw-output" style="background:#0f172a; color:#38bdf8; padding:14px; border-radius:8px; font-family:monospace; font-size:11px; line-height:1.5; max-height:360px; overflow-y:auto; margin:0; border:1px solid #1e293b;"></pre>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #e2e8f0; padding-top:12px; margin-top:12px;">
+            <div style="display:flex; gap:8px;">
+                <button class="btn btn-outline" style="font-size:11px; padding:6px 12px;" onclick="reScanNmap()"><i class="fas fa-rotate"></i> Yeniden Tara</button>
+                <button class="btn btn-outline" style="font-size:11px; padding:6px 12px; border-color:#6366f1; color:#6366f1;" onclick="reAnalyzeWithAI()"><i class="fas fa-brain"></i> AI Raporunu Yenile</button>
+            </div>
+            <button class="btn btn-outline" onclick="closeNmapModal()" style="font-size:12px; padding:6px 16px;">Kapat</button>
+        </div>
     </div>
 </div>
 
@@ -3785,22 +3915,7 @@ async function ctxAction(action) {
     }
     if (action === 'wol') { showToast(`Magic Packet (WOL) gönderildi: ${contextNodeId}`); }
     if (action === 'nmap') { 
-        showToast(`🔍 Nmap Port Taraması başlatıldı: ${contextNodeId}... (birkaç saniye sürebilir)`, 5000);
-        try {
-            const r = await fetch('/api/network/nmap', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ ip: contextNodeId })
-            });
-            const data = await r.json();
-            if (data.success) {
-                alert(`Nmap Tarama Sonucu (${contextNodeId}):\n\n${data.output || 'Açık port bulunamadı.'}`);
-            } else {
-                showToast(`❌ Nmap hatası: ${data.error}`, 5000);
-            }
-        } catch(e) {
-            showToast(`❌ Nmap isteğinde hata: ${e.message}`, 4000);
-        }
+        openNmapModal(contextNodeId, node ? node.label : '');
         return;
     }
     if (action === 'backup') {
@@ -4941,6 +5056,294 @@ async function checkNodeServices() {
     } catch(e) {
         resBox.innerHTML = '<span style="color:#ef4444;">Servis tarama hatası.</span>';
     }
+}
+
+// ── Nmap Port Taraması & Yapay Zeka Güvenlik Raporu ─────────────────────────
+let currentNmapTarget = { ip: '', label: '' };
+let currentNmapData = null;
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function openNmapModal(ip, label) {
+    if (!ip) {
+        showToast("❌ Geçerli bir IP adresi seçilmedi.", 3000);
+        return;
+    }
+    currentNmapTarget = { ip: ip, label: label || ip };
+    currentNmapData = null;
+
+    document.getElementById('nmap-target-ip').innerText = ip;
+    document.getElementById('nmap-target-label').innerText = label || ip;
+    
+    // Modalı aç
+    document.getElementById('nmapModal').style.display = 'flex';
+    switchNmapTab('ai');
+
+    // Başlangıç durumu
+    document.getElementById('nmap-spinner').style.display = 'inline-block';
+    document.getElementById('nmap-status-desc').innerText = 'Nmap ile açık portlar ve servisler taranıyor...';
+    document.getElementById('nmap-badges-container').style.display = 'none';
+    
+    document.getElementById('nmap-ai-loading').style.display = 'block';
+    document.getElementById('nmap-ai-content').style.display = 'none';
+    document.getElementById('nmap-ports-table-body').innerHTML = '<tr><td colspan="4" style="text-align:center; padding:15px; color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Taranıyor...</td></tr>';
+    document.getElementById('nmap-raw-output').innerText = 'Nmap port taraması çalıştırılıyor...';
+
+    // Taramayı başlat
+    executeNmapScan(ip, label);
+}
+
+function closeNmapModal() {
+    document.getElementById('nmapModal').style.display = 'none';
+}
+
+function switchNmapTab(tabName) {
+    const tabs = ['ai', 'ports', 'raw'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`nmap-tab-btn-${t}`);
+        const content = document.getElementById(`nmap-tab-${t}`);
+        if (!btn || !content) return;
+        if (t === tabName) {
+            btn.style.borderBottomColor = '#6366f1';
+            btn.style.color = '#6366f1';
+            content.style.display = 'block';
+        } else {
+            btn.style.borderBottomColor = 'transparent';
+            btn.style.color = '#64748b';
+            content.style.display = 'none';
+        }
+    });
+}
+
+async function executeNmapScan(ip, label) {
+    try {
+        const r = await fetch('/api/network/nmap', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ ip: ip, hostname: label, with_ai: true })
+        });
+        const data = await r.json();
+        
+        if (!data.success) {
+            document.getElementById('nmap-spinner').style.display = 'none';
+            document.getElementById('nmap-status-desc').innerHTML = `<span style="color:#ef4444;">❌ Hata: ${escapeHtml(data.error)}</span>`;
+            document.getElementById('nmap-ai-loading').innerHTML = `
+                <div style="color:#ef4444; padding:20px;">
+                    <i class="fas fa-circle-exclamation" style="font-size:32px; margin-bottom:10px;"></i>
+                    <div>Tarama başarısız oldu: ${escapeHtml(data.error)}</div>
+                    <button class="btn btn-outline" onclick="reScanNmap()" style="margin-top:10px;">Tekrar Dene</button>
+                </div>`;
+            return;
+        }
+
+        currentNmapData = data;
+        renderNmapResults(data);
+
+    } catch (e) {
+        document.getElementById('nmap-spinner').style.display = 'none';
+        document.getElementById('nmap-status-desc').innerHTML = `<span style="color:#ef4444;">❌ İstek hatası: ${escapeHtml(e.message)}</span>`;
+        document.getElementById('nmap-ai-loading').innerHTML = `
+            <div style="color:#ef4444; padding:20px;">
+                <i class="fas fa-circle-exclamation" style="font-size:32px; margin-bottom:10px;"></i>
+                <div>Bağlantı hatası: ${escapeHtml(e.message)}</div>
+                <button class="btn btn-outline" onclick="reScanNmap()" style="margin-top:10px;">Tekrar Dene</button>
+            </div>`;
+    }
+}
+
+function renderNmapResults(data) {
+    const ports = data.ports || [];
+    const analysis = data.analysis || {};
+
+    // 1. Durum Çubuğu
+    document.getElementById('nmap-spinner').style.display = 'none';
+    document.getElementById('nmap-status-desc').innerHTML = `<b>✅ Tarama Tamamlandı</b> (${ports.length} açık port bulundu)`;
+    
+    const badgesCont = document.getElementById('nmap-badges-container');
+    badgesCont.style.display = 'flex';
+
+    document.getElementById('nmap-ports-count-badge').innerText = `${ports.length} Port Açık`;
+    
+    const riskBadge = document.getElementById('nmap-risk-badge');
+    const riskLevel = (analysis.risk_level || 'BİLİNMİYOR').toUpperCase();
+    riskBadge.innerText = `RİSK: ${riskLevel}`;
+
+    if (riskLevel === 'KRİTİK') {
+        riskBadge.style.cssText = 'background:#fee2e2; color:#991b1b; border:1px solid #f87171; font-size:11px; font-weight:700; padding:3px 10px; border-radius:6px;';
+    } else if (riskLevel === 'YÜKSEK') {
+        riskBadge.style.cssText = 'background:#ffedd5; color:#9a3412; border:1px solid #fb923c; font-size:11px; font-weight:700; padding:3px 10px; border-radius:6px;';
+    } else if (riskLevel === 'ORTA') {
+        riskBadge.style.cssText = 'background:#fef9c3; color:#854d0e; border:1px solid #facc15; font-size:11px; font-weight:700; padding:3px 10px; border-radius:6px;';
+    } else if (riskLevel === 'DÜŞÜK') {
+        riskBadge.style.cssText = 'background:#dbeafe; color:#1e40af; border:1px solid #93c5fd; font-size:11px; font-weight:700; padding:3px 10px; border-radius:6px;';
+    } else {
+        riskBadge.style.cssText = 'background:#dcfce7; color:#166534; border:1px solid #86efac; font-size:11px; font-weight:700; padding:3px 10px; border-radius:6px;';
+    }
+
+    const provBadge = document.getElementById('nmap-provider-badge');
+    if (analysis.provider) {
+        provBadge.style.display = 'inline-block';
+        provBadge.innerHTML = `<i class="fas fa-microchip"></i> ${escapeHtml(analysis.provider)}`;
+    } else {
+        provBadge.style.display = 'none';
+    }
+
+    // 2. Tab 1: AI Raporu
+    document.getElementById('nmap-ai-loading').style.display = 'none';
+    document.getElementById('nmap-ai-content').style.display = 'block';
+
+    document.getElementById('nmap-ai-summary').innerText = analysis.summary || 'Genel değerlendirme bulunmuyor.';
+
+    // Risk / Zafiyet Kartları
+    const findingsCont = document.getElementById('nmap-ai-findings');
+    const findings = analysis.findings || [];
+    if (findings.length > 0) {
+        findingsCont.innerHTML = findings.map(f => {
+            const sev = (f.severity || 'BİLGİ').toUpperCase();
+            let sevBadgeStyle = 'background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;';
+            let borderLeftColor = '#94a3b8';
+            if (sev === 'KRİTİK') {
+                sevBadgeStyle = 'background:#fee2e2; color:#991b1b; border:1px solid #f87171;';
+                borderLeftColor = '#ef4444';
+            } else if (sev === 'YÜKSEK') {
+                sevBadgeStyle = 'background:#ffedd5; color:#9a3412; border:1px solid #fb923c;';
+                borderLeftColor = '#f97316';
+            } else if (sev === 'ORTA') {
+                sevBadgeStyle = 'background:#fef9c3; color:#854d0e; border:1px solid #facc15;';
+                borderLeftColor = '#eab308';
+            } else if (sev === 'DÜŞÜK') {
+                sevBadgeStyle = 'background:#dbeafe; color:#1e40af; border:1px solid #93c5fd;';
+                borderLeftColor = '#3b82f6';
+            }
+
+            return `
+            <div style="background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid ${borderLeftColor}; border-radius:6px; padding:10px 12px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <strong style="font-size:12px; color:#1e293b;">
+                        <i class="fas fa-circle-nodes" style="color:#6366f1;"></i> ${escapeHtml(f.port)} - ${escapeHtml(f.service)}
+                    </strong>
+                    <span style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:4px; ${sevBadgeStyle}">${sev}</span>
+                </div>
+                <div style="font-size:12px; color:#334155; margin-bottom:4px; line-height:1.4;">
+                    <b style="color:#64748b;">Risk:</b> ${escapeHtml(f.risk)}
+                </div>
+                <div style="font-size:11px; color:#047857; line-height:1.4;">
+                    <b><i class="fas fa-shield-halved"></i> Tavsiye:</b> ${escapeHtml(f.recommendation)}
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        findingsCont.innerHTML = `<div style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:10px 12px; border-radius:6px; font-size:12px;">✅ Herhangi bir kritik veya yüksek riskli port zafiyeti tespit edilmedi.</div>`;
+    }
+
+    // Tavsiyeler
+    const recsCont = document.getElementById('nmap-ai-recommendations');
+    const recs = analysis.recommendations || [];
+    if (recs.length > 0) {
+        recsCont.innerHTML = recs.map(r => `<li>${escapeHtml(r)}</li>`).join('');
+    } else {
+        recsCont.innerHTML = `<li>Ağ yapılandırmanız güvenli standartlara uygundur.</li>`;
+    }
+
+    // Komutlar
+    const cmdsSection = document.getElementById('nmap-ai-commands-section');
+    const cmdsCont = document.getElementById('nmap-ai-commands');
+    const cmds = analysis.quick_commands || [];
+    if (cmds.length > 0) {
+        cmdsSection.style.display = 'block';
+        cmdsCont.innerHTML = cmds.map(c => `
+            <div style="display:flex; align-items:center; justify-content:space-between; background:#0f172a; color:#e2e8f0; padding:8px 12px; border-radius:6px; font-family:monospace; font-size:11px; gap:8px;">
+                <div style="display:flex; flex-direction:column; gap:2px; overflow:hidden;">
+                    <span style="font-size:10px; color:#94a3b8; font-family:sans-serif; font-weight:600;">${escapeHtml(c.title)}</span>
+                    <code style="color:#38bdf8; word-break:break-all;">${escapeHtml(c.command)}</code>
+                </div>
+                <button class="btn btn-outline" onclick="copyNmapCommand(this, '${escapeHtml(c.command)}')" style="border-color:#334155; color:#f8fafc; padding:3px 10px; font-size:11px; cursor:pointer; white-space:nowrap; background:#1e293b;">
+                    <i class="fas fa-copy"></i> Kopyala
+                </button>
+            </div>
+        `).join('');
+    } else {
+        cmdsSection.style.display = 'none';
+    }
+
+    // 3. Tab 2: Açık Portlar Tablosu
+    const portsBody = document.getElementById('nmap-ports-table-body');
+    if (ports.length > 0) {
+        portsBody.innerHTML = ports.map(p => `
+            <tr style="border-bottom:1px solid #f1f5f9;">
+                <td style="padding:8px 12px; font-family:monospace; font-weight:700; color:#0284c7;">${escapeHtml(p.port)}</td>
+                <td style="padding:8px 12px;"><span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:4px; font-weight:600; font-size:11px;">${escapeHtml(p.state)}</span></td>
+                <td style="padding:8px 12px; font-weight:600; color:#334155;">${escapeHtml(p.service)}</td>
+                <td style="padding:8px 12px; color:#64748b; font-family:monospace;">${escapeHtml(p.version || '-')}</td>
+            </tr>
+        `).join('');
+    } else {
+        portsBody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:#64748b;">Açık veya yanıt veren TCP portu bulunamadı.</td></tr>`;
+    }
+
+    // 4. Tab 3: Ham Çıktı
+    document.getElementById('nmap-raw-output').innerText = data.output || 'Ham çıktı boş.';
+}
+
+function reScanNmap() {
+    if (!currentNmapTarget.ip) return;
+    openNmapModal(currentNmapTarget.ip, currentNmapTarget.label);
+}
+
+async function reAnalyzeWithAI() {
+    if (!currentNmapData || !currentNmapTarget.ip) {
+        reScanNmap();
+        return;
+    }
+    document.getElementById('nmap-ai-loading').style.display = 'block';
+    document.getElementById('nmap-ai-content').style.display = 'none';
+    switchNmapTab('ai');
+
+    try {
+        const r = await fetch('/api/network/nmap_analyze', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                ip: currentNmapTarget.ip,
+                hostname: currentNmapTarget.label,
+                output: currentNmapData.output,
+                ports: currentNmapData.ports
+            })
+        });
+        const res = await r.json();
+        if (res.success && res.analysis) {
+            currentNmapData.analysis = res.analysis;
+            renderNmapResults(currentNmapData);
+            showToast("✅ Yapay zeka güvenlik analizi yenilendi!", 3000);
+        } else {
+            showToast("❌ Analiz yenilenemedi: " + (res.error || 'Bilinmeyen hata'), 4000);
+            document.getElementById('nmap-ai-loading').style.display = 'none';
+            document.getElementById('nmap-ai-content').style.display = 'block';
+        }
+    } catch (e) {
+        showToast("❌ Analiz yenileme hatası: " + e.message, 4000);
+        document.getElementById('nmap-ai-loading').style.display = 'none';
+        document.getElementById('nmap-ai-content').style.display = 'block';
+    }
+}
+
+function copyNmapCommand(btn, cmd) {
+    navigator.clipboard.writeText(cmd).then(() => {
+        const origText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check" style="color:#10b981;"></i> Kopyalandı!';
+        setTimeout(() => { btn.innerHTML = origText; }, 2000);
+        showToast("📋 Komut panoya kopyalandı!", 2000);
+    }).catch(() => {
+        prompt("Komutu kopyalayın:", cmd);
+    });
 }
 
 // ── Tuval & Cihaz Kilitleme (Canvas Lock) ──────────────────────────────────────
