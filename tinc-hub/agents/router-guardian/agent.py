@@ -19,6 +19,11 @@ from datetime import datetime, time as dtime
 # Shared DB modülü
 sys.path.insert(0, '/opt/tinc-hub/shared')
 from db import init_db, register_agent, heartbeat, log_event, write_metric
+try:
+    from router_util import reboot_router, test_router_login
+except ImportError:
+    reboot_router = None
+    test_router_login = None
 
 import requests
 import urllib3
@@ -61,14 +66,24 @@ log = logging.getLogger(AGENT_ID)
 # ──────────────────────────────────────────────
 # Config yükleme
 # ──────────────────────────────────────────────
-config = dotenv_values('/etc/tinc-hub/config.env')
+DEFAULT_REBOOT_TIME = '06:00'
 
-ROUTER_IP             = config.get('ROUTER_IP', '192.168.1.1')
-ROUTER_USER           = config.get('ROUTER_USER', 'admin')
-ROUTER_PASS           = config.get('ROUTER_PASS', 'admin')
-ROUTER_PING_INTERVAL  = int(config.get('ROUTER_PING_INTERVAL', DEFAULT_PING_INTERVAL))
-ROUTER_REBOOT_CRON    = config.get('ROUTER_REBOOT_CRON', DEFAULT_REBOOT_CRON)
-ROUTER_SMART_REBOOT   = config.get('ROUTER_SMART_REBOOT', 'true').lower() == 'true'
+def reload_config():
+    global config, ROUTER_IP, ROUTER_USER, ROUTER_PASS, ROUTER_PING_INTERVAL, ROUTER_REBOOT_CRON, ROUTER_REBOOT_TIME, ROUTER_REBOOT_ENABLED, ROUTER_SMART_REBOOT
+    try:
+        config = dotenv_values('/etc/tinc-hub/config.env')
+        ROUTER_IP             = config.get('ROUTER_IP', '192.168.1.1')
+        ROUTER_USER           = config.get('ROUTER_USER', 'admin')
+        ROUTER_PASS           = config.get('ROUTER_PASS', 'admin')
+        ROUTER_PING_INTERVAL  = int(config.get('ROUTER_PING_INTERVAL', DEFAULT_PING_INTERVAL))
+        ROUTER_REBOOT_CRON    = config.get('ROUTER_REBOOT_CRON', DEFAULT_REBOOT_CRON)
+        ROUTER_REBOOT_TIME    = config.get('ROUTER_REBOOT_TIME', DEFAULT_REBOOT_TIME)
+        ROUTER_REBOOT_ENABLED = config.get('ROUTER_REBOOT_ENABLED', 'true').lower() == 'true'
+        ROUTER_SMART_REBOOT   = config.get('ROUTER_SMART_REBOOT', 'true').lower() == 'true'
+    except Exception as e:
+        log.warning(f"Config reload hatası: {e}")
+
+reload_config()
 
 # ──────────────────────────────────────────────
 # Durum değişkenleri
@@ -220,15 +235,26 @@ def router_login(session: requests.Session) -> bool:
 
 def trigger_router_reboot() -> bool:
     """
-    Router'a login olup reboot endpoint'ini çağırır.
-    Döner: reboot isteği gönderildi mi?
+    Router'a login olup reboot komutunu gönderir.
+    Önce router_util (Zyxel RSA+AES hibrit oturumu) denenir, ardından fallback.
     """
-    db_log('warning', "Router reboot tetikleniyor...")
+    db_log('warning', f"Router ({ROUTER_IP}) reboot tetikleniyor...")
+    if reboot_router:
+        try:
+            ok, msg = reboot_router(ROUTER_IP, ROUTER_USER, ROUTER_PASS)
+            if ok:
+                db_log('info', f"Router reboot başarılı: {msg}")
+                return True
+            else:
+                db_log('error', f"Router reboot başarısız: {msg}")
+        except Exception as e:
+            db_log('error', f"router_util reboot hatası: {e}")
+
+    # Fallback eski yöntem
     session = requests.Session()
     session.verify = False
-
     if not router_login(session):
-        db_log('error', "Reboot iptal: Login başarısız.")
+        db_log('error', "Reboot iptal: Fallback login başarısız.")
         return False
 
     url_reboot = f"https://{ROUTER_IP}{ROUTER_REBOOT_ENDPOINT}"
@@ -276,19 +302,21 @@ def measure_recovery_time(max_wait: int = 300, check_interval: int = 5) -> int:
 
 def should_run_scheduled_reboot() -> bool:
     """
-    ROUTER_REBOOT_CRON saatine (HH:MM) göre scheduled reboot zamanı geldi mi?
+    ROUTER_REBOOT_TIME veya ROUTER_REBOOT_CRON saatine göre scheduled reboot zamanı geldi mi?
     Bugün zaten yapıldıysa tekrar yapmaz.
     """
     global last_scheduled_reboot_date
+    if not ROUTER_REBOOT_ENABLED:
+        return False
+
     try:
-        parts = ROUTER_REBOOT_CRON.strip().split()
+        cron_str = (ROUTER_REBOOT_TIME or ROUTER_REBOOT_CRON or "06:00").strip().strip('"').strip("'")
+        parts = cron_str.split()
         if len(parts) >= 2:
-            # Cron format: "minute hour ..." e.g. "0 6 * * *"
             minute = int(parts[0])
             hour = int(parts[1])
-        elif ':' in ROUTER_REBOOT_CRON:
-            # "HH:MM" e.g. "06:00"
-            hour, minute = map(int, ROUTER_REBOOT_CRON.split(':'))
+        elif ':' in cron_str:
+            hour, minute = map(int, cron_str.split(':'))
         else:
             return False
 
@@ -310,6 +338,10 @@ def should_run_scheduled_reboot() -> bool:
 def do_reboot_cycle(reason: str):
     """Reboot döngüsünü yönetir: reboot → recovery ölçümü → metrik yaz."""
     global reboot_in_progress, consecutive_failures, last_scheduled_reboot_date
+
+    if not ROUTER_REBOOT_ENABLED:
+        log.info(f"Router reboot devre dışı (ROUTER_REBOOT_ENABLED=false), {reason} atlanıyor.")
+        return
 
     if reboot_in_progress:
         log.warning("Reboot zaten devam ediyor, atlanıyor.")
@@ -394,6 +426,7 @@ def main():
     # ── Ana kontrol döngüsü ──
     while not shutdown_flag.is_set():
         loop_start = time.monotonic()
+        reload_config()
 
         # 1) İnternet bağlantısı kontrolü
         internet_ok, ping_ms = check_internet()
@@ -434,7 +467,7 @@ def main():
             log.warning("WAN IP alınamadı.")
 
         # 4) Ardışık hata → reboot tetikle
-        if ROUTER_SMART_REBOOT and consecutive_failures >= CONSECUTIVE_FAIL_THRESHOLD:
+        if ROUTER_REBOOT_ENABLED and ROUTER_SMART_REBOOT and consecutive_failures >= CONSECUTIVE_FAIL_THRESHOLD:
             db_log('error', f"Ardışık {consecutive_failures} başarısız ping! Reboot tetikleniyor...")
             reboot_thread = threading.Thread(
                 target=do_reboot_cycle,

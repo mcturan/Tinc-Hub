@@ -268,6 +268,58 @@
                 <input type="checkbox" id="edit-is-user">
                 <label for="edit-is-user">Bu bir kullanıcı servisidir (--user)</label>
             </div>
+
+            <!-- Router Guardian Özel Ayarları (Yalnızca router-guardian servisi düzenlenirken görünür) -->
+            <div id="router-guardian-section" style="display:none; margin-top:12px; padding:14px; background:var(--bg); border:1px solid var(--border); border-radius:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                    <div style="font-weight:700; font-size:0.95rem; display:flex; align-items:center; gap:8px;">
+                        <span>📡</span>
+                        <span>Modem Restarter & Zamanlama Ayarları</span>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.8rem; font-weight:600; margin:0;">
+                        <input type="checkbox" id="rg-router-enabled" style="cursor:pointer;" checked>
+                        <span id="rg-router-enabled-label" style="color:#10b981;">Otomasyon Açık ✓</span>
+                    </label>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label style="font-size:0.8rem;">Modem IP Adresi</label>
+                        <input type="text" id="rg-router-ip" placeholder="192.168.1.1" value="192.168.1.1">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size:0.8rem;">Kullanıcı Adı</label>
+                        <input type="text" id="rg-router-user" placeholder="admin" value="admin">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label style="font-size:0.8rem;">Modem Şifresi</label>
+                        <span id="rg-pass-status" style="font-size:0.75rem; color:var(--muted);">(Kayıtlı)</span>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <input type="password" id="rg-router-pass" placeholder="Değiştirmek istemiyorsanız boş bırakın" style="flex:1;">
+                        <button type="button" class="btn btn-sm" onclick="toggleRgPassVisibility()" style="padding:0 10px;" title="Şifreyi Göster/Gizle">👁️</button>
+                    </div>
+                </div>
+
+                <div class="form-row" style="margin-top:8px;">
+                    <div class="form-group">
+                        <label style="font-size:0.8rem;">Yeniden Başlatma Saati</label>
+                        <input type="time" id="rg-router-time" value="06:00">
+                    </div>
+                    <div class="form-group" style="display:flex; align-items:flex-end; gap:8px;">
+                        <button type="button" class="btn btn-sm" id="btn-rg-test" onclick="testRgRouterConnection()" style="height:38px; width:100%;">🔬 Girişi Test Et</button>
+                    </div>
+                </div>
+
+                <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+                    <button type="button" class="btn btn-sm btn-danger" id="btn-rg-reboot" onclick="triggerRgRouterReboot()" style="width:100%;">🔄 Modemi Şimdi Yeniden Başlat</button>
+                </div>
+
+                <div id="rg-action-results" style="display:none; margin-top:10px; padding:10px; border-radius:6px; font-size:0.82rem; background:var(--surface); border:1px solid var(--border);"></div>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn" onclick="closeAddModal()">İptal</button>
@@ -550,6 +602,8 @@ function openAddModal(serviceName='') {
     document.getElementById('edit-health').value = 'systemd';
     document.getElementById('edit-pinned').checked = true;
     document.getElementById('edit-is-user').checked = false;
+    const rgSec = document.getElementById('router-guardian-section');
+    if (rgSec) rgSec.style.display = 'none';
     document.getElementById('addModal').classList.remove('hidden');
 }
 
@@ -570,6 +624,18 @@ async function editApp(appId) {
         document.getElementById('edit-health').value = data.health_check || 'systemd';
         document.getElementById('edit-pinned').checked = !!data.pinned;
         document.getElementById('edit-is-user').checked = !!data.is_user_service;
+
+        // Router Guardian (Modem Restarter) özel alanları
+        const rgSec = document.getElementById('router-guardian-section');
+        if (rgSec) {
+            if (appId === 'router-guardian' || (data.service && data.service.includes('router-guardian')) || (data.name && data.name.toLowerCase().includes('modem restarter'))) {
+                rgSec.style.display = 'block';
+                await loadRgRouterSettings();
+            } else {
+                rgSec.style.display = 'none';
+            }
+        }
+
         document.getElementById('addModal').classList.remove('hidden');
     } catch(e) { alert("Bilgiler alınamadı: "+e); }
 }
@@ -595,6 +661,34 @@ async function submitAddModal() {
     };
     if(!data.name) return alert("Uygulama adı gerekli");
     
+    // Router Guardian ayarları görünürse kaydet
+    const rgSec = document.getElementById('router-guardian-section');
+    if (rgSec && rgSec.style.display !== 'none') {
+        const ip = document.getElementById('rg-router-ip').value.trim();
+        const user = document.getElementById('rg-router-user').value.trim();
+        const password = document.getElementById('rg-router-pass').value.trim();
+        const time = document.getElementById('rg-router-time').value.trim();
+        const enabled = document.getElementById('rg-router-enabled').checked;
+
+        if (!ip || !user || !time) {
+            return alert("Lütfen modem IP, kullanıcı adı ve saat alanlarını doldurun.");
+        }
+
+        try {
+            const rRouter = await fetch('/api/settings/router', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ip, user, password, time, enabled })
+            });
+            const dRouter = await rRouter.json();
+            if (!dRouter.ok) {
+                return alert("Modem ayarları kaydedilirken hata oluştu: " + dRouter.error);
+            }
+        } catch(err) {
+            return alert("Modem ayarları kaydedilirken bağlantı hatası: " + err);
+        }
+    }
+
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/settings/apps/${id}` : `/api/settings/apps/add`;
     
@@ -608,6 +702,140 @@ async function submitAddModal() {
         else alert("Hata oluştu");
     } catch(e) { alert("Hata: "+e); }
 }
+
+// ── Router Guardian (Modem Restarter) Fonksiyonları ──
+
+function toggleRgPassVisibility() {
+    const p = document.getElementById('rg-router-pass');
+    p.type = p.type === 'password' ? 'text' : 'password';
+}
+
+function updateRgRouterEnabledLabel(checked) {
+    const lbl = document.getElementById('rg-router-enabled-label');
+    if (lbl) {
+        lbl.textContent = checked ? 'Otomasyon Açık ✓' : 'Otomasyon Kapalı ✕';
+        lbl.style.color = checked ? '#10b981' : '#ef4444';
+    }
+}
+
+async function loadRgRouterSettings() {
+    try {
+        const r = await fetch('/api/settings/router');
+        const d = await r.json();
+        if (d.ok) {
+            document.getElementById('rg-router-ip').value = d.ip || '192.168.1.1';
+            document.getElementById('rg-router-user').value = d.user || 'admin';
+            document.getElementById('rg-router-time').value = d.time || '06:00';
+            const chk = document.getElementById('rg-router-enabled');
+            if (chk) {
+                chk.checked = !!d.enabled;
+                updateRgRouterEnabledLabel(chk.checked);
+            }
+            const statusSpan = document.getElementById('rg-pass-status');
+            if (statusSpan) {
+                if (d.has_pass) {
+                    statusSpan.textContent = `(Kayıtlı: ${d.pass_masked})`;
+                    statusSpan.style.color = '#10b981';
+                } else {
+                    statusSpan.textContent = '(Kayıtlı şifre yok ⚠)';
+                    statusSpan.style.color = '#ef4444';
+                }
+            }
+            document.getElementById('rg-router-pass').value = '';
+            document.getElementById('rg-action-results').style.display = 'none';
+        }
+    } catch(e) {
+        console.error("Router settings load error:", e);
+    }
+}
+
+async function testRgRouterConnection() {
+    const btn = document.getElementById('btn-rg-test');
+    const resBox = document.getElementById('rg-action-results');
+    const ip = document.getElementById('rg-router-ip').value.trim();
+    const user = document.getElementById('rg-router-user').value.trim();
+    const password = document.getElementById('rg-router-pass').value.trim();
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Test Ediliyor...';
+    resBox.style.display = 'block';
+    resBox.style.borderLeft = '4px solid #3b82f6';
+    resBox.style.color = 'var(--text)';
+    resBox.innerHTML = '🔬 Modeme bağlanılıyor, RSA ve AES kimlik doğrulaması kontrol ediliyor...';
+
+    try {
+        const r = await fetch('/api/settings/router/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ ip, user, password })
+        });
+        const d = await r.json();
+        if (d.ok) {
+            resBox.style.borderLeft = '4px solid #10b981';
+            resBox.style.color = '#10b981';
+            resBox.innerHTML = `✅ ${d.message}`;
+        } else {
+            resBox.style.borderLeft = '4px solid #ef4444';
+            resBox.style.color = '#ef4444';
+            resBox.innerHTML = `❌ Giriş Başarısız: ${d.error}`;
+        }
+    } catch(e) {
+        resBox.style.borderLeft = '4px solid #ef4444';
+        resBox.style.color = '#ef4444';
+        resBox.innerHTML = `❌ Bağlantı hatası: ${e}`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔬 Girişi Test Et';
+    }
+}
+
+async function triggerRgRouterReboot() {
+    if (!confirm("Modem hemen yeniden başlatılacak ve internet bağlantınız kısa süreliğine kesilecektir. Devam etmek istiyor musunuz?")) {
+        return;
+    }
+
+    const btn = document.getElementById('btn-rg-reboot');
+    const resBox = document.getElementById('rg-action-results');
+    const ip = document.getElementById('rg-router-ip').value.trim();
+    const user = document.getElementById('rg-router-user').value.trim();
+    const password = document.getElementById('rg-router-pass').value.trim();
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Gönderiliyor...';
+    resBox.style.display = 'block';
+    resBox.style.borderLeft = '4px solid #f59e0b';
+    resBox.style.color = 'var(--text)';
+    resBox.innerHTML = '📡 Modeme yeniden başlatma komutu iletiliyor...';
+
+    try {
+        const r = await fetch('/api/settings/router/reboot', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ ip, user, password })
+        });
+        const d = await r.json();
+        if (d.ok) {
+            resBox.style.borderLeft = '4px solid #10b981';
+            resBox.style.color = '#10b981';
+            resBox.innerHTML = `✅ ${d.message}`;
+        } else {
+            resBox.style.borderLeft = '4px solid #ef4444';
+            resBox.style.color = '#ef4444';
+            resBox.innerHTML = `❌ Yeniden Başlatma Hatası: ${d.error}`;
+        }
+    } catch(e) {
+        resBox.style.borderLeft = '4px solid #10b981';
+        resBox.style.color = '#10b981';
+        resBox.innerHTML = `✅ Komut gönderildi (cihaz soketi kapattı).`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Modemi Şimdi Yeniden Başlat';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('rg-router-enabled')?.addEventListener('change', (e) => updateRgRouterEnabledLabel(e.target.checked));
+});
 async function togglePin(appId, currentPinned) {
     event.stopPropagation();
     try {
