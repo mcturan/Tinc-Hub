@@ -67,23 +67,107 @@
     </style>
 </head>
 <body>
-    <header>
-        <div class="header-inner">
-            <a href="/" class="logo">
-                <span class="logo-icon">⚙</span>
-                <span class="logo-text">TINC <strong>Hub</strong></span>
+<div class="app-layout">
+    <!-- Left Sidebar (Pi-hole / CasaOS style) -->
+    <aside class="sidebar" id="appSidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-logo">
+                <span class="sidebar-logo-icon">⬡</span>
+                <span class="sidebar-brand-name">Tinc<strong>Hub</strong></span>
+                <span class="sidebar-badge">OS</span>
             </a>
-            <nav>
-                <a href="/" class="{% if request.path == '/' %}active{% endif %}">Hub</a>
-                <a href="/logs" class="{% if request.path.startswith('/logs') %}active{% endif %}">Loglar</a>
-                <a href="/rules" class="{% if request.path.startswith('/rules') %}active{% endif %}">Otomasyon</a>
-                <a href="/multi" class="{% if request.path.startswith('/multi') %}active{% endif %}">Makineler</a>
-                <a href="/agents" class="{% if request.path.startswith('/agents') %}active{% endif %}">Ajanlar</a>
-                <a href="/settings" class="{% if request.path.startswith('/settings') %}active{% endif %}">Ayarlar</a>
-                <a href="javascript:void(0)" onclick="openAIAgentModal()" style="background: linear-gradient(135deg, #6366f1, #a855f7); color:white !important; font-weight:700; padding:4px 10px; border-radius:6px; text-decoration:none; margin-left:6px; box-shadow:0 2px 8px rgba(99,102,241,0.4);" title="TincOps AI Görev Ajanı">🤖 TincOps</a>
-            </nav>
-            <div class="header-actions">
-                <div class="notification-bell" onclick="toggleNotifications()">
+            <button class="sidebar-close-btn" onclick="toggleSidebar()" title="Kapat">&times;</button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-title">Yönetim</div>
+            <a href="/" class="sidebar-link {% if request.path == '/' %}active{% endif %}">
+                <span class="icon">📊</span>
+                <span class="label">Genel Bakış</span>
+            </a>
+            <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9011';" class="sidebar-link" title="Ağ Topolojisi ve Port Tarayıcı">
+                <span class="icon">🌐</span>
+                <span class="label">TincNet</span>
+            </a>
+            <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9014';" class="sidebar-link" title="Süreç Ağacı ve PID/Port Dedektifi">
+                <span class="icon">🔬</span>
+                <span class="label">TincProcess</span>
+            </a>
+            <a href="/terminal" class="sidebar-link {% if request.path.startswith('/terminal') %}active{% endif %}" title="Bash / Shell Web Terminali">
+                <span class="icon">💻</span>
+                <span class="label">Terminal</span>
+            </a>
+            <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9013/notes';" class="sidebar-link" title="OneNote Stili Notlar ve Kasa">
+                <span class="icon">📝</span>
+                <span class="label">TincNote</span>
+            </a>
+
+            <div class="sidebar-section-title">Sistem &amp; Kontrol</div>
+            <a href="/logs" class="sidebar-link {% if request.path.startswith('/logs') %}active{% endif %}">
+                <span class="icon">📜</span>
+                <span class="label">Günlükler</span>
+            </a>
+            <a href="/rules" class="sidebar-link {% if request.path.startswith('/rules') %}active{% endif %}">
+                <span class="icon">⚡</span>
+                <span class="label">Otomasyon</span>
+            </a>
+            <a href="/multi" class="sidebar-link {% if request.path.startswith('/multi') %}active{% endif %}">
+                <span class="icon">🖥️</span>
+                <span class="label">Makineler</span>
+            </a>
+            <a href="/settings" class="sidebar-link {% if request.path.startswith('/settings') %}active{% endif %}">
+                <span class="icon">⚙️</span>
+                <span class="label">Ayarlar</span>
+            </a>
+
+            <div class="sidebar-section-title">Akıllı Asistan</div>
+            <a href="javascript:void(0)" onclick="openAIAgentModal()" class="sidebar-link tincops-link" title="TincOps Yapay Zeka Görev Ajanı">
+                <span class="icon">🤖</span>
+                <span class="label">TincOps Ajanı</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="sidebar-host-status">
+                <span class="status-dot-sm"></span>
+                <span>{{ system.ip if system else '127.0.0.1' }}</span>
+            </div>
+            {% if has_auth %}
+            <a href="/logout" class="sidebar-logout" title="Oturumu Kapat">🚪</a>
+            {% else %}
+            <span style="font-size:0.7rem; color:#64748b;">v2.5</span>
+            {% endif %}
+        </div>
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+    <!-- Main Wrapper -->
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="sidebar-toggle-btn" onclick="toggleSidebar()" title="Menüyü Aç/Kapat">☰</button>
+                <div class="topbar-breadcrumb">
+                    {% if request.path == '/' %}
+                        <span class="topbar-title">Pano</span>
+                    {% elif request.path.startswith('/logs') %}
+                        <span class="topbar-title">Sistem Günlükleri</span>
+                    {% elif request.path.startswith('/rules') %}
+                        <span class="topbar-title">Otomasyon &amp; Kurallar</span>
+                    {% elif request.path.startswith('/multi') %}
+                        <span class="topbar-title">Makineler</span>
+                    {% elif request.path.startswith('/settings') %}
+                        <span class="topbar-title">Sistem Ayarları</span>
+                    {% elif request.path.startswith('/terminal') %}
+                        <span class="topbar-title">Web Terminal</span>
+                    {% else %}
+                        <span class="topbar-title">TincHub</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="topbar-right">
+                <div class="notification-bell" onclick="toggleNotifications()" title="Bildirimler">
                     🔔 <span id="notif-badge" class="badge hidden">0</span>
                 </div>
                 <div class="header-time">{{ now }}</div>
@@ -91,18 +175,20 @@
                 <a href="/logout" class="btn btn-sm">Çıkış</a>
                 {% endif %}
             </div>
-        </div>
-    </header>
+        </header>
 
-    <main>
-        {% block content %}{% endblock %}
-    </main>
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
 
-    <footer>
-        <span>Tinc Hub {{ app_version or 'v2' }} · Sistem Yönetim Merkezi</span>
-    </footer>
+        <footer class="app-footer">
+            <span>Tinc Hub {{ app_version or 'v2.5' }} · Sistem Yönetim Merkezi</span>
+            <span class="footer-host">{{ system.ip if system else '127.0.0.1' }}</span>
+        </footer>
+    </div>
+</div>
 
-    {% block scripts %}{% endblock %}
+{% block scripts %}{% endblock %}
     
     <!-- Live Streaming Terminal Modal -->
     <div id="termModal" class="modal-overlay hidden" style="z-index: 10000;">
@@ -530,6 +616,13 @@
         const cmds = currentAITask.commands;
         closeAIAgentModal();
         runLiveCommands(`🤖 TincOps: ${title}`, cmds);
+    }
+
+    function toggleSidebar() {
+        const sb = document.getElementById('appSidebar');
+        const bd = document.getElementById('sidebarBackdrop');
+        if (sb) sb.classList.toggle('open');
+        if (bd) bd.classList.toggle('active');
     }
     </script>
 </body>

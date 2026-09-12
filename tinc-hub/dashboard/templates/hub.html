@@ -4,10 +4,7 @@
 {% macro render_app_card(app) %}
 <div class="casa-app-card {{ app.status_class }}" onclick="handleCardClick(event, '{{ app.url or '' }}', '{{ app.id }}')">
     <div class="casa-app-top">
-        <div class="casa-status-indicator" title="Durum: {{ 'Çalışıyor' if app.status_class == 'healthy' else ('Durdu' if app.status_class == 'dead' else 'Bilinmiyor') }}">
-            <span class="casa-status-dot {{ app.status_class }}"></span>
-            {% if app.pinned %}<span class="casa-pin-badge" title="Öne Çıkarıldı">📌</span>{% endif %}
-        </div>
+        <span class="casa-status-dot {{ app.status_class }}" title="Durum: {{ 'Çalışıyor' if app.status_class == 'healthy' else ('Durdu' if app.status_class == 'dead' else 'Bilinmiyor') }}"></span>
         <button class="casa-app-menu-btn" onclick="toggleAppMenu(event, '{{ app.id }}')" title="Seçenekler">⋮</button>
         
         <!-- CasaOS 3-Dots Dropdown Menu -->
@@ -20,7 +17,7 @@
                 <span>↗️</span> Tarayıcıda Aç
             </a>
             <button onclick="editApp('{{ app.id }}')" class="casa-menu-item">
-                <span>⚙️</span> Yapılandır &amp; Port
+                <span>⚙️</span> Yapılandır
             </button>
             <button onclick="serviceAction('{{ app.id }}', 'restart')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
                 <span>⟳</span> Yeniden Başlat
@@ -38,7 +35,7 @@
                 <span>📜</span> Canlı Loglar
             </a>
             <button onclick="openTerminalFor('{{ app.service }}')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
-                <span>💻</span> Terminal / Shell
+                <span>💻</span> Terminal
             </button>
             <div class="casa-menu-divider"></div>
             <button onclick="togglePin('{{ app.id }}', {{ 'true' if app.pinned else 'false' }})" class="casa-menu-item">
@@ -62,109 +59,102 @@
         {% if app.port %}
         <span class="casa-port-tag">:{{ app.port }}</span>
         {% else %}
-        <span class="casa-cat-tag">{{ app.category or 'Uygulama' }}</span>
+        <span class="casa-cat-tag">{{ app.category or 'Servis' }}</span>
         {% endif %}
-    </div>
-
-    <!-- Canlı Kaynak Tüketimi (Bellek, RAM, CPU) -->
-    <div class="casa-app-resources" id="res-{{ app.id }}">
-        {% if app.running %}
-            <span class="casa-metric-tag ram" title="Bellek (RAM) Tüketimi">
-                💾 {{ (app.ram_mb ~ ' MB') if app.ram_mb is not none else 'Aktif' }}
-            </span>
-            <span class="casa-metric-tag cpu" title="İşlemci (CPU) Tüketimi">
-                ⚡ {{ (app.cpu_percent or 0) ~ '%' }}
-            </span>
-        {% elif app.status_class == 'dead' %}
-            <span class="casa-metric-tag stopped" title="Servis Durduruldu">⏹️ Kapalı</span>
-        {% else %}
-            <span class="casa-metric-tag neutral" title="Durum">⚪ {{ app.category or 'Uygulama' }}</span>
-        {% endif %}
+        <span class="casa-metric-compact" id="res-{{ app.id }}">
+            {% if app.running and app.ram_mb is not none %}
+                {{ app.ram_mb|round|int }}MB
+            {% elif app.status_class == 'dead' %}
+                <span class="muted">Kapalı</span>
+            {% endif %}
+        </span>
     </div>
 </div>
 {% endmacro %}
 
 {% block content %}
-<div class="casa-hero-header">
-    <div class="casa-greeting-box">
-        <div class="casa-greeting-title">
-            <span>👋</span> <span>Tinc Hub</span> <span class="casa-system-badge">OS</span>
-        </div>
-        <div class="casa-greeting-sub">
-            Makineleriniz, mikroservisleriniz ve otomasyonlarınız tek çatı altında
+<div class="pro-top-strip">
+    <div class="pro-strip-left">
+        <div class="pro-host-pill">
+            <span class="status-dot-sm"></span>
+            <span>Host: <strong>{{ system.ip or '127.0.0.1' }}</strong></span>
+            <span class="pro-pill-sep">·</span>
+            <span>İşlemci: <strong>{{ system.cpu_cores or 4 }} vCPU</strong></span>
+            <span class="pro-pill-sep">·</span>
+            <span>Durum: <strong style="color:#10b981;">Aktif</strong></span>
         </div>
     </div>
-    <div class="casa-header-actions">
+    <div class="pro-strip-right">
         {% if role == "admin" %}
-        <button onclick="openAIAgentModal()" class="btn btn-sm" style="background: linear-gradient(135deg, #4f46e5, #9333ea); color: white; font-weight: 600; box-shadow: 0 4px 12px rgba(99,102,241,0.35);" title="TincOps Yapay Zeka Görev Ajanı">🤖 TincOps Ajanı</button>
-        <button onclick="runSystemAudit()" class="btn btn-sm" style="background-color: #f59e0b; color: white;" title="Sistemi Denetle (Akıllı Ajan)">🔍 Denetle</button>
-        <button onclick="openSettingsModal()" class="btn btn-sm" style="background-color: #475569; color: white;">⚙️ Ayarlar</button>
-        <button onclick="openStoreModal()" class="btn btn-sm" style="background-color: #8b5cf6; color: white;" title="Uygulama Mağazası (App Store)">🛒 App Store</button>
-        <button onclick="openAddModal()" class="btn btn-primary btn-sm" title="Yeni uygulama, mikroservis veya web linki ekle">➕ Uygulama Ekle</button>
+        <button onclick="openAIAgentModal()" class="btn-pro-subtle" title="TincOps Yapay Zeka Görev Ajanı">🤖 TincOps</button>
+        <button onclick="openStoreModal()" class="btn-pro-subtle" title="Uygulama Mağazası">🛒 App Store</button>
+        <button onclick="openAddModal()" class="btn-pro-primary" title="Yeni servis ekle">➕ Servis Ekle</button>
         {% endif %}
     </div>
 </div>
 
-<!-- CasaOS Stilinde Sistem Kaynakları -->
-<div class="casa-system-widgets">
-    <div class="casa-sys-card">
-        <div class="casa-sys-header">
-            <span class="casa-sys-label">⚡ CPU Kullanımı</span>
-            <span id="sys-cpu-val" class="casa-sys-value">--%</span>
+<!-- Kompakt Sistem Telemetri Şeridi (Pi-hole / Proxmox standardı) -->
+<div class="pro-metrics-grid">
+    <div class="pro-metric-card">
+        <div class="pro-metric-head">
+            <span class="pro-metric-label">CPU Yükü</span>
+            <span id="sys-cpu-val" class="pro-metric-val">--%</span>
         </div>
-        <div class="casa-sys-bar-bg">
-            <div id="sys-cpu-bar" class="casa-sys-bar-fill cpu"></div>
+        <div class="pro-metric-track">
+            <div id="sys-cpu-bar" class="pro-metric-fill cpu"></div>
         </div>
-        <canvas id="cpu-sparkline" width="200" height="30" style="margin-top:6px;"></canvas>
+        <div class="pro-metric-sub">{{ system.cpu_cores or 4 }} Çekirdek</div>
     </div>
 
-    <div class="casa-sys-card">
-        <div class="casa-sys-header">
-            <span class="casa-sys-label">🧠 Bellek (RAM)</span>
-            <span id="sys-ram-val" class="casa-sys-value">--%</span>
+    <div class="pro-metric-card">
+        <div class="pro-metric-head">
+            <span class="pro-metric-label">Bellek (RAM)</span>
+            <span id="sys-ram-val" class="pro-metric-val">--%</span>
         </div>
-        <div class="casa-sys-bar-bg">
-            <div id="sys-ram-bar" class="casa-sys-bar-fill ram"></div>
+        <div class="pro-metric-track">
+            <div id="sys-ram-bar" class="pro-metric-fill ram"></div>
         </div>
-        <div id="sys-ram-text" class="casa-sys-sub">-- / -- GB</div>
+        <div id="sys-ram-text" class="pro-metric-sub">-- / -- GB</div>
     </div>
 
-    <div class="casa-sys-card">
-        <div class="casa-sys-header">
-            <span class="casa-sys-label">💾 Depolama (Disk)</span>
-            <span id="sys-disk-val" class="casa-sys-value">--%</span>
+    <div class="pro-metric-card">
+        <div class="pro-metric-head">
+            <span class="pro-metric-label">Depolama (Disk)</span>
+            <span id="sys-disk-val" class="pro-metric-val">--%</span>
         </div>
-        <div class="casa-sys-bar-bg">
-            <div id="sys-disk-bar" class="casa-sys-bar-fill disk"></div>
+        <div class="pro-metric-track">
+            <div id="sys-disk-bar" class="pro-metric-fill disk"></div>
         </div>
-        <div id="sys-disk-text" class="casa-sys-sub">-- / -- GB</div>
+        <div id="sys-disk-text" class="pro-metric-sub">-- / -- GB</div>
     </div>
 
-    <div class="casa-sys-card">
-        <div class="casa-sys-header">
-            <span class="casa-sys-label">🌐 Ağ &amp; Sistem</span>
-            <span id="sys-ip-val" class="casa-sys-value" style="font-size:0.95rem;">{{ system.ip or '192.168.1.10' }}</span>
+    <div class="pro-metric-card">
+        <div class="pro-metric-head">
+            <span class="pro-metric-label">Ağ &amp; IP</span>
+            <span id="sys-ip-val" class="pro-metric-val mono">{{ system.ip or '127.0.0.1' }}</span>
         </div>
-        <div class="casa-net-details" style="font-size:0.75rem; color:var(--muted); margin-top:6px; display:flex; flex-direction:column; gap:3px;">
-            <div>Aktif Portlar: <strong>9010 (Hub), 9011 (Net), 9013 (Note), 9014 (Process)</strong></div>
-            <div>Durum: <span style="color:#10b981; font-weight:700;">🟢 Tüm Mikroservisler Aktif</span></div>
+        <div class="pro-metric-track">
+            <div class="pro-metric-fill net" style="width:100%;"></div>
         </div>
+        <div class="pro-metric-sub">Port 9010 · 9011 · 9013 · 9014</div>
     </div>
 </div>
 
 <!-- Plugin Widgetleri -->
-<div style="display: flex; gap: 20px; flex-wrap: wrap;">
+{% if plugin_widgets %}
+<div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
 {% for widget in plugin_widgets %}
     {% if widget.position == 'sidebar' or widget.position == 'main' %}
-        <div class="plugin-widget widget-box" id="widget-{{ widget.id }}" style="flex: 1; min-width: 200px; background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 20px;">
+        <div class="plugin-widget widget-box" id="widget-{{ widget.id }}" style="flex: 1; min-width: 200px; background: var(--surface); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
             {{ widget.html | safe }}
         </div>
     {% endif %}
 {% endfor %}
 </div>
+{% endif %}
 
 <!-- Kategori Filtreleri -->
-<div class="cat-filters" style="margin: 20px 0;">
+<div class="cat-filters">
     <a href="/" class="cat-chip {% if not selected_cat %}active{% endif %}">Tümü</a>
     {% for c in categories %}
     <a href="/?cat={{ c }}" class="cat-chip {% if selected_cat == c %}active{% endif %}">{{ c }}</a>
@@ -172,88 +162,78 @@
 </div>
 
 {% if not selected_cat %}
-<!-- 1. TINC EKOSİSTEMİ (ÇEKİRDEK UYGULAMALAR) -->
-<div class="section" style="margin-bottom: 32px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-        <div style="display:flex; align-items:center; gap:8px;">
-            <h2 style="font-size:1.15rem; font-weight:700; color:var(--text); margin:0;">🏠 Tinc Ekosistemi (Çekirdek Uygulamalar)</h2>
-            <span class="badge" style="background:#6366f1; color:white; font-size:0.7rem; padding:2px 8px; border-radius:12px;">Port 9010-9019</span>
-        </div>
-        <span style="font-size:0.8rem; color:var(--muted);">{{ tinc_core|length }} Modül</span>
+<!-- 1. ÇEKİRDEK SERVİSLER -->
+<div class="section" style="margin-bottom: 22px;">
+    <div class="pro-section-head">
+        <div class="pro-section-title">Çekirdek Servisler</div>
+        <span class="pro-section-count">{{ tinc_core|length }}</span>
     </div>
     <div class="casa-apps-grid">
         {% for app in tinc_core %}
             {{ render_app_card(app) }}
         {% endfor %}
-        <!-- CasaOS App Ekle Butonu -->
-        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Tinc Servisi Ekle">
-            <div class="casa-app-icon-wrap add-icon">➕</div>
-            <div class="casa-app-name" style="color:var(--accent);">Modül Ekle</div>
-            <div class="casa-app-meta"><span>Özel Tinc Servisi</span></div>
+        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis Ekle">
+            <div class="casa-app-icon-wrap add-icon">＋</div>
+            <div class="casa-app-name" style="color:var(--accent);">Ekle</div>
+            <div class="casa-app-meta"><span class="casa-cat-tag">Yeni</span></div>
         </div>
     </div>
 </div>
 
 <!-- 2. SİSTEM VE ALTYAPI SERVİSLERİ -->
-<div class="section" style="margin-bottom: 32px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-        <div style="display:flex; align-items:center; gap:8px;">
-            <h2 style="font-size:1.15rem; font-weight:700; color:var(--text); margin:0;">🖥️ Sistem &amp; Altyapı Servisleri (Host)</h2>
-            <span class="badge" style="background:#0284c7; color:white; font-size:0.7rem; padding:2px 8px; border-radius:12px;">Linux Daemon</span>
-        </div>
-        <span style="font-size:0.8rem; color:var(--muted);">{{ system_services|length }} Servis</span>
+<div class="section" style="margin-bottom: 22px;">
+    <div class="pro-section-head">
+        <div class="pro-section-title">Sistem &amp; Altyapı Servisleri</div>
+        <span class="pro-section-count">{{ system_services|length }}</span>
     </div>
     <div class="casa-apps-grid">
         {% for app in system_services %}
             {{ render_app_card(app) }}
         {% endfor %}
         <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Sistem Servisi Tanımla">
-            <div class="casa-app-icon-wrap add-icon">➕</div>
-            <div class="casa-app-name" style="color:var(--accent);">Servis Ekle</div>
-            <div class="casa-app-meta"><span>Daemon / Proxy</span></div>
+            <div class="casa-app-icon-wrap add-icon">＋</div>
+            <div class="casa-app-name" style="color:var(--accent);">Ekle</div>
+            <div class="casa-app-meta"><span class="casa-cat-tag">Daemon</span></div>
         </div>
     </div>
 </div>
 
-<!-- 3. WEB VE HARİCİ UYGULAMALAR -->
+<!-- 3. HARİCİ UYGULAMALAR -->
 {% if web_external|length > 0 %}
-<div class="section" style="margin-bottom: 28px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-        <div style="display:flex; align-items:center; gap:8px;">
-            <h2 style="font-size:1.15rem; font-weight:700; color:var(--text); margin:0;">🌐 Web &amp; Harici Uygulamalar</h2>
-            <span class="badge" style="background:#10b981; color:white; font-size:0.7rem; padding:2px 8px; border-radius:12px;">Web Linkleri</span>
-        </div>
-        <span style="font-size:0.8rem; color:var(--muted);">{{ web_external|length }} Uygulama</span>
+<div class="section" style="margin-bottom: 22px;">
+    <div class="pro-section-head">
+        <div class="pro-section-title">Harici Servisler &amp; Linkler</div>
+        <span class="pro-section-count">{{ web_external|length }}</span>
     </div>
     <div class="casa-apps-grid">
         {% for app in web_external %}
             {{ render_app_card(app) }}
         {% endfor %}
-        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Web Kısayolu Ekle">
-            <div class="casa-app-icon-wrap add-icon">➕</div>
-            <div class="casa-app-name" style="color:var(--accent);">Link Ekle</div>
-            <div class="casa-app-meta"><span>Harici Port / URL</span></div>
+        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Harici Link Ekle">
+            <div class="casa-app-icon-wrap add-icon">＋</div>
+            <div class="casa-app-name" style="color:var(--accent);">Ekle</div>
+            <div class="casa-app-meta"><span class="casa-cat-tag">Web</span></div>
         </div>
     </div>
 </div>
 {% endif %}
 {% else %}
 <!-- Kategori Seçildiğinde Filtrelenmiş Liste -->
-<div class="section">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-        <h2 style="font-size:1.15rem; font-weight:700; color:var(--text);">📁 {{ selected_cat }} Uygulamaları</h2>
-        <span style="font-size:0.8rem; color:var(--muted);">{{ apps|length }} Servis</span>
+<div class="section" style="margin-bottom: 22px;">
+    <div class="pro-section-head">
+        <div class="pro-section-title">{{ selected_cat }} Servisleri</div>
+        <span class="pro-section-count">{{ apps|length }}</span>
     </div>
     <div class="casa-apps-grid">
         {% for app in apps %}
             {{ render_app_card(app) }}
         {% else %}
-            <div class="empty-state" style="grid-column: 1 / -1;">Bu kategoride uygulama yok.</div>
+            <div class="empty-state" style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--muted); font-size: 0.85rem;">Bu kategoride servis bulunamadı.</div>
         {% endfor %}
-        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis veya Bağlantı Ekle">
-            <div class="casa-app-icon-wrap add-icon">➕</div>
-            <div class="casa-app-name" style="color:var(--accent);">Uygulama Ekle</div>
-            <div class="casa-app-meta"><span>Özel Servis / Link</span></div>
+        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis Ekle">
+            <div class="casa-app-icon-wrap add-icon">＋</div>
+            <div class="casa-app-name" style="color:var(--accent);">Ekle</div>
+            <div class="casa-app-meta"><span class="casa-cat-tag">Servis</span></div>
         </div>
     </div>
 </div>
@@ -261,8 +241,11 @@
 
 {% if not selected_cat %}
 <!-- Docker Containerları -->
-<div class="section" style="margin-top: 40px;">
-    <h2>Keşfedilen Docker Container'ları</h2>
+<div class="section" style="margin-top: 24px;">
+    <div class="pro-section-head">
+        <div class="pro-section-title">Docker Konteynerları</div>
+        <span class="pro-section-count">{{ docker|length if docker else 0 }}</span>
+    </div>
     {% if docker %}
     <div class="table-wrap">
         <table>
@@ -285,13 +268,16 @@
         </table>
     </div>
     {% else %}
-    <div class="info-box">Çalışan Docker container bulunamadı.</div>
+    <div class="info-box" style="font-size:0.8rem; padding:10px 14px;">Çalışan Docker container bulunamadı.</div>
     {% endif %}
 </div>
 
 <!-- Keşfedilen Diğer Servisler -->
-<div class="section" style="margin-top: 40px;">
-    <h2>Keşfedilen Diğer Servisler</h2>
+<div class="section" style="margin-top: 24px;">
+    <div class="pro-section-head">
+        <div class="pro-section-title">Keşfedilen Sistem Servisleri</div>
+        <span class="pro-section-count">{{ unknown_services|length }}</span>
+    </div>
     <div class="table-wrap">
         <table>
             <thead><tr><th>Servis Adı</th><th>Durum</th><th>Eylem</th></tr></thead>
@@ -528,17 +514,19 @@ async function saveTelegram() {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 async function loadSparklines() {
+    const canvas = document.getElementById('cpu-sparkline');
+    if (!canvas) return;
     try {
         const r = await fetch('/api/system/history?hours=1');
         const data = await r.json();
         
-        new Chart(document.getElementById('cpu-sparkline'), {
+        new Chart(canvas, {
             type: 'line',
             data: {
                 labels: data.map(d => d.time),
                 datasets: [{
                     data: data.map(d => d.cpu_percent),
-                    borderColor: '#3b82f6',
+                    borderColor: '#2563eb',
                     borderWidth: 1.5,
                     fill: false,
                     pointRadius: 0,
@@ -561,7 +549,7 @@ async function updateSystemMetrics() {
         if (data.cpu_percent !== undefined) {
             document.getElementById('sys-cpu-val').innerText = data.cpu_percent + '%';
             document.getElementById('sys-cpu-bar').style.width = data.cpu_percent + '%';
-            document.getElementById('sys-cpu-bar').style.background = data.cpu_percent > 80 ? '#ef4444' : '#3b82f6';
+            document.getElementById('sys-cpu-bar').style.background = data.cpu_percent > 80 ? '#ef4444' : '#2563eb';
             
             document.getElementById('sys-ram-val').innerText = data.ram_percent + '%';
             document.getElementById('sys-ram-text').innerText = data.ram_used_gb + ' / ' + data.ram_total_gb + ' GB';
@@ -589,17 +577,15 @@ async function updateAppMetrics() {
         apps.forEach(app => {
             const el = document.getElementById(`res-${app.id}`);
             if (el) {
-                if (app.running) {
-                    const ramText = app.ram_mb !== null ? `${app.ram_mb} MB` : 'Aktif';
-                    const cpuText = `${app.cpu_percent || 0}%`;
-                    el.innerHTML = `
-                        <span class="casa-metric-tag ram" title="Bellek (RAM) Tüketimi">💾 ${ramText}</span>
-                        <span class="casa-metric-tag cpu" title="İşlemci (CPU) Tüketimi">⚡ ${cpuText}</span>
-                    `;
+                if (app.running && app.ram_mb !== null) {
+                    el.innerText = `${Math.round(app.ram_mb)}MB`;
+                    el.className = 'casa-metric-compact';
                 } else if (app.status_class === 'dead') {
-                    el.innerHTML = `<span class="casa-metric-tag stopped" title="Servis Durduruldu">⏹️ Kapalı</span>`;
+                    el.innerHTML = '<span class="muted">Kapalı</span>';
+                    el.className = 'casa-metric-compact';
                 } else {
-                    el.innerHTML = `<span class="casa-metric-tag neutral" title="Durum">⚪ ${app.category || 'Uygulama'}</span>`;
+                    el.innerText = '';
+                    el.className = 'casa-metric-compact';
                 }
             }
         });
