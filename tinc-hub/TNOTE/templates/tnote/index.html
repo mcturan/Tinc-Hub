@@ -73,11 +73,11 @@
         <div class="sidebar-categories" id="sidebar-categories">
             {% for cat in categories %}
             <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}">
-                <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" onclick="toggleCategoryGroup({{ cat.id }})">
+                <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" title="{{ cat.name }}" onclick="toggleCategoryGroup({{ cat.id }})">
                     <div class="category-title-area">
                         <span class="drag-handle cat-drag-handle" title="Kategoriyi taşımak için sürükleyin" onclick="event.stopPropagation()">⋮</span>
-                        <span class="cat-chevron" id="cat-chevron-{{ cat.id }}">▼</span>
-                        <span class="cat-icon-span" style="font-size:0.9rem;">{{ cat.icon }}</span>
+                        <span class="cat-chevron" id="cat-chevron-{{ cat.id }}">▾</span>
+                        <span class="cat-icon-span" style="font-size:0.9rem;" title="{{ cat.name }}">{{ cat.icon }}</span>
                         <span class="category-title-text" title="{{ cat.name }}">{{ cat.name }}</span>
                     </div>
                     <div class="category-actions" onclick="event.stopPropagation()">

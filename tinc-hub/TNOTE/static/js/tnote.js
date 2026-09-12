@@ -162,7 +162,8 @@ function initSidebarDragAndDrop() {
             // Kategori kapalıysa aç
             const group = document.getElementById(`cat-group-${targetCatId}`);
             if (group && group.classList.contains('collapsed')) {
-                toggleCategoryGroup(targetCatId);
+                group.classList.remove('collapsed');
+                saveCategoryCollapsedState(targetCatId, false);
             }
 
             // Sayfayı bu kategorinin sonuna ekle
@@ -306,15 +307,22 @@ function updateCategoryBadges(sourceCatId, targetCatId) {
 function toggleCategoryGroup(catId) {
     const container = document.querySelector('.tnote-container');
     if (container && container.classList.contains('sidebar-collapsed')) {
+        // Daraltılmış kenar çubuğundan kategoriye tıklandığında menüyü aç ve kategoriyi göster
         setSidebarState(false);
+        const group = document.getElementById(`cat-group-${catId}`);
+        if (group) {
+            group.classList.remove('collapsed');
+            saveCategoryCollapsedState(catId, false);
+        }
+        return;
     }
     const group = document.getElementById(`cat-group-${catId}`);
     if (!group) return;
     const isCollapsed = group.classList.toggle('collapsed');
-    const chevron = document.getElementById(`cat-chevron-${catId}`);
-    if (chevron) {
-        chevron.textContent = isCollapsed ? '▶' : '▼';
-    }
+    saveCategoryCollapsedState(catId, isCollapsed);
+}
+
+function saveCategoryCollapsedState(catId, isCollapsed) {
     try {
         const map = JSON.parse(localStorage.getItem('tnote_collapsed_cats') || '{}');
         map[catId] = isCollapsed;
@@ -327,10 +335,12 @@ function restoreCategoryCollapsedState() {
         const map = JSON.parse(localStorage.getItem('tnote_collapsed_cats') || '{}');
         for (const [catId, isCollapsed] of Object.entries(map)) {
             const group = document.getElementById(`cat-group-${catId}`);
-            if (group && isCollapsed) {
-                group.classList.add('collapsed');
-                const chevron = document.getElementById(`cat-chevron-${catId}`);
-                if (chevron) chevron.textContent = '▶';
+            if (group) {
+                if (isCollapsed) {
+                    group.classList.add('collapsed');
+                } else {
+                    group.classList.remove('collapsed');
+                }
             }
         }
     } catch (e) {}
@@ -1068,8 +1078,8 @@ async function loadPage(pageId) {
             const parentGroup = el.closest('.category-group');
             if (parentGroup && parentGroup.classList.contains('collapsed')) {
                 parentGroup.classList.remove('collapsed');
-                const chevron = parentGroup.querySelector('.cat-chevron');
-                if (chevron) chevron.textContent = '▼';
+                const catId = parentGroup.dataset.categoryId;
+                if (catId) saveCategoryCollapsedState(catId, false);
             }
         }
     });
