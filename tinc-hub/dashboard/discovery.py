@@ -19,9 +19,9 @@ import json
 from datetime import datetime
 
 
-def _run(cmd: list[str], timeout: int = 5) -> str:
+def _run(cmd: list[str], timeout: int = 5, env: dict = None) -> str:
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env)
         return r.stdout
     except Exception as e:
         import logging
@@ -121,11 +121,21 @@ def get_systemd_services(all_states: bool = False) -> list[dict]:
     return services
 
 
-def get_service_detail(service_name: str) -> dict:
+def get_service_detail(service_name: str, is_user_service: bool = False) -> dict:
     """Tek bir servisin detaylarını döner."""
     unit = service_name if service_name.endswith(".service") else f"{service_name}.service"
-    out = _run(["systemctl", "show", unit,
-                "--property=ActiveState,SubState,MainPID,ActiveEnterTimestamp,Description,ExecStart"])
+    cmd = ["systemctl"]
+    env = None
+    if is_user_service:
+        cmd.append("--user")
+        env = dict(os.environ)
+        if "XDG_RUNTIME_DIR" not in env:
+            env["XDG_RUNTIME_DIR"] = f"/run/user/{RUN_UID}"
+        if "DBUS_SESSION_BUS_ADDRESS" not in env:
+            env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path=/run/user/{RUN_UID}/bus"
+
+    cmd.extend(["show", unit, "--property=ActiveState,SubState,MainPID,ActiveEnterTimestamp,Description,ExecStart"])
+    out = _run(cmd, env=env) if env else _run(cmd)
     detail = {}
     for line in out.splitlines():
         k, _, v = line.partition("=")
@@ -215,7 +225,12 @@ def get_process_info(pid: int) -> dict | None:
             del _process_cache[pid]
             return None
             
-        mem = p.memory_info()
+        rss_bytes = p.memory_info().rss
+        try:
+            for child in p.children(recursive=True):
+                rss_bytes += child.memory_info().rss
+        except Exception:
+            pass
         
         # CPU'yu 'interval=None' ile alarak son ölçümden (son sayfa yenilemesinden) bu yana ortalamayı alır.
         # Böylece %0 gözükme sorunu ortadan kalkar.
@@ -223,7 +238,7 @@ def get_process_info(pid: int) -> dict | None:
         
         return {
             "cpu_percent": round(cpu, 1),
-            "ram_mb": round(mem.rss / 1024 / 1024, 1),
+            "ram_mb": round(rss_bytes / 1024 / 1024, 1),
             "status": p.status(),
             "create_time": p.create_time(),
         }

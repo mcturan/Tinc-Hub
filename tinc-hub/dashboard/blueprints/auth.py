@@ -84,33 +84,77 @@ def _enrich_apps(apps: list[dict]) -> list[dict]:
                 app["running"]     = svc_data.get("running", False)
                 app["cpu_percent"] = svc_data.get("cpu_percent")
                 app["ram_mb"]      = svc_data.get("ram_mb")
-                
-                # Min/Max Tracking
-                app_id = app["id"]
-                if app_id not in _metrics_history:
-                    _metrics_history[app_id] = {"cpu_min": app["cpu_percent"], "cpu_max": app["cpu_percent"], "ram_min": app["ram_mb"], "ram_max": app["ram_mb"]}
-                else:
-                    hist = _metrics_history[app_id]
-                    if app["cpu_percent"] is not None:
-                        if hist["cpu_min"] is None or app["cpu_percent"] < hist["cpu_min"]: hist["cpu_min"] = app["cpu_percent"]
-                        if hist["cpu_max"] is None or app["cpu_percent"] > hist["cpu_max"]: hist["cpu_max"] = app["cpu_percent"]
-                    if app["ram_mb"] is not None:
-                        if hist["ram_min"] is None or app["ram_mb"] < hist["ram_min"]: hist["ram_min"] = app["ram_mb"]
-                        if hist["ram_max"] is None or app["ram_mb"] > hist["ram_max"]: hist["ram_max"] = app["ram_mb"]
-                app["metrics_history"] = _metrics_history[app_id]
-
-            app["since"] = svc_data.get("since") if svc_data else None
-            app["pid"]   = svc_data.get("pid") if svc_data else None
-            
-            if not svc_data:
+                app["since"]       = svc_data.get("since")
+                app["pid"]         = svc_data.get("pid")
+            else:
                 # systemctl ile anlık sorgula
-                det = get_service_detail(svc)
+                from discovery import get_service_detail, get_process_info
+                det = get_service_detail(svc, is_user_service=app.get("is_user_service", False))
                 app["running"] = det.get("active_state") == "active"
                 app["since"]   = det.get("since", "")
+                app["pid"]     = det.get("pid")
+                if app["pid"]:
+                    proc_info = get_process_info(app["pid"])
+                    if proc_info:
+                        app["cpu_percent"] = proc_info.get("cpu_percent")
+                        app["ram_mb"]      = proc_info.get("ram_mb")
+
+        # Port veya PID discovery'den tamamla
+        if (not app.get("pid") or not app.get("running")) and app.get("port"):
+            p_info = port_map.get(app.get("port"))
+            if p_info and p_info.get("pid"):
+                app["pid"] = p_info["pid"]
+                if app.get("running") is None or not app.get("running"):
+                    app["running"] = True
+                from discovery import get_process_info
+                proc_info = get_process_info(app["pid"])
+                if proc_info:
+                    if app.get("cpu_percent") is None:
+                        app["cpu_percent"] = proc_info.get("cpu_percent")
+                    if app.get("ram_mb") is None:
+                        app["ram_mb"] = proc_info.get("ram_mb")
+
+        # psutil ile sadece is_user_service olan servisler için arama (örn: aprs-beacon)
+        if app.get("is_user_service") and (not app.get("pid") or not app.get("running")):
+            try:
+                import psutil
+                from discovery import get_process_info
+                script_name = (app.get("service") or "").split("@")[0].replace("-", "_") + ".py"
+                for proc in psutil.process_iter(['pid', 'cmdline', 'name']):
+                    try:
+                        cmd_line = ' '.join(proc.info['cmdline'] or []).lower()
+                        if script_name in cmd_line and proc.info['pid'] != os.getpid():
+                            app["pid"] = proc.info['pid']
+                            app["running"] = True
+                            proc_info = get_process_info(app["pid"])
+                            if proc_info:
+                                app["cpu_percent"] = proc_info.get("cpu_percent")
+                                app["ram_mb"]      = proc_info.get("ram_mb")
+                            break
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        # Min/Max Tracking
+        if app.get("cpu_percent") is not None or app.get("ram_mb") is not None:
+            app_id = app["id"]
+            if app_id not in _metrics_history:
+                _metrics_history[app_id] = {"cpu_min": app["cpu_percent"], "cpu_max": app["cpu_percent"], "ram_min": app["ram_mb"], "ram_max": app["ram_mb"]}
+            else:
+                hist = _metrics_history[app_id]
+                if app["cpu_percent"] is not None:
+                    if hist["cpu_min"] is None or app["cpu_percent"] < hist["cpu_min"]: hist["cpu_min"] = app["cpu_percent"]
+                    if hist["cpu_max"] is None or app["cpu_percent"] > hist["cpu_max"]: hist["cpu_max"] = app["cpu_percent"]
+                if app["ram_mb"] is not None:
+                    if hist["ram_min"] is None or app["ram_mb"] < hist["ram_min"]: hist["ram_min"] = app["ram_mb"]
+                    if hist["ram_max"] is None or app["ram_mb"] > hist["ram_max"]: hist["ram_max"] = app["ram_mb"]
+            app["metrics_history"] = _metrics_history[app_id]
 
         # Port bilgisi discovery'den tamamla
         if not app.get("port") and svc:
-            det = get_service_detail(svc)
+            from discovery import get_service_detail
+            det = get_service_detail(svc, is_user_service=app.get("is_user_service", False))
             pid = det.get("pid")
             if pid:
                 matched = [p for p, info in port_map.items() if info.get("pid") == pid]
@@ -119,8 +163,8 @@ def _enrich_apps(apps: list[dict]) -> list[dict]:
 
         # Durum sınıfı
         ok = app["health"].get("ok")
-        app["status_class"] = ("healthy" if ok is True
-                               else "dead" if ok is False else "unknown")
+        app["status_class"] = ("healthy" if ok is True or app.get("running") is True
+                               else "dead" if ok is False or app.get("running") is False else "unknown")
 
     return apps
 

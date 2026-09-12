@@ -64,9 +64,21 @@
         {% else %}
         <span class="casa-cat-tag">{{ app.category or 'Uygulama' }}</span>
         {% endif %}
-        
-        {% if app.cpu_percent is not none and app.cpu_percent > 0 %}
-        <span class="casa-cpu-tag" title="CPU">{{ app.cpu_percent }}%</span>
+    </div>
+
+    <!-- Canlı Kaynak Tüketimi (Bellek, RAM, CPU) -->
+    <div class="casa-app-resources" id="res-{{ app.id }}">
+        {% if app.running %}
+            <span class="casa-metric-tag ram" title="Bellek (RAM) Tüketimi">
+                💾 {{ (app.ram_mb ~ ' MB') if app.ram_mb is not none else 'Aktif' }}
+            </span>
+            <span class="casa-metric-tag cpu" title="İşlemci (CPU) Tüketimi">
+                ⚡ {{ (app.cpu_percent or 0) ~ '%' }}
+            </span>
+        {% elif app.status_class == 'dead' %}
+            <span class="casa-metric-tag stopped" title="Servis Durduruldu">⏹️ Kapalı</span>
+        {% else %}
+            <span class="casa-metric-tag neutral" title="Durum">⚪ {{ app.category or 'Uygulama' }}</span>
         {% endif %}
     </div>
 </div>
@@ -525,9 +537,35 @@ async function updateSystemMetrics() {
     setTimeout(updateSystemMetrics, 5000);
 }
 
+async function updateAppMetrics() {
+    try {
+        const r = await fetch('/api/apps');
+        const apps = await r.json();
+        apps.forEach(app => {
+            const el = document.getElementById(`res-${app.id}`);
+            if (el) {
+                if (app.running) {
+                    const ramText = app.ram_mb !== null ? `${app.ram_mb} MB` : 'Aktif';
+                    const cpuText = `${app.cpu_percent || 0}%`;
+                    el.innerHTML = `
+                        <span class="casa-metric-tag ram" title="Bellek (RAM) Tüketimi">💾 ${ramText}</span>
+                        <span class="casa-metric-tag cpu" title="İşlemci (CPU) Tüketimi">⚡ ${cpuText}</span>
+                    `;
+                } else if (app.status_class === 'dead') {
+                    el.innerHTML = `<span class="casa-metric-tag stopped" title="Servis Durduruldu">⏹️ Kapalı</span>`;
+                } else {
+                    el.innerHTML = `<span class="casa-metric-tag neutral" title="Durum">⚪ ${app.category || 'Uygulama'}</span>`;
+                }
+            }
+        });
+    } catch(e) {}
+    setTimeout(updateAppMetrics, 8000);
+}
+
 // Sayfa yüklendiğinde başlat
 document.addEventListener('DOMContentLoaded', () => {
     updateSystemMetrics();
+    updateAppMetrics();
     loadSparklines();
 });
 

@@ -3,6 +3,92 @@
 # Web arayüzünden veya elle düzenleyebilirsiniz.
 
 apps:
+  - id: tinc-hub
+    name: Tinc Hub Manager
+    description: Sistemin kalbi, merkezi yönetim paneli
+    url: http://{{host}}:9010
+    internal_url: http://127.0.0.1:9010
+    service: tinc-hub
+    port: 9010
+    category: Sistem
+    icon: "⚙️"
+    health_check: systemd
+    pinned: true
+
+  - id: tincnet
+    name: TincNet
+    description: Ağ topolojisi, harita, port tarayıcı ve analizör
+    url: http://{{host}}:9011
+    internal_url: http://127.0.0.1:9011
+    health_url: http://127.0.0.1:9011
+    service: tincnet
+    port: 9011
+    category: Ağ
+    icon: "🌐"
+    health_check: http
+    pinned: true
+
+  - id: terminal
+    name: Web Terminal
+    description: Tarayıcı üzerinden tam yetkili Bash & SSH web terminali
+    url: http://{{host}}:9012
+    internal_url: http://127.0.0.1:9012
+    health_url: http://127.0.0.1:9012
+    port: 9012
+    category: Sistem
+    icon: "💻"
+    health_check: http
+    pinned: true
+
+  - id: tnote
+    name: TincNote
+    description: OneNote stili not defterleri, yapılacaklar, şifre kasası ve mobil senkronizasyon
+    url: http://{{host}}:9013/notes
+    internal_url: http://127.0.0.1:9013/notes
+    health_url: http://127.0.0.1:9013/notes/api/app-version
+    service: tincnote
+    port: 9013
+    category: Üretkenlik
+    icon: "📝"
+    health_check: http
+    pinned: true
+
+  - id: tincprocess
+    name: TincProcess
+    description: Hiyerarşik süreç ağacı, PID/port dedektifi ve kaynak yöneticisi
+    url: http://{{host}}:9014
+    internal_url: http://127.0.0.1:9014
+    health_url: http://127.0.0.1:9014/api/system
+    service: tincprocess
+    port: 9014
+    category: Sistem
+    icon: "🔬"
+    health_check: http
+    pinned: true
+
+  - id: aprs-beacon
+    name: APRS Beacon & Manager
+    description: Telsiz konum beacon servisi ve paket yöneticisi
+    service: aprs-beacon@ta1xba
+    is_user_service: true
+    category: Telsiz
+    icon: "📡"
+    health_check: systemd
+    pinned: true
+
+  - id: ollama
+    name: Ollama AI
+    description: Yerel yapay zeka sunucusu
+    url: http://{{host}}:11434
+    internal_url: http://127.0.0.1:11434
+    health_url: http://127.0.0.1:11434
+    service: ollama
+    port: 11434
+    category: Araç
+    icon: "🧠"
+    health_check: http
+    pinned: false
+
   - id: docker
     name: Docker
     description: Container yönetimi
@@ -12,9 +98,40 @@ apps:
     health_check: systemd
     pinned: false
 
+  - id: anydesk
+    name: AnyDesk
+    description: Uzak masaüstü erişimi
+    service: anydesk
+    port: 7070
+    category: Araç
+    icon: "🖥️"
+    health_check: systemd
+    pinned: false
+
+  - id: samba
+    name: Samba Dosya Paylaşımı
+    description: Ağ dosya paylaşımı (SMB/CIFS)
+    service: smbd
+    port: 445
+    category: Sistem
+    icon: "📁"
+    health_check: systemd
+    pinned: false
+
+  - id: rclone
+    name: rclone Bulut Sync
+    description: Bulut depolama senkronizasyonu
+    service: rclone
+    category: Araç
+    icon: "☁️"
+    health_check: systemd
+    pinned: false
+
   - id: nginx
     name: Nginx Web Proxy
     description: Web sunucu ve ters proxy
+    url: http://{{host}}:80
+    internal_url: http://127.0.0.1:80
     service: nginx
     port: 80
     category: Sistem
@@ -35,7 +152,6 @@ apps:
     icon: "🍞"
     health_check: http
     pinned: true
-    parent: nginx
 
   - id: firinna-web
     name: Firinna Web
@@ -43,28 +159,16 @@ apps:
     repo: github.com/mcturan/firinna-pos
     url: https://firinna.com
     health_url: https://firinna.com
-    service: nginx
     port: 443
     category: İş
     icon: "🌐"
     health_check: http
     pinned: true
-    parent: nginx
-
-  - id: aprs-beacon
-    name: APRS Beacon
-    description: Telsiz konum beacon servisi
-    service: aprs-beacon@ta1xba
-    is_user_service: true
-    category: Telsiz
-    icon: "📡"
-    health_check: systemd
-    pinned: true
 
   - id: plex
     name: Plex Media Server
     description: Medya yayın sunucusu
-    url: http://127.0.0.1:32400/web
+    url: http://{{host}}:32400/web
     health_url: http://127.0.0.1:32400/identity
     service: plexmediaserver
     port: 32400
@@ -73,101 +177,13 @@ apps:
     health_check: http
     pinned: false
 
-  - id: ollama
-    name: Ollama AI
-    description: Yerel yapay zeka sunucusu
-    health_url: http://127.0.0.1:11434
-    service: ollama
-    port: 11434
-    category: Araç
-    icon: "🧠"
-    health_check: http
-    pinned: false
-
-  - id: anydesk
-    name: AnyDesk
-    description: Uzak masaüstü erişimi
-    service: anydesk
-    category: Araç
-    icon: "🖥️"
-    health_check: systemd
-    pinned: false
-
-  - id: samba
-    name: Samba Dosya Paylaşımı
-    description: Ağ dosya paylaşımı (SMB/CIFS)
-    service: smbd
-    port: 445
-    category: Sistem
-    icon: "📁"
-    health_check: systemd
-    pinned: false
-
   - id: cctv
-    name: CCTV
-    description: Güvenlik kamera sistemi (snap)
+    name: CCTV Viewer
+    description: Güvenlik kamera izleyici
     category: Güvenlik
     icon: "📷"
     health_check: none
     pinned: false
-
-  - id: rclone
-    name: rclone Bulut Sync
-    description: Bulut depolama senkronizasyonu
-    service: rclone
-    category: Araç
-    icon: "☁️"
-    health_check: systemd
-    pinned: false
-
-  - id: tinc-hub
-    name: Tinc Hub Manager
-    description: Sistemin kalbi, bu dashboard.
-    service: tinc-hub
-    port: 9010
-    category: Sistem
-    icon: "⚙️"
-    health_check: systemd
-    pinned: true
-
-  - id: tincnet
-    name: TincNet
-    description: Ağ topolojisi, harita, port tarayıcı ve analizör
-    url: http://192.168.1.10:9011
-    internal_url: http://127.0.0.1:9011
-    health_url: http://127.0.0.1:9011
-    service: tincnet
-    port: 9011
-    category: Ağ
-    icon: "🌐"
-    health_check: http
-    pinned: true
-
-  - id: tnote
-    name: TincNote
-    description: OneNote stili not defterleri, yapılacaklar, şifre kasası ve mobil senkronizasyon
-    url: http://192.168.1.10:9013/notes
-    internal_url: http://127.0.0.1:9013/notes
-    health_url: http://127.0.0.1:9013/notes/api/app-version
-    service: tincnote
-    port: 9013
-    category: Üretkenlik
-    icon: "📝"
-    health_check: http
-    pinned: true
-
-  - id: tincprocess
-    name: TincProcess
-    description: Hiyerarşik süreç ağacı, PID/port dedektifi ve kaynak yöneticisi
-    url: http://192.168.1.10:9014
-    internal_url: http://127.0.0.1:9014
-    health_url: http://127.0.0.1:9014/api/system
-    service: tincprocess
-    port: 9014
-    category: Sistem
-    icon: "🔬"
-    health_check: http
-    pinned: true
 
   - id: socies
     name: Socies Game
