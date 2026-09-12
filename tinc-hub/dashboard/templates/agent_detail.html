@@ -16,15 +16,16 @@
                 <span class="logo-text">TINC <strong>Hub</strong></span>
             </div>
             <nav>
-                <a href="/">Panel</a>
-                <a href="/events">Olaylar</a>
+                <a href="/">Hub</a>
+                <a href="/agents" class="active">Ajanlar</a>
+                <a href="/logs">Loglar</a>
             </nav>
             <div class="header-time">{{ now }}</div>
         </div>
     </header>
 
     <main>
-        <div class="breadcrumb"><a href="/">← Panel</a> / {{ agent.name }}</div>
+        <div class="breadcrumb"><a href="/agents">← Ajanlar</a> / {{ agent.name }}</div>
 
         <section class="agent-hero health-{{ agent.health }}">
             <div class="agent-hero-info">

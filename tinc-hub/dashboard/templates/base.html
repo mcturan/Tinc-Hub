@@ -75,10 +75,6 @@
             </a>
             <nav>
                 <a href="/" class="{% if request.path == '/' %}active{% endif %}">Hub</a>
-                <a href="http://{{ request.host.split(':')[0] }}:9014" target="_blank" title="TincProcess (Port 9014)">🔬 TincProcess</a>
-                <a href="http://{{ request.host.split(':')[0] }}:9011" target="_blank" title="TincNet (Port 9011)">🌐 TincNet</a>
-                <a href="http://{{ request.host.split(':')[0] }}:9012" target="_blank" title="Web Terminal (Port 9012)">💻 Terminal</a>
-                <a href="http://{{ request.host.split(':')[0] }}:9013/notes" target="_blank" title="TincNote (Port 9013)">📝 TincNote</a>
                 <a href="/logs" class="{% if request.path.startswith('/logs') %}active{% endif %}">Loglar</a>
                 <a href="/rules" class="{% if request.path.startswith('/rules') %}active{% endif %}">Otomasyon</a>
                 <a href="/multi" class="{% if request.path.startswith('/multi') %}active{% endif %}">Makineler</a>

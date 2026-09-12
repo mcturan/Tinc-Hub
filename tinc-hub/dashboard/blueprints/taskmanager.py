@@ -24,8 +24,28 @@ def api_taskmanager():
         svc = app_data.get('service')
         if not svc:
             continue
-        detail = get_service_detail(svc)
+        is_user = app_data.get('is_user_service', False)
+        detail = get_service_detail(svc, is_user_service=is_user)
         pid = detail.get('pid')
+        running = detail.get('active_state') == 'active'
+
+        # User service veya port fallback
+        if not pid and is_user:
+            try:
+                import psutil
+                script_name = (svc or "").split("@")[0].replace("-", "_") + ".py"
+                for proc in psutil.process_iter(['pid', 'cmdline']):
+                    try:
+                        cmd_line = ' '.join(proc.info['cmdline'] or []).lower()
+                        if script_name in cmd_line:
+                            pid = proc.info['pid']
+                            running = True
+                            break
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
         proc_info = get_process_info(pid) if pid else None
         
         processes.append({
@@ -35,11 +55,11 @@ def api_taskmanager():
             'service': svc,
             'type': 'systemd',
             'pid': pid,
-            'running': detail.get('active_state') == 'active',
+            'running': running,
             'cpu_percent': proc_info['cpu_percent'] if proc_info else None,
             'ram_mb': proc_info['ram_mb'] if proc_info else None,
             'since': detail.get('since', ''),
-            'is_user_service': app_data.get('is_user_service', False)
+            'is_user_service': is_user
         })
     
     # Add Docker containers

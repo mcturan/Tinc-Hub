@@ -135,3 +135,14 @@ def network_page():
 def multi_page():
     return render_template("multi_hub.html", now=_now(), has_auth=bool(PASSWORD))
 
+@bp.route("/apps")
+@auth_required
+def apps_redirect():
+    return redirect("/")
+
+@bp.route("/events")
+@auth_required
+def events_redirect():
+    return redirect("/agents")
+
+
