@@ -399,7 +399,8 @@ h2 {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 table {
   width: 100%;
@@ -684,10 +685,78 @@ footer {
   .sysbar { gap: 16px; }
   .app-hero { flex-direction: column; }
   .form-row { grid-template-columns: 1fr; }
+  
+  /* CasaOS Mobile / Tablet Enhancements */
+  .casa-hero-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .casa-header-actions {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .casa-header-actions .btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .casa-system-widgets {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+  }
 }
 @media (max-width: 600px) {
   .app-grid { grid-template-columns: 1fr; }
   nav a { padding: 6px 8px; font-size: 0.8rem; }
+  
+  .cat-filters {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .cat-chip {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .casa-apps-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+  }
+  .casa-app-card {
+    padding: 12px 6px 10px 6px;
+  }
+  .casa-app-icon-wrap {
+    width: 48px;
+    height: 48px;
+    font-size: 1.5rem;
+    margin-top: 10px;
+  }
+  .casa-app-name {
+    font-size: 0.82rem;
+  }
+
+  .modal-overlay {
+    padding: 10px;
+  }
+  .modal {
+    padding: 18px 16px;
+    max-height: 94vh;
+  }
+}
+
+@media (max-width: 420px) {
+  .casa-apps-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .casa-system-widgets {
+    grid-template-columns: 1fr;
+  }
 }
 
 .btn-disabled {

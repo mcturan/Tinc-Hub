@@ -17,12 +17,16 @@
         --text: #212529;
         --text-muted: #6c757d;
     }
-    .dark-mode {
+    body.dark-mode {
         --bg: #0f172a;
+        --surface: #1e293b;
+        --surface2: #334155;
+        --surface3: #0f172a;
         --bg-card: #1e293b;
         --bg-card-header: #0f172a;
         --border: #334155;
         --text: #f8fafc;
+        --muted: #94a3b8;
         --text-muted: #94a3b8;
     }
 
@@ -340,6 +344,11 @@
 
             <button onclick="saveTopology()" class="tb-btn tb-btn-success" style="padding:5px 14px;">
                 <i class="fas fa-save"></i> Kaydet
+            </button>
+
+            <!-- Tema Değiştirici -->
+            <button id="btn-theme-toggle" onclick="toggleTheme()" class="tb-btn tb-btn-icon" title="Karanlık / Aydınlık Mod">
+                <i class="fas fa-moon"></i>
             </button>
         </div>
     </div>
@@ -1463,6 +1472,41 @@
 {% block scripts %}
 <script>
 console.log("[TINC-NOC] Network Map v2.5 loaded at: 1788605733");
+
+// Tema Yöneticisi (Dark / Light Mode)
+(function() {
+    const savedTheme = localStorage.getItem('tincnet_theme');
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark-mode');
+    }
+})();
+
+function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('tincnet_theme', isDark ? 'dark' : 'light');
+    updateThemeIcon();
+    if (window.network && window.nodes) {
+        const textColor = isDark ? '#cbd5e1' : '#334155';
+        const allNodes = nodes.get();
+        if (allNodes && allNodes.length) {
+            const updates = allNodes.map(n => ({ id: n.id, font: { color: textColor, size: 12, strokeWidth: 0 } }));
+            nodes.update(updates);
+        }
+        network.redraw();
+    }
+    showToast(isDark ? "🌙 Karanlık mod aktif edildi" : "☀️ Aydınlık mod aktif edildi", 2000);
+}
+
+function updateThemeIcon() {
+    const btnIcon = document.querySelector('#btn-theme-toggle i');
+    if (btnIcon) {
+        const isDark = document.body.classList.contains('dark-mode');
+        btnIcon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+        btnIcon.style.color = isDark ? '#fbbf24' : '';
+    }
+}
+document.addEventListener('DOMContentLoaded', updateThemeIcon);
+
 let toastTimer = null;
 function showToast(message, duration=3500) {
     const toast = document.getElementById('toast-container');
