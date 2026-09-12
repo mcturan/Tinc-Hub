@@ -3,24 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}TNOTE — Notlar & Listeler{% endblock %}</title>
+    <title>{% block title %}TincNote — Notlar & Listeler{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('tnote.static', filename='css/tnote.css') }}">
     <style>
         :root {
-            --bg: #f4f6f9;
+            --bg: #f8fafc;
             --surface: #ffffff;
-            --surface2: #e9ecef;
-            --surface3: #f8f9fa;
-            --border: #dee2e6;
-            --text: #212529;
-            --muted: #6c757d;
-            --accent: #0d6efd;
-            --green: #198754;
-            --yellow: #ffc107;
-            --red: #dc3545;
+            --surface2: #f1f5f9;
+            --surface3: #e2e8f0;
+            --border: #cbd5e1;
+            --text: #0f172a;
+            --muted: #64748b;
+            --accent: #3b82f6;
+            --green: #10b981;
+            --yellow: #f59e0b;
+            --red: #ef4444;
             --radius: 10px;
             --radius-sm: 6px;
             --shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        * {
+            box-sizing: border-box;
         }
         body {
             margin: 0;
@@ -32,14 +35,14 @@
         header.standalone-header {
             background: var(--surface);
             border-bottom: 1px solid var(--border);
-            padding: 12px 24px;
+            padding: 10px 24px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             box-shadow: var(--shadow);
             position: sticky;
             top: 0;
-            z-index: 100;
+            z-index: 1000;
         }
         .header-logo {
             font-weight: 700;
@@ -52,23 +55,28 @@
         }
         .header-nav {
             display: flex;
-            gap: 16px;
+            gap: 12px;
+            align-items: center;
         }
         .header-nav a {
             text-decoration: none;
             color: var(--text);
             font-weight: 500;
-            padding: 6px 12px;
+            padding: 6px 14px;
             border-radius: var(--radius-sm);
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
         .header-nav a.active, .header-nav a:hover {
             background: var(--surface2);
             color: var(--accent);
         }
-        main {
-            padding: 20px;
-            max-width: 1400px;
+        .standalone-container {
+            padding: 14px 20px;
+            width: 100%;
+            max-width: 1600px;
             margin: 0 auto;
         }
     </style>
@@ -77,15 +85,16 @@
 <body>
     <header class="standalone-header">
         <a href="/notes" class="header-logo">
-            <span>📝</span> TNOTE <strong>App</strong>
+            <span>📝</span> <strong>TincNote</strong>
         </a>
         <nav class="header-nav">
-            <a href="/notes" class="{% if request.path == '/notes' or request.path == '/notes/' %}active{% endif %}">📋 Notlar & Listeler</a>
-            <a href="/notes/settings" class="{% if request.path.startswith('/notes/settings') %}active{% endif %}">⚙️ Telegram & Ayarlar</a>
+            <a href="/notes" class="{% if request.path == '/notes' or request.path == '/notes/' %}active{% endif %}">📋 Notlar &amp; Listeler</a>
+            <a href="/notes/settings" class="{% if request.path.startswith('/notes/settings') %}active{% endif %}">⚙️ Ayarlar</a>
+            <a href="http://192.168.1.10:9010" style="color: var(--muted); font-size: 0.85rem;" title="TincHub Ana Panosuna Dön">🏠 TincHub</a>
         </nav>
     </header>
-    <main>
+    <div class="standalone-container">
         {% block content %}{% endblock %}
-    </main>
+    </div>
 </body>
 </html>

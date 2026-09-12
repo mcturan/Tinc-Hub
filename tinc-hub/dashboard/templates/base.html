@@ -80,6 +80,7 @@
                 <a href="/multi" class="{% if request.path.startswith('/multi') %}active{% endif %}">Makineler</a>
                 <a href="/agents" class="{% if request.path.startswith('/agents') %}active{% endif %}">Ajanlar</a>
                 <a href="/settings" class="{% if request.path.startswith('/settings') %}active{% endif %}">Ayarlar</a>
+                <a href="javascript:void(0)" onclick="openAIAgentModal()" style="background: linear-gradient(135deg, #6366f1, #a855f7); color:white !important; font-weight:700; padding:4px 10px; border-radius:6px; text-decoration:none; margin-left:6px; box-shadow:0 2px 8px rgba(99,102,241,0.4);" title="TincOps AI Görev Ajanı">🤖 TincOps</a>
             </nav>
             <div class="header-actions">
                 <div class="notification-bell" onclick="toggleNotifications()">
@@ -153,6 +154,61 @@
                     </div>
 
                     <button class="btn" onclick="closeDeleteModal()" style="width:100%; margin-top:5px;">❌ İptal</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Modal: TincOps AI Görev Ajanı -->
+    <div id="aiAgentModal" class="modal-overlay hidden" style="z-index: 9998;" onclick="closeAIAgentModal()">
+        <div class="modal" style="max-width: 680px; width: 92%; background: var(--surface, #1e293b); border: 1px solid var(--border); border-radius: 12px; padding: 22px;" onclick="event.stopPropagation()">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:1.5rem;">🤖</span>
+                    <div>
+                        <h3 style="margin:0; font-size:1.15rem; color:var(--text);">TincOps AI Görev Ajanı</h3>
+                        <div style="font-size:0.78rem; color:var(--muted);">Doğal dille görev verin; sistem analiz etsin ve komutları canlı çalıştırsın.</div>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="closeAIAgentModal()">&times;</button>
+            </div>
+
+            <div style="margin-bottom: 14px;">
+                <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px;">Hızlı Görev Önerileri:</label>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button type="button" class="btn btn-sm" onclick="setAIPrompt('Ollama servisini sistemden tamamen kaldır ve temizle')" style="font-size:0.75rem; background:var(--surface2, #334155);">🗑️ Ollama'yı Kökten Kaldır</button>
+                    <button type="button" class="btn btn-sm" onclick="setAIPrompt('Port 9015 boş mu, kim dinliyor?')" style="font-size:0.75rem; background:var(--surface2, #334155);">🔌 Port 9015 Boş mu?</button>
+                    <button type="button" class="btn btn-sm" onclick="setAIPrompt('TincNet servisini yeniden başlat ve durumuna bak')" style="font-size:0.75rem; background:var(--surface2, #334155);">⟳ TincNet'i Yeniden Başlat</button>
+                    <button type="button" class="btn btn-sm" onclick="setAIPrompt('3 günden eski logları ve diskteki gereksiz paketleri temizle')" style="font-size:0.75rem; background:var(--surface2, #334155);">🧹 Disk &amp; Log Temizliği</button>
+                    <button type="button" class="btn btn-sm" onclick="setAIPrompt('En çok RAM tüketen süreçleri listele')" style="font-size:0.75rem; background:var(--surface2, #334155);">📊 RAM Tüketen İlk 5 Süreç</button>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-bottom:14px;">
+                <input type="text" id="aiAgentInput" placeholder="Örn: Ollama servisini tamamen kaldır, 9015 portunu test et..." style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid var(--border); background:var(--bg, #0f172a); color:var(--text); font-size:0.9rem;" onkeydown="if(event.key==='Enter') analyzeAITask()">
+                <button type="button" id="btn-ai-analyze" onclick="analyzeAITask()" class="btn btn-primary" style="padding:10px 18px; font-weight:600; display:flex; align-items:center; gap:6px;">
+                    <span>🚀 Analiz Et</span>
+                </button>
+            </div>
+
+            <div id="ai-task-loading" style="display:none; text-align:center; padding:20px; color:var(--muted); font-size:0.9rem;">
+                ⏳ TincOps görevi analiz ediyor ve sistem planını hazırlıyor...
+            </div>
+
+            <!-- Task Plan Output Card -->
+            <div id="ai-plan-card" style="display:none; background:var(--bg, #0f172a); border:1px solid var(--border); border-radius:8px; padding:14px; margin-top:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <strong id="ai-plan-title" style="font-size:0.95rem; color:var(--text);"></strong>
+                    <span id="ai-plan-risk" class="badge" style="padding:3px 8px; border-radius:4px; font-size:0.75rem;"></span>
+                </div>
+                <p id="ai-plan-desc" style="font-size:0.85rem; color:var(--muted); margin-bottom:10px;"></p>
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:0.75rem; font-weight:700; color:var(--muted); margin-bottom:4px; text-transform:uppercase;">Çalıştırılacak Bash Komutları:</div>
+                    <pre id="ai-plan-cmds" style="background:#020617; color:#38bdf8; padding:10px; border-radius:6px; font-family:monospace; font-size:0.8rem; line-height:1.4; margin:0; max-height:160px; overflow-y:auto;"></pre>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:8px;">
+                    <button type="button" class="btn" onclick="document.getElementById('ai-plan-card').style.display='none'">İptal</button>
+                    <button type="button" class="btn btn-danger" id="ai-plan-exec-btn" onclick="executeAITaskPlan()" style="font-weight:700;">▶️ Onayla &amp; Canlı Terminalde Çalıştır</button>
                 </div>
             </div>
         </div>
@@ -386,6 +442,94 @@
                 activeEventSource = null;
             }
         };
+    }
+
+    // ── Global TincOps AI Görev Ajanı Denetleyicisi ──
+    let currentAITask = null;
+
+    function openAIAgentModal() {
+        const modal = document.getElementById('aiAgentModal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            const inp = document.getElementById('aiAgentInput');
+            if (inp) inp.focus();
+        }
+    }
+
+    function closeAIAgentModal() {
+        const modal = document.getElementById('aiAgentModal');
+        if (modal) modal.classList.add('hidden');
+        const planCard = document.getElementById('ai-plan-card');
+        if (planCard) planCard.style.display = 'none';
+        const loadEl = document.getElementById('ai-task-loading');
+        if (loadEl) loadEl.style.display = 'none';
+    }
+
+    function setAIPrompt(text) {
+        const inp = document.getElementById('aiAgentInput');
+        if (inp) {
+            inp.value = text;
+            analyzeAITask();
+        }
+    }
+
+    async function analyzeAITask() {
+        const inp = document.getElementById('aiAgentInput');
+        if (!inp) return;
+        const prompt = inp.value.trim();
+        if (!prompt) return;
+
+        const loadEl = document.getElementById('ai-task-loading');
+        const planCard = document.getElementById('ai-plan-card');
+        if (loadEl) loadEl.style.display = 'block';
+        if (planCard) planCard.style.display = 'none';
+
+        try {
+            const r = await fetch('/api/ai/agent-task', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({prompt})
+            });
+            const data = await r.json();
+            if (loadEl) loadEl.style.display = 'none';
+
+            if (data.ok) {
+                currentAITask = data;
+                document.getElementById('ai-plan-title').textContent = data.title;
+                document.getElementById('ai-plan-desc').textContent = data.explanation;
+                
+                const riskEl = document.getElementById('ai-plan-risk');
+                if (data.risk_level === 'high') {
+                    riskEl.textContent = 'Yüksek Risk ⚠️';
+                    riskEl.style.background = '#ef4444';
+                    riskEl.style.color = 'white';
+                } else if (data.risk_level === 'medium') {
+                    riskEl.textContent = 'Orta Risk ⚠️';
+                    riskEl.style.background = '#f59e0b';
+                    riskEl.style.color = 'white';
+                } else {
+                    riskEl.textContent = 'Güvenli ✓';
+                    riskEl.style.background = '#10b981';
+                    riskEl.style.color = 'white';
+                }
+
+                document.getElementById('ai-plan-cmds').textContent = data.commands.join('\n');
+                if (planCard) planCard.style.display = 'block';
+            } else {
+                alert("Ajan Hatası: " + (data.error || 'Analiz yapılamadı.'));
+            }
+        } catch(err) {
+            if (loadEl) loadEl.style.display = 'none';
+            alert("Bağlantı hatası: " + err.message);
+        }
+    }
+
+    function executeAITaskPlan() {
+        if (!currentAITask || !currentAITask.commands || currentAITask.commands.length === 0) return;
+        const title = currentAITask.title;
+        const cmds = currentAITask.commands;
+        closeAIAgentModal();
+        runLiveCommands(`🤖 TincOps: ${title}`, cmds);
     }
     </script>
 </body>
