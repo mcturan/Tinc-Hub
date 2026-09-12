@@ -51,7 +51,11 @@ def _enrich_apps(apps: list[dict]) -> list[dict]:
     svc_map  = {s["name"]: s for s in disc.get("services", [])}
 
     for app in apps:
-        app["children"] = [a for a in apps if a.get("parent") == app["id"] or (a.get("parent") and a.get("parent") == app.get("service"))]
+        app["children"] = [
+            {k: v for k, v in a.items() if k != "children"}
+            for a in apps
+            if a.get("parent") == app["id"] or (a.get("parent") and a.get("parent") == app.get("service"))
+        ]
         
         # Sağlık
         cached = get_cached_health(app["id"])

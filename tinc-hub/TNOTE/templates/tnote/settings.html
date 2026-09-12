@@ -1,0 +1,803 @@
+{% extends "base.html" if not standalone else "tnote/standalone_base.html" %}
+
+{% block title %}TincNote — Ayarlar & Not Defterleri{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('tnote.static', filename='css/tnote.css') }}">
+<style>
+.settings-tabs-nav {
+    display: flex;
+    gap: 8px;
+    border-bottom: 2px solid var(--border, #e2e8f0);
+    padding-bottom: 0;
+    margin-bottom: 16px;
+    overflow-x: auto;
+}
+.settings-tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--muted, #64748b);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.settings-tab-btn:hover {
+    color: var(--text, #1e293b);
+}
+.settings-tab-btn.active {
+    color: var(--accent, #3b82f6);
+    border-bottom-color: var(--accent, #3b82f6);
+}
+.settings-tab-panel {
+    display: none;
+}
+.settings-tab-panel.active {
+    display: block;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+}
+@media (max-width: 900px) {
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+}
+.settings-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Notebook Cards */
+.notebook-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+}
+.notebook-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    position: relative;
+}
+.notebook-card.active-nb {
+    border-color: var(--accent, #3b82f6);
+    box-shadow: 0 0 0 1px var(--accent, #3b82f6), var(--shadow);
+}
+.notebook-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.notebook-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+.notebook-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--text);
+}
+.notebook-card-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+.notebook-card-desc {
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.4;
+    min-height: 2.8em;
+}
+.notebook-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: auto;
+}
+
+/* Import Dropzone */
+.import-dropzone {
+    border: 2px dashed var(--border, #cbd5e1);
+    border-radius: 6px;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    background: var(--surface2, #f8fafc);
+    transition: all 0.2s ease;
+}
+.import-dropzone:hover, .import-dropzone.dragover {
+    border-color: var(--accent, #3b82f6);
+    background: #eff6ff;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 1100px; margin: 0 auto; display:flex; flex-direction:column; gap:14px;">
+    <!-- Üst Başlık & Eylemler -->
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+        <h2 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:8px;">
+            ⚙️ TincNote Ayarları & Yönetim
+        </h2>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <a href="/notes/download/apk" class="btn btn-primary btn-sm" title="Android APK İndir">📱 Mobil APK (v1.2.0)</a>
+            <a href="/notes" class="btn btn-sm">« Notlara Dön</a>
+        </div>
+    </div>
+
+    <!-- Sekme Gezgini (Tabs) -->
+    <div class="settings-tabs-nav">
+        <button class="settings-tab-btn active" id="tab-btn-notebooks" onclick="switchSettingsTab('notebooks')">
+            <span>📓</span> Not Defterlerim ({{ notebooks|length }})
+        </button>
+        <button class="settings-tab-btn" id="tab-btn-telegram" onclick="switchSettingsTab('telegram')">
+            <span>🤖</span> Telegram Botu & İzinler
+        </button>
+        <button class="settings-tab-btn" id="tab-btn-import" onclick="switchSettingsTab('import')">
+            <span>📥</span> Dışarıdan Veri İçe Aktar & Yedekle
+        </button>
+    </div>
+
+    <!-- ─────────────────────────────────────────────────────────────────
+         SEKME 1: 📓 NOT DEFTERLERİM (ONENOTE MİMARİSİ)
+         ───────────────────────────────────────────────────────────────── -->
+    <div class="settings-tab-panel active" id="settings-tab-notebooks">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+            <!-- Not Defterleri Tanıtım & Hızlı Eylemler Kartı -->
+            <div class="settings-card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.06), rgba(99, 102, 241, 0.04));">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <h3 style="margin:0; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+                            📓 Not Defterleriniz (Notebooks)
+                        </h3>
+                        <p style="margin:4px 0 0 0; font-size:0.82rem; color:var(--muted); line-height:1.4;">
+                            Tıpkı Microsoft OneNote gibi, her not defteri tamamen bağımsız bir çalışma alanıdır. Mevcut tüm kategorileriniz ve sayfalarınız ana not defterinizde güvenle tutulur. İstediğiniz defteri <strong>.tnote</strong> formatında tek tıkla dışa aktarabilir ve paylaşabilirsiniz.
+                        </p>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('notebook-import-input').click()">
+                            📥 Not Defteri İçe Aktar (.tnote)
+                        </button>
+                        <input type="file" id="notebook-import-input" style="display:none;" accept=".tnote,.json" onchange="handleNotebookImport(this)">
+                        <button class="btn btn-primary btn-sm" onclick="openCreateNotebookModal()">
+                            ➕ Yeni Not Defteri
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Not Defteri Kartları -->
+            <div class="notebook-cards-grid">
+                {% for nb in notebooks %}
+                {% set is_active = (current_notebook and current_notebook.id == nb.id) %}
+                <div class="notebook-card {% if is_active %}active-nb{% endif %}" id="nb-card-{{ nb.id }}">
+                    <div class="notebook-card-header">
+                        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                            <div class="notebook-avatar" style="background: {{ nb.color }}22; color: {{ nb.color }};">
+                                {{ nb.icon }}
+                            </div>
+                            <div style="min-width:0;">
+                                <h4 class="notebook-card-title" title="{{ nb.name }}">{{ nb.name }}</h4>
+                                <div class="notebook-card-stats">
+                                    <span>📁 {{ nb.category_count }} Kategori</span>
+                                    <span>📝 {{ nb.page_count }} Sayfa</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% if is_active %}
+                        <span style="background:#ecfdf5; color:#065f46; padding:2px 8px; border-radius:12px; font-size:0.72rem; font-weight:700; white-space:nowrap;">
+                            🟢 Aktif
+                        </span>
+                        {% else %}
+                        <button class="btn btn-secondary btn-sm" onclick="switchNotebook({{ nb.id }})" style="padding:3px 8px; font-size:0.75rem;">
+                            Deftere Geç
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    <div class="notebook-card-desc">
+                        {{ nb.description or 'Açıklama belirtilmemiş.' }}
+                    </div>
+
+                    <div class="notebook-card-actions">
+                        <button class="btn btn-ghost btn-sm" onclick="exportNotebook({{ nb.id }})" title="Bu not defterini dışa aktar (.tnote)" style="font-size:0.78rem; padding:4px 8px;">
+                            📤 Dışa Aktar (.tnote)
+                        </button>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn btn-ghost btn-sm" onclick="openEditNotebookModal({{ nb.id }}, '{{ nb.name|escape }}', '{{ nb.icon|escape }}', '{{ nb.color|escape }}', '{{ nb.description|escape }}')" title="Düzenle">
+                                ✏️
+                            </button>
+                            {% if notebooks|length > 1 %}
+                            <button class="btn btn-ghost btn-sm" onclick="deleteNotebookFromSettings({{ nb.id }}, '{{ nb.name|escape }}')" style="color:var(--danger);" title="Sil">
+                                🗑️
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ─────────────────────────────────────────────────────────────────
+         SEKME 2: 🤖 TELEGRAM BOTU & İZİNLER
+         ───────────────────────────────────────────────────────────────── -->
+    <div class="settings-tab-panel" id="settings-tab-telegram">
+        <div class="settings-grid">
+            <div style="display:flex; flex-direction:column; gap:14px;">
+                <div class="settings-card">
+                    <h3 style="margin:0; font-size:0.95rem; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                        🤖 Telegram Botu
+                    </h3>
+
+                    <div class="form-group">
+                        <label style="font-size:0.82rem;">Bot API Token</label>
+                        <input type="password" id="cfg-token" class="form-control" value="{{ settings.telegram_bot_token or '' }}" placeholder="123456789:ABCdefGhIJKlmNoPQRstuVWXyz" style="font-size:0.85rem; padding:6px 10px;">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-size:0.82rem;">Varsayılan Hedef Liste</label>
+                        <select id="cfg-default-page" class="form-control" style="font-size:0.85rem; padding:6px 10px;">
+                            {% for p in pages %}
+                            <option value="{{ p.id }}" {% if settings.telegram_default_page_id == (p.id|string) %}selected{% endif %}>
+                                {{ p.icon }} {{ p.title }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div style="display:flex; flex-direction:column; gap:8px; padding:8px 10px; background:var(--surface3); border-radius:6px; font-size:0.82rem;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+                            <input type="checkbox" id="cfg-telegram-enabled" {% if settings.telegram_enabled == '1' %}checked{% endif %} style="width:16px; height:16px;">
+                            Bot Dinleyicisini (Long Polling) Aktif Et
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600;">
+                            <input type="checkbox" id="cfg-ui-notify" {% if settings.ui_notify_enabled == '1' %}checked{% endif %} style="width:16px; height:16px;">
+                            Web Paneli Bildirim Ziline Entegre Et
+                        </label>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                        <button type="button" class="btn btn-sm" onclick="testTelegramConnection()">🚀 Test Mesajı</button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="saveSettings()">💾 Ayarları Kaydet</button>
+                    </div>
+                </div>
+
+                <!-- Kullanıcı Yönetimi Kartı -->
+                <div class="settings-card">
+                    <div style="border-bottom:1px solid var(--border); padding-bottom:6px;">
+                        <h3 style="margin:0; font-size:0.95rem;">👥 Telegram İzinleri</h3>
+                        <p style="margin:2px 0 0 0; color:var(--muted); font-size:0.75rem;">
+                            Chat ID veya @kullanıcıadı ile yetkilendirin.
+                        </p>
+                    </div>
+
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="new-user-target" class="form-control" placeholder="Chat ID veya @kullanıcı" style="flex:1; font-size:0.82rem; padding:5px 8px;">
+                        <button class="btn btn-primary btn-sm" onclick="addUserTarget()">+ İzin Ver</button>
+                    </div>
+
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.8rem;">
+                            <thead>
+                                <tr style="border-bottom:1px solid var(--border); text-align:left; color:var(--muted);">
+                                    <th style="padding:6px;">Kullanıcı</th>
+                                    <th style="padding:6px;">Chat ID</th>
+                                    <th style="padding:6px;">Son Görülme</th>
+                                    <th style="padding:6px;">Durum</th>
+                                    <th style="padding:6px; text-align:right;">İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tg-users-table-body">
+                                {% for u in telegram_users %}
+                                <tr style="border-bottom:1px solid var(--border);">
+                                    <td style="padding:6px; font-weight:600;">
+                                        {{ u.first_name or 'İsimsiz' }}
+                                        {% if u.username %}
+                                        <span style="color:var(--accent); font-weight:normal;">(@{{ u.username }})</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding:6px; font-family:monospace; font-size:0.78rem;">{{ u.chat_id }}</td>
+                                    <td style="padding:6px; font-size:0.72rem; color:var(--muted);">{{ u.last_seen }}</td>
+                                    <td style="padding:6px;">
+                                        {% if u.is_allowed == 1 %}
+                                        <span style="background:#ecfdf5; color:#065f46; padding:1px 6px; border-radius:10px; font-size:0.7rem; font-weight:600;">✓ İzinli</span>
+                                        {% else %}
+                                        <span style="background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:10px; font-size:0.7rem; font-weight:600;">Bekliyor</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding:6px; text-align:right;">
+                                        <button class="btn btn-sm" onclick="toggleUserAllowed('{{ u.chat_id }}')" style="font-size:0.75rem; padding:2px 6px;">
+                                            {{ 'Kaldır' if u.is_allowed == 1 else '✓ İzin Ver' }}
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteUser('{{ u.chat_id }}')" title="Sil" style="padding:2px 6px;">🗑️</button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" style="padding:12px; text-align:center; color:var(--muted); font-size:0.78rem;">
+                                        Henüz kayıtlı kullanıcı yok.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:14px;">
+                <div class="settings-card">
+                    <h4 style="margin:0; font-size:0.88rem;">Canlı Bot Durumu</h4>
+                    <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:var(--surface3); border-radius:6px;">
+                        <span style="font-size:1.1rem;">{{ '🟢' if bot_status else '⚪' }}</span>
+                        <div>
+                            <div style="font-weight:700; font-size:0.85rem;">{{ 'Bot Çalışıyor' if bot_status else 'Bot Durduruldu' }}</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm" onclick="toggleBot()">
+                        {{ 'Botu Durdur' if bot_status else 'Botu Başlat' }}
+                    </button>
+                </div>
+
+                <div class="settings-card">
+                    <details style="cursor:pointer;">
+                        <summary style="font-weight:700; font-size:0.85rem; color:var(--text);">ℹ️ Bot Kurulum Rehberi</summary>
+                        <div style="font-size:0.78rem; color:var(--muted); margin-top:8px; display:flex; flex-direction:column; gap:6px; line-height:1.4;">
+                            <div>1. @BotFather üzerinden <code>/newbot</code> ile bot açın ve token'ı yapıştırın.</div>
+                            <div>2. Bota <code>/start</code> yazın, gelen Chat ID'yi izinler listesine ekleyin.</div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─────────────────────────────────────────────────────────────────
+         SEKME 3: 📥 DIŞARIDAN VERİ İÇE AKTAR & YEDEKLE
+         ───────────────────────────────────────────────────────────────── -->
+    <div class="settings-tab-panel" id="settings-tab-import">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+            <div class="settings-card">
+                <div style="border-bottom:1px solid var(--border); padding-bottom:8px;">
+                    <h3 style="margin:0; font-size:0.95rem; display:flex; align-items:center; gap:6px;">
+                        📥 OneNote / Keep / Evernote / To-Do Verilerini Aktar
+                    </h3>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:0.8rem;">Kaynak Uygulama</label>
+                        <select id="import-source" class="form-control" style="font-size:0.82rem; padding:5px 8px;">
+                            <option value="auto">✨ Otomatik Algıla</option>
+                            <option value="onenote">🟣 Microsoft OneNote (.onepkg / .htm / .zip)</option>
+                            <option value="google_keep">🟡 Google Keep (.zip / .json)</option>
+                            <option value="evernote">🐘 Evernote (.enex)</option>
+                            <option value="microsoft">🔵 Microsoft To-Do (.csv / .json)</option>
+                            <option value="markdown">📝 Markdown (.md / .zip)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:0.8rem;">Hedef Kategori</label>
+                        <select id="import-category" class="form-control" style="font-size:0.82rem; padding:5px 8px;">
+                            <option value="">📁 Otomatik ("İçe Aktarılanlar")</option>
+                            {% for c in categories %}
+                            <option value="{{ c.id }}">{{ c.icon }} {{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="import-dropzone" id="import-dropzone" onclick="document.getElementById('import-file-input').click()">
+                    <input type="file" id="import-file-input" style="display:none;" accept=".zip,.enex,.json,.csv,.md,.txt,.onepkg,.htm,.html" onchange="handleFileSelected(this)">
+                    <div style="font-size:1.3rem; margin-bottom:2px;">📂</div>
+                    <div id="dropzone-text" style="font-weight:600; font-size:0.82rem; color:var(--text);">Dosyayı sürükleyin veya seçin</div>
+                    <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">Desteklenen: .zip, .onepkg, .htm, .enex, .json, .csv, .md</div>
+                </div>
+
+                <div id="import-status-box" style="display:none; padding:8px; border-radius:6px; font-size:0.8rem;"></div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div id="selected-file-info" style="font-size:0.78rem; color:var(--muted);">Henüz dosya seçilmedi</div>
+                    <button type="button" class="btn btn-primary btn-sm" id="btn-start-import" onclick="startImport()" disabled>
+                        🚀 İçe Aktar
+                    </button>
+                </div>
+
+                <!-- Tüm Verileri Yedekle -->
+                <div style="margin-top:12px; padding:10px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <div>
+                        <div style="font-weight:600; font-size:0.82rem; display:flex; align-items:center; gap:4px;">
+                            📦 Tüm Sistemi Yedekle (Dışa Aktar)
+                        </div>
+                        <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">
+                            Tüm not defterlerini, kategorileri, sayfaları, finans ve projeleri tek bir ZIP arşivi olarak indirin.
+                        </div>
+                    </div>
+                    <a href="/notes/api/export/backup" class="btn btn-sm" style="text-decoration:none; padding:6px 12px; font-size:0.78rem; white-space:nowrap; background:var(--surface3); border:1px solid var(--border); font-weight:600;">
+                        ⬇️ Yedek İndir (.zip)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Not Defteri Ekle / Düzenle -->
+<div class="tnote-modal-backdrop" id="modal-edit-notebook" style="display:none;" onclick="if(event.target===this) closeNotebookModal()">
+    <div class="tnote-modal" style="max-width:450px;">
+        <div class="modal-header">
+            <span id="nb-modal-title">📓 Yeni Not Defteri</span>
+            <button class="btn-icon" onclick="closeNotebookModal()">✕</button>
+        </div>
+        <form onsubmit="submitSaveNotebook(event)">
+            <input type="hidden" id="nb-modal-id">
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
+                <div class="form-group">
+                    <label>Not Defteri Adı *</label>
+                    <input type="text" id="nb-modal-name" class="form-control" placeholder="Örn: Kişisel, İş & Projeler..." required>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="form-group">
+                        <label>İkon (Emoji)</label>
+                        <input type="text" id="nb-modal-icon" class="form-control" value="📓">
+                    </div>
+                    <div class="form-group">
+                        <label>Renk</label>
+                        <input type="color" id="nb-modal-color" value="#3b82f6" style="height:38px; border:1px solid var(--border); border-radius:6px; width:100%; cursor:pointer;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Açıklama (Opsiyonel)</label>
+                    <textarea id="nb-modal-desc" class="form-control" placeholder="Defter içeriği veya kullanım amacı..." style="min-height:70px;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top:12px; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn" onclick="closeNotebookModal()">İptal</button>
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Sekme Değiştirme
+function switchSettingsTab(tabName) {
+    document.querySelectorAll('.settings-tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
+
+    const panel = document.getElementById(`settings-tab-${tabName}`);
+    if (panel) panel.classList.add('active');
+
+    const btn = document.getElementById(`tab-btn-${tabName}`);
+    if (btn) btn.classList.add('active');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab') || 'notebooks';
+    switchSettingsTab(tab);
+});
+
+// Not Defteri Ekle / Düzenle Modal
+function openCreateNotebookModal() {
+    document.getElementById('nb-modal-id').value = '';
+    document.getElementById('nb-modal-title').innerText = '📓 Yeni Not Defteri Oluştur';
+    document.getElementById('nb-modal-name').value = '';
+    document.getElementById('nb-modal-icon').value = '📓';
+    document.getElementById('nb-modal-color').value = '#3b82f6';
+    document.getElementById('nb-modal-desc').value = '';
+    document.getElementById('modal-edit-notebook').style.display = 'flex';
+}
+
+function openEditNotebookModal(id, name, icon, color, desc) {
+    document.getElementById('nb-modal-id').value = id;
+    document.getElementById('nb-modal-title').innerText = '✏️ Not Defterini Düzenle';
+    document.getElementById('nb-modal-name').value = name;
+    document.getElementById('nb-modal-icon').value = icon || '📓';
+    document.getElementById('nb-modal-color').value = color || '#3b82f6';
+    document.getElementById('nb-modal-desc').value = desc || '';
+    document.getElementById('modal-edit-notebook').style.display = 'flex';
+}
+
+function closeNotebookModal() {
+    document.getElementById('modal-edit-notebook').style.display = 'none';
+}
+
+async function submitSaveNotebook(e) {
+    if (e) e.preventDefault();
+    const id = document.getElementById('nb-modal-id').value;
+    const name = document.getElementById('nb-modal-name').value.trim();
+    const icon = document.getElementById('nb-modal-icon').value.trim() || '📓';
+    const color = document.getElementById('nb-modal-color').value || '#3b82f6';
+    const description = document.getElementById('nb-modal-desc').value.trim();
+
+    if (!name) {
+        alert('Lütfen defter adını girin.');
+        return;
+    }
+
+    const url = id ? `/notes/api/notebooks/${id}` : '/notes/api/notebooks';
+    const method = id ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, icon, color, description })
+    });
+    const data = await res.json();
+    if (data.ok) {
+        closeNotebookModal();
+        window.location.reload();
+    } else {
+        alert(data.error || 'Kaydedilemedi.');
+    }
+}
+
+async function deleteNotebookFromSettings(id, name) {
+    if (!confirm(`"${name}" not defterini ve içindeki tüm kategorileri silmek istediğinize emin misiniz?`)) return;
+
+    const res = await fetch(`/notes/api/notebooks/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.ok) {
+        window.location.reload();
+    } else {
+        alert(data.error || 'Silinemedi.');
+    }
+}
+
+function exportNotebook(nbId) {
+    window.location.href = `/notes/api/notebooks/${nbId}/export`;
+}
+
+async function handleNotebookImport(inputEl) {
+    const file = inputEl.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch('/notes/api/notebooks/import', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.ok) {
+            alert('🎉 Not defteri başarıyla içe aktarıldı!');
+            window.location.href = `/notes?notebook_id=${data.id}`;
+        } else {
+            alert('❌ Hata: ' + (data.error || 'İçe aktarılamadı.'));
+        }
+    } catch (e) {
+        alert('Bağlantı hatası: ' + e.message);
+    }
+}
+
+async function switchNotebook(nbId) {
+    await fetch('/notes/api/notebooks/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notebook_id: nbId })
+    });
+    window.location.href = `/notes?notebook_id=${nbId}`;
+}
+
+// Telegram ve Diğer Fonksiyonlar
+async function saveSettings() {
+    const token = document.getElementById('cfg-token').value.trim();
+    const defaultPageId = document.getElementById('cfg-default-page').value;
+    const enabled = document.getElementById('cfg-telegram-enabled').checked ? '1' : '0';
+    const uiNotify = document.getElementById('cfg-ui-notify').checked ? '1' : '0';
+
+    const res = await fetch('/notes/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            telegram_bot_token: token,
+            telegram_default_page_id: defaultPageId,
+            telegram_enabled: enabled,
+            ui_notify_enabled: uiNotify
+        })
+    });
+    const data = await res.json();
+    if (data.ok) {
+        alert("✅ Ayarlar kaydedildi!");
+        window.location.reload();
+    } else {
+        alert("❌ Hata: " + (data.error || "Bilinmeyen hata"));
+    }
+}
+
+async function testTelegramConnection() {
+    const res = await fetch('/notes/api/telegram/test', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+        alert("✅ " + data.message);
+    } else {
+        alert("❌ Hata: " + data.error);
+    }
+}
+
+async function toggleBot() {
+    const res = await fetch('/notes/api/telegram/toggle', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+        window.location.reload();
+    } else {
+        alert("Hata: " + data.error);
+    }
+}
+
+async function addUserTarget() {
+    const input = document.getElementById('new-user-target');
+    const target = input.value.trim();
+    if (!target) return;
+
+    const res = await fetch('/notes/api/telegram/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: target })
+    });
+    const data = await res.json();
+    if (data.ok) {
+        window.location.reload();
+    } else {
+        alert("Hata: " + data.error);
+    }
+}
+
+async function toggleUserAllowed(chatId) {
+    const res = await fetch(`/notes/api/telegram/users/${chatId}/toggle`, { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) window.location.reload();
+}
+
+async function deleteUser(chatId) {
+    if (!confirm("Kullanıcıyı silmek istediğinize emin misiniz?")) return;
+    const res = await fetch(`/notes/api/telegram/users/${chatId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.ok) window.location.reload();
+}
+
+// Dosya İçe Aktarma Dropzone
+let selectedImportFile = null;
+function handleFileSelected(input) {
+    if (input.files && input.files.length > 0) {
+        selectedImportFile = input.files[0];
+        updateDropzoneUI();
+    }
+}
+
+function updateDropzoneUI() {
+    const dropzoneText = document.getElementById('dropzone-text');
+    const infoText = document.getElementById('selected-file-info');
+    const btn = document.getElementById('btn-start-import');
+
+    if (selectedImportFile) {
+        const sizeKb = Math.round(selectedImportFile.size / 1024);
+        dropzoneText.innerHTML = `📄 <strong>${selectedImportFile.name}</strong> (${sizeKb} KB)`;
+        infoText.innerHTML = `Seçili: ${selectedImportFile.name}`;
+        btn.disabled = false;
+    }
+}
+
+const dropzone = document.getElementById('import-dropzone');
+['dragenter', 'dragover'].forEach(eventName => {
+    dropzone?.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+    }, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+    dropzone?.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+    }, false);
+});
+
+dropzone?.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files && files.length > 0) {
+        selectedImportFile = files[0];
+        updateDropzoneUI();
+    }
+});
+
+async function startImport() {
+    if (!selectedImportFile) {
+        alert("Lütfen önce bir dosya seçin.");
+        return;
+    }
+
+    const btn = document.getElementById('btn-start-import');
+    const statusBox = document.getElementById('import-status-box');
+    const sourceSelect = document.getElementById('import-source');
+    const categorySelect = document.getElementById('import-category');
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Aktarılıyor...';
+    statusBox.style.display = 'block';
+    statusBox.style.background = 'var(--surface2)';
+    statusBox.style.color = 'var(--text)';
+    statusBox.style.border = '1px solid var(--border)';
+    statusBox.innerHTML = '🔄 Dosya yükleniyor ve TincNote formatına dönüştürülüyor... Lütfen bekleyin.';
+
+    const formData = new FormData();
+    formData.append('file', selectedImportFile);
+    formData.append('source_type', sourceSelect.value);
+    if (categorySelect.value) {
+        formData.append('target_category_id', categorySelect.value);
+    }
+
+    try {
+        const res = await fetch('/notes/api/import', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+            statusBox.style.background = '#ecfdf5';
+            statusBox.style.color = '#065f46';
+            statusBox.style.border = '1px solid #a7f3d0';
+            statusBox.innerHTML = `🎉 <strong>Başarılı!</strong> Toplam <strong>${data.imported_count || 0}</strong> adet sayfa aktarıldı.`;
+            setTimeout(() => {
+                window.location.href = '/notes';
+            }, 1200);
+        } else {
+            statusBox.style.background = '#fef2f2';
+            statusBox.style.color = '#991b1b';
+            statusBox.style.border = '1px solid #fecaca';
+            statusBox.innerHTML = `❌ <strong>Hata:</strong> ${data.error || 'İçe aktarma tamamlanamadı.'}`;
+        }
+    } catch (e) {
+        statusBox.style.background = '#fef2f2';
+        statusBox.style.color = '#991b1b';
+        statusBox.style.border = '1px solid #fecaca';
+        statusBox.innerHTML = `❌ <strong>Bağlantı Hatası:</strong> ${e.message}`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🚀 İçe Aktar';
+    }
+}
+</script>
+{% endblock %}

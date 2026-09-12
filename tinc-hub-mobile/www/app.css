@@ -1,0 +1,1466 @@
+/**
+ * TincNote Mobile CSS — Aydınlık (Light) Tema & Floating Sidebar Drawer
+ * Web sürümüyle %100 uyumlu, OneNote & Keep kalitesinde mobil deneyim.
+ */
+
+:root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface2: #f1f5f9;
+    --surface3: #e2e8f0;
+    --border: #e2e8f0;
+    --border-subtle: #f8fafc;
+    --text: #0f172a;
+    --text-secondary: #334155;
+    --muted: #64748b;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-light: #eff6ff;
+    --success: #10b981;
+    --success-light: #ecfdf5;
+    --warning: #f59e0b;
+    --warning-light: #fffbeb;
+    --danger: #ef4444;
+    --danger-light: #fef2f2;
+    --purple: #8b5cf6;
+    --purple-light: #f5f3ff;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow: 0 2px 6px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+}
+
+* {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+input, textarea, [contenteditable="true"], select {
+    user-select: text;
+    font-family: inherit;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    background-color: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+    overflow-x: hidden;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Üst Bar (Top Bar / Header)
+   ───────────────────────────────────────────────────────────────────────────── */
+.top-bar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    box-shadow: var(--shadow-sm);
+}
+
+.top-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.menu-toggle-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s;
+}
+
+.menu-toggle-btn:active {
+    background: var(--surface3);
+}
+
+.top-header-title-box {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.top-header-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.top-header-subtitle {
+    font-size: 0.72rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.icon-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.icon-btn:active {
+    background: var(--surface3);
+    transform: scale(0.96);
+}
+
+.icon-btn.primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.sync-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.sync-badge.online { color: var(--success); background: var(--success-light); border-color: rgba(16, 185, 129, 0.3); }
+.sync-badge.syncing { color: var(--warning); background: var(--warning-light); border-color: rgba(245, 158, 11, 0.3); }
+.sync-badge.offline { color: var(--muted); }
+.sync-badge.error { color: var(--danger); background: var(--danger-light); border-color: rgba(239, 68, 68, 0.3); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Sol Floating Drawer (Çekmece Menü)
+   ───────────────────────────────────────────────────────────────────────────── */
+.sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.sidebar-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sidebar-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(320px, 86vw);
+    background: var(--surface);
+    z-index: 101;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+    border-right: 1px solid var(--border);
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+}
+
+.sidebar-drawer.open {
+    transform: translateX(0);
+}
+
+.drawer-header {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #ffffff;
+}
+
+.drawer-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.drawer-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    font-size: 1.15rem;
+    color: var(--text);
+    letter-spacing: -0.3px;
+}
+
+.drawer-brand-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2563eb, #8b5cf6);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+}
+
+.drawer-close-btn {
+    background: none;
+    border: none;
+    font-size: 1.15rem;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.drawer-close-btn:active {
+    background: var(--surface2);
+}
+
+/* Not Defteri Seçici Dropdown (OneNote Stili) */
+.drawer-notebook-box {
+    position: relative;
+}
+
+.notebook-selector-btn {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.notebook-selector-btn:active {
+    background: var(--surface3);
+}
+
+.notebook-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+    z-index: 120;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 6px;
+    display: none;
+}
+
+.notebook-dropdown-menu.active {
+    display: block;
+}
+
+.notebook-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: var(--text);
+    transition: background 0.1s;
+}
+
+.notebook-item:active, .notebook-item.active {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.notebook-add-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin-top: 4px;
+    border-top: 1px dashed var(--border);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.84rem;
+    cursor: pointer;
+}
+
+.drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.drawer-quick-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.drawer-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.drawer-nav-link:active, .drawer-nav-link.active {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+
+.drawer-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 0 4px;
+}
+
+.drawer-cat-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.drawer-cat-group {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--surface);
+}
+
+.drawer-cat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    cursor: pointer;
+    background: var(--surface2);
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--text);
+    transition: background 0.15s;
+}
+
+.drawer-cat-header:active {
+    background: var(--surface3);
+}
+
+.drawer-cat-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.drawer-cat-arrow {
+    font-size: 0.7rem;
+    color: var(--muted);
+    transition: transform 0.2s ease;
+    display: inline-block;
+}
+
+.drawer-cat-group.open .drawer-cat-arrow {
+    transform: rotate(90deg);
+}
+
+.drawer-cat-pages {
+    display: none;
+    flex-direction: column;
+    background: #ffffff;
+    border-top: 1px solid var(--border);
+}
+
+.drawer-cat-group.open .drawer-cat-pages {
+    display: flex;
+}
+
+.drawer-page-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px 8px 30px;
+    cursor: pointer;
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.1s;
+}
+
+.drawer-page-item:last-child {
+    border-bottom: none;
+}
+
+.drawer-page-item:active, .drawer-page-item.active {
+    background: var(--accent-light);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.drawer-add-page-btn {
+    padding: 6px 12px 6px 30px;
+    font-size: 0.78rem;
+    color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+    background: #fafafa;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.drawer-footer {
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    background: var(--surface);
+}
+
+.drawer-footer-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.drawer-footer-btn:active {
+    background: var(--surface3);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Ana İçerik Alanı & Sayfa Görünümleri
+   ───────────────────────────────────────────────────────────────────────────── */
+.main-view {
+    display: none;
+    padding: 14px;
+    max-width: 800px;
+    margin: 0 auto;
+    animation: fadeIn 0.18s ease;
+}
+
+.main-view.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   1. Sayfa (Checklist & Not) Görünümü
+   ───────────────────────────────────────────────────────────────────────────── */
+.page-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.page-header-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.page-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.page-badge-category {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-light);
+    padding: 3px 8px;
+    border-radius: 6px;
+    display: inline-block;
+}
+
+.page-title-input {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text);
+    border: none;
+    outline: none;
+    background: transparent;
+    width: 100%;
+    padding: 0;
+}
+
+.page-progress-bar-wrap {
+    background: var(--surface2);
+    border-radius: 6px;
+    height: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.page-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #10b981, #059669);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.page-progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+/* Yapışkan Hızlı Madde Ekleme Kutusu */
+.quick-add-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px 8px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+}
+
+.quick-add-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 0.95rem;
+    color: var(--text);
+    padding: 6px 8px;
+}
+
+.quick-add-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.quick-add-btn:active {
+    background: var(--accent-hover);
+}
+
+/* Checklist Maddeleri */
+.checklist-items-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.checklist-item-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.15s;
+}
+
+.checklist-item-card.done {
+    opacity: 0.65;
+    background: #fafafa;
+}
+
+.checkbox-custom {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 2px solid #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-top: 1px;
+    transition: all 0.15s;
+}
+
+.checklist-item-card.done .checkbox-custom {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+}
+
+.checklist-item-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.checklist-item-title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+    word-break: break-word;
+    line-height: 1.35;
+}
+
+.checklist-item-card.done .checklist-item-title {
+    text-decoration: line-through;
+    color: var(--muted);
+}
+
+.checklist-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 0.78rem;
+}
+
+.meta-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.meta-badge.price {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+.meta-badge.url {
+    background: var(--accent-light);
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.checklist-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.item-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.item-action-btn:active {
+    background: var(--surface2);
+    color: var(--danger);
+}
+
+/* Not Görünümü (Metin Notu) */
+.note-editor-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+.note-textarea {
+    width: 100%;
+    min-height: 360px;
+    border: none;
+    outline: none;
+    resize: vertical;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--text);
+    background: transparent;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   2. Özet Dashboard Görünümü
+   ───────────────────────────────────────────────────────────────────────────── */
+.overview-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.overview-welcome {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: white;
+    padding: 18px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.welcome-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin: 0;
+}
+
+.welcome-subtitle {
+    font-size: 0.85rem;
+    opacity: 0.88;
+    margin-top: 4px;
+}
+
+.overview-kpi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow-sm);
+    cursor: pointer;
+}
+
+.kpi-icon-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.kpi-icon-badge.blue { background: var(--accent-light); color: var(--accent); }
+.kpi-icon-badge.amber { background: var(--warning-light); color: var(--warning); }
+.kpi-icon-badge.purple { background: var(--purple-light); color: var(--purple); }
+.kpi-icon-badge.green { background: var(--success-light); color: var(--success); }
+
+.kpi-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.kpi-val {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.1;
+}
+
+.kpi-label {
+    font-size: 0.74rem;
+    color: var(--muted);
+}
+
+.overview-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+}
+
+.overview-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.section-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.overview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.overview-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--surface2);
+    cursor: pointer;
+    font-size: 0.88rem;
+}
+
+.empty-hint {
+    text-align: center;
+    padding: 18px;
+    font-size: 0.82rem;
+    color: var(--muted);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   3. Kasa (Vault) Görünümü
+   ───────────────────────────────────────────────────────────────────────────── */
+.vault-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.vault-top-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.vault-scope-filter {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+}
+
+.scope-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.scope-pill.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.vault-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vault-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vault-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vault-card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vault-field-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+}
+
+.vault-field-val {
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   4. Ayarlar & Yönetim Görünümü
+   ───────────────────────────────────────────────────────────────────────────── */
+.settings-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 12px;
+}
+
+.settings-section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 0 0 10px 0;
+    color: var(--text);
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.form-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.input-text {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 0.92rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.input-text:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.btn {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:active { background: var(--accent-hover); }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:active { background: var(--surface3); }
+.btn-danger { background: var(--danger); color: white; }
+.btn-ghost { background: transparent; color: var(--muted); }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Modal Dialoglar
+   ───────────────────────────────────────────────────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 480px;
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+
+.modal-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 0.82rem;
+    border-radius: 6px;
+}
+
+.btn-xs {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   5. Finans & Bütçe Modülü Mobil Stilleri
+   ───────────────────────────────────────────────────────────────────────────── */
+.fin-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.fin-kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.fin-kpi-card.income { border-left: 4px solid var(--success); }
+.fin-kpi-card.expense { border-left: 4px solid var(--danger); }
+.fin-kpi-card.balance { border-left: 4px solid var(--accent); }
+.fin-kpi-card.unpaid { border-left: 4px solid var(--warning); }
+
+.fin-kpi-title {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.fin-kpi-val {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.fin-kpi-card.income .fin-kpi-val { color: var(--success); }
+.fin-kpi-card.expense .fin-kpi-val { color: var(--danger); }
+.fin-kpi-card.unpaid .fin-kpi-val { color: var(--warning); }
+
+.fin-kpi-sub {
+    font-size: 0.74rem;
+    color: var(--muted);
+}
+
+.fin-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    box-shadow: var(--shadow-sm);
+}
+
+.fin-period-box {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fin-period-text {
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--text);
+    min-width: 65px;
+    text-align: center;
+}
+
+.fin-filter-tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.fin-entries-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fin-entry-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    transition: transform 0.1s;
+}
+
+.fin-entry-card:active {
+    transform: scale(0.99);
+}
+
+.fin-entry-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.fin-entry-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fin-entry-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fin-entry-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.76rem;
+    color: var(--muted);
+}
+
+.fin-entry-pill {
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--surface2);
+    font-weight: 600;
+    font-size: 0.72rem;
+}
+
+.fin-entry-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.fin-entry-amount {
+    font-size: 1.05rem;
+    font-weight: 800;
+}
+
+.fin-entry-amount.income { color: var(--success); }
+.fin-entry-amount.expense { color: var(--danger); }
+
+.fin-pay-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.fin-pay-btn.paid {
+    background: var(--success-light);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.fin-pay-btn.unpaid {
+    background: var(--warning-light);
+    color: var(--warning);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   6. Proje & Atölye Modülü Mobil Stilleri
+   ───────────────────────────────────────────────────────────────────────────── */
+.project-header-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.project-mini-kpis {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.project-mini-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.project-mini-pill .pill-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+.project-mini-pill .pill-value {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--text);
+}
+
+.project-progress-track {
+    width: 100%;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.project-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #8b5cf6);
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
+.project-tabs-nav {
+    display: flex;
+    gap: 6px;
+    background: var(--surface2);
+    padding: 4px;
+    border-radius: var(--radius);
+}
+
+.project-tab-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--muted);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+}
+
+.project-tab-btn.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+}
+
+.project-milestone-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.project-milestone-card.completed {
+    opacity: 0.85;
+    background: #fdfefe;
+}
+
+.project-milestone-card.completed .ms-title {
+    text-decoration: line-through;
+    color: var(--muted);
+}
+
+.project-material-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.mat-status-pill {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.mat-status-pill.needed {
+    background: var(--warning-light);
+    color: var(--warning);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.mat-status-pill.ordered {
+    background: var(--accent-light);
+    color: var(--accent);
+    border: 1px solid rgba(37, 99, 235, 0.3);
+}
+
+.mat-status-pill.available {
+    background: var(--success-light);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+

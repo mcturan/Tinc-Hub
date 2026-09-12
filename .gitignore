@@ -7,3 +7,12 @@ __pycache__/
 *.swo
 .DS_Store
 backups/
+node_modules/
+.gradle/
+build/
+*.apk
+*.log
+*.db
+*.sqlite3
+TNOTE/data/*.db
+TNOTE/data/uploads/

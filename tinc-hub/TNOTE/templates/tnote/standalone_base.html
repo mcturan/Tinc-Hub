@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TNOTE — Notlar & Listeler{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('tnote.static', filename='css/tnote.css') }}">
+    <style>
+        :root {
+            --bg: #f4f6f9;
+            --surface: #ffffff;
+            --surface2: #e9ecef;
+            --surface3: #f8f9fa;
+            --border: #dee2e6;
+            --text: #212529;
+            --muted: #6c757d;
+            --accent: #0d6efd;
+            --green: #198754;
+            --yellow: #ffc107;
+            --red: #dc3545;
+            --radius: 10px;
+            --radius-sm: 6px;
+            --shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        header.standalone-header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .header-logo {
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+        .header-nav {
+            display: flex;
+            gap: 16px;
+        }
+        .header-nav a {
+            text-decoration: none;
+            color: var(--text);
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+        }
+        .header-nav a.active, .header-nav a:hover {
+            background: var(--surface2);
+            color: var(--accent);
+        }
+        main {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header class="standalone-header">
+        <a href="/notes" class="header-logo">
+            <span>📝</span> TNOTE <strong>App</strong>
+        </a>
+        <nav class="header-nav">
+            <a href="/notes" class="{% if request.path == '/notes' or request.path == '/notes/' %}active{% endif %}">📋 Notlar & Listeler</a>
+            <a href="/notes/settings" class="{% if request.path.startswith('/notes/settings') %}active{% endif %}">⚙️ Telegram & Ayarlar</a>
+        </nav>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

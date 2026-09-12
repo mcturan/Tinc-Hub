@@ -2,115 +2,142 @@
 {% set refresh = 60 %}
 
 {% macro render_app_card(app) %}
-<div class="app-card {{ app.status_class }}" onclick="if(!event.target.closest('button') && !event.target.closest('a.btn')) window.location.href='/app/{{ app.id }}'">
-    <button class="pin-btn {% if app.pinned %}pinned{% endif %}" onclick="togglePin('{{ app.id }}', {{ 'true' if app.pinned else 'false' }})" title="Sabitle/Kaldır">📌</button>
-    
-    <div class="card-main">
-        <div class="card-icon">{{ app.icon or '📦' }}</div>
-        <div class="card-title">
-            <div class="card-name">{{ app.name }}</div>
-            <div class="card-desc">{{ app.description or 'Açıklama yok' }}</div>
-            {% if app.children %}
-            <div style="font-size: 0.7rem; color: var(--accent); margin-top: 4px; font-weight: 600;">
-                ↘️ Bağlı Uygulamalar: {{ app.children|map(attribute='name')|join(', ') }}
+<div class="casa-app-card {{ app.status_class }}" onclick="handleCardClick(event, '{{ app.url or '' }}', '{{ app.id }}')">
+    <div class="casa-app-top">
+        <div class="casa-status-indicator" title="Durum: {{ 'Çalışıyor' if app.status_class == 'healthy' else ('Durdu' if app.status_class == 'dead' else 'Bilinmiyor') }}">
+            <span class="casa-status-dot {{ app.status_class }}"></span>
+            {% if app.pinned %}<span class="casa-pin-badge" title="Öne Çıkarıldı">📌</span>{% endif %}
+        </div>
+        <button class="casa-app-menu-btn" onclick="toggleAppMenu(event, '{{ app.id }}')" title="Seçenekler">⋮</button>
+        
+        <!-- CasaOS 3-Dots Dropdown Menu -->
+        <div class="casa-dropdown-menu" id="menu-{{ app.id }}" onclick="event.stopPropagation()">
+            <div class="casa-menu-header">
+                <strong>{{ app.name }}</strong>
+                {% if app.port %}<span class="casa-port-tag">:{{ app.port }}</span>{% endif %}
             </div>
+            <a {% if app.url %}href="{{ app.url }}" target="_blank"{% else %}href="#" onclick="alert('Bu uygulamanın web arayüzü (URL) yapılandırılmamış.'); return false;"{% endif %} class="casa-menu-item {% if not app.url %}disabled{% endif %}">
+                <span>↗️</span> Tarayıcıda Aç
+            </a>
+            <button onclick="editApp('{{ app.id }}')" class="casa-menu-item">
+                <span>⚙️</span> Yapılandır &amp; Port
+            </button>
+            <button onclick="serviceAction('{{ app.id }}', 'restart')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                <span>⟳</span> Yeniden Başlat
+            </button>
+            {% if app.status_class == 'healthy' %}
+            <button onclick="serviceAction('{{ app.id }}', 'stop')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                <span>⏹️</span> Servisi Durdur
+            </button>
+            {% else %}
+            <button onclick="serviceAction('{{ app.id }}', 'start')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                <span>▶️</span> Servisi Başlat
+            </button>
             {% endif %}
-            <div style="font-size: 0.7rem; color: var(--muted); margin-top: 4px;">
-                {% if app.repo %}🔗 Kaynak: <a href="https://{{ app.repo }}" target="_blank" onclick="event.stopPropagation()">{{ app.repo }}</a>{% else %}⚙️ Sistem Servisi{% endif %}
-            </div>
+            <a {% if app.service %}href="/logs?service={{ app.service }}"{% else %}href="#" onclick="alert('Log bağlantısı yok.'); return false;"{% endif %} class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                <span>📜</span> Canlı Loglar
+            </a>
+            <button onclick="openTerminalFor('{{ app.service }}')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                <span>💻</span> Terminal / Shell
+            </button>
+            <div class="casa-menu-divider"></div>
+            <button onclick="togglePin('{{ app.id }}', {{ 'true' if app.pinned else 'false' }})" class="casa-menu-item">
+                <span>📌</span> {{ 'Sabitlemeyi Kaldır' if app.pinned else 'Panoya Sabitle' }}
+            </button>
+            {% if app.id != "tinc-hub" %}
+            <button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="casa-menu-item danger">
+                <span>🗑️</span> Panodan Sil
+            </button>
+            {% endif %}
         </div>
     </div>
     
-    <div class="card-meta-info">
-        <div>Durum: <span class="status-badge {{ app.status_class }}">
-            {% if app.status_class == 'healthy' %}🟢 Çalışıyor
-            {% elif app.status_class == 'dead' %}🔴 Durdu
-            {% else %}🟡 Bilinmiyor{% endif %}
-        </span></div>
-        <div>Kategori: <strong>{{ app.category or 'Uygulama' }}</strong></div>
-        {% if app.port %}<div>Port: <strong>{{ app.port }}</strong></div>{% endif %}
-        {% if app.since %}<div>Uptime: <strong>{{ format_uptime(app.since) }}</strong></div>{% endif %}
-        {% if app.cpu_percent is not none %}
-        <div style="margin-top: 4px; font-size: 0.75rem;">
-            CPU: <strong>{{ app.cpu_percent }}%</strong> 
-            <span style="color:var(--muted)">(Min: {{ app.metrics_history.cpu_min or 0 }}% / Max: {{ app.metrics_history.cpu_max or 0 }}%)</span>
-        </div>
-        {% endif %}
-        {% if app.ram_mb is not none %}
-        <div style="font-size: 0.75rem;">
-            RAM: <strong>{{ app.ram_mb }} MB</strong> 
-            <span style="color:var(--muted)">(Min: {{ app.metrics_history.ram_min or 0 }} MB / Max: {{ app.metrics_history.ram_max or 0 }} MB)</span>
-        </div>
-        {% endif %}
+    <div class="casa-app-icon-wrap">
+        {{ app.icon or '📦' }}
     </div>
-
-    <div class="card-actions">
-        <a {% if app.url %}href="{{ app.url }}" target="_blank"{% else %}href="#" onclick="alert('Bu uygulamanın web arayüzü (URL) yapılandırılmamış.'); return false;"{% endif %} class="btn btn-sm btn-icon {% if not app.url %}btn-disabled{% endif %}" title="Uygulamayı tarayıcıda aç">↗ Aç</a>
+    
+    <div class="casa-app-name" title="{{ app.name }}">{{ app.name }}</div>
+    
+    <div class="casa-app-meta">
+        {% if app.port %}
+        <span class="casa-port-tag">:{{ app.port }}</span>
+        {% else %}
+        <span class="casa-cat-tag">{{ app.category or 'Uygulama' }}</span>
+        {% endif %}
         
-        <button onclick="{% if app.service %}serviceAction('{{ app.id }}', 'restart'){% else %}alert('Bu uygulama bir systemd servisiyle ilişkilendirilmemiş.');{% endif %}" class="btn btn-sm btn-icon {% if not app.service %}btn-disabled{% endif %}" title="Servisi yeniden başlat">⟳ Yeniden Başlat</button>
-        
-        <a {% if app.service %}href="/logs?service={{ app.service }}"{% else %}href="#" onclick="alert('Bu uygulama için log dosyası bağlantısı yok.'); return false;"{% endif %} class="btn btn-sm btn-icon {% if not app.service %}btn-disabled{% endif %}" title="Canlı logları görüntüle">📜 Log</a>
-        
-        <button onclick="openTerminalFor('{{ app.service }}')" class="btn btn-sm btn-icon {% if not app.service %}btn-disabled{% endif %}" title="Terminal aç">💻 Shell</button>
-        
-        <button onclick="editApp('{{ app.id }}')" class="btn btn-sm btn-icon" title="Uygulama ayarlarını düzenle">✏️ Düzenle</button>
-        
-        <button onclick="updateApp('{{ app.id }}', '{{ app.name }}', '{{ app.repo or '' }}')" class="btn btn-sm btn-icon" title="Github'dan en güncel sürümü çek ve yeniden kur">⬇️ Güncelle</button>
-        
-        {% if app.id == "tinc-hub" %}<button onclick="alert('Tinc Hub ana sistem bilesenidir, silinemez.')" class="btn btn-sm btn-icon btn-disabled">🗑 Sil</button>{% else %}<button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="btn btn-sm btn-icon btn-danger" title="Uygulamayı panodan sil">🗑 Sil</button>{% endif %}
+        {% if app.cpu_percent is not none and app.cpu_percent > 0 %}
+        <span class="casa-cpu-tag" title="CPU">{{ app.cpu_percent }}%</span>
+        {% endif %}
     </div>
 </div>
 {% endmacro %}
 
 {% block content %}
-<div class="section-header" style="margin-bottom: 20px;">
-    <h2>Tinc Hub - Sistem Merkezi</h2>
-    <div class="actions">
+<div class="casa-hero-header">
+    <div class="casa-greeting-box">
+        <div class="casa-greeting-title">
+            <span>👋</span> <span>Tinc Hub</span> <span class="casa-system-badge">OS</span>
+        </div>
+        <div class="casa-greeting-sub">
+            Makineleriniz, mikroservisleriniz ve otomasyonlarınız tek çatı altında
+        </div>
+    </div>
+    <div class="casa-header-actions">
         {% if role == "admin" %}
-        <button onclick="runSystemAudit()" class="btn" style="background-color: #f59e0b; color: white;" title="Sistemi Denetle (Akıllı Ajan)">🔍 Denetle</button>
-        <button onclick="openSettingsModal()"
-         class="btn" style="background-color: #475569; color: white;">⚙️ Ayarlar</button>
-        <button onclick="openStoreModal()" class="btn" title="Uygulama Mağazası" style="background-color: #8b5cf6; color: white;">🛒 App Store</button>
-        <button onclick="openAddModal()" class="btn btn-primary" title="Yeni uygulama, docker container veya sistem servisi ekle">+ Yeni Ekle</button>
+        <button onclick="runSystemAudit()" class="btn btn-sm" style="background-color: #f59e0b; color: white;" title="Sistemi Denetle (Akıllı Ajan)">🔍 Denetle</button>
+        <button onclick="openSettingsModal()" class="btn btn-sm" style="background-color: #475569; color: white;">⚙️ Ayarlar</button>
+        <button onclick="openStoreModal()" class="btn btn-sm" style="background-color: #8b5cf6; color: white;" title="Uygulama Mağazası">🛒 App Store</button>
+        <button onclick="openAddModal()" class="btn btn-primary btn-sm" title="Yeni uygulama, mikroservis veya web linki ekle">➕ Uygulama Ekle</button>
         {% endif %}
     </div>
 </div>
 
-<!-- Faz 1: Sistem Monitörü (Lego 1) -->
-<div class="system-monitor-widget" style="display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap;">
-    <div class="widget-box" style="flex: 1; min-width: 200px; background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-        <div style="font-size: 0.9rem; color: var(--muted); margin-bottom: 5px;">CPU Kullanımı</div>
-        <div style="display: flex; align-items: baseline; gap: 10px;">
-            <div id="sys-cpu-val" style="font-size: 1.5rem; font-weight: bold;">--%</div>
+<!-- CasaOS Stilinde Sistem Kaynakları -->
+<div class="casa-system-widgets">
+    <div class="casa-sys-card">
+        <div class="casa-sys-header">
+            <span class="casa-sys-label">⚡ CPU Kullanımı</span>
+            <span id="sys-cpu-val" class="casa-sys-value">--%</span>
         </div>
-        <div class="progress-bar" style="height: 6px; background: var(--border); border-radius: 3px; margin-top: 10px; overflow: hidden;">
-            <div id="sys-cpu-bar" style="height: 100%; width: 0%; background: #3b82f6; transition: width 0.5s;"></div>
+        <div class="casa-sys-bar-bg">
+            <div id="sys-cpu-bar" class="casa-sys-bar-fill cpu"></div>
         </div>
-        <canvas id="cpu-sparkline" width="200" height="40" style="margin-top: 10px;"></canvas>
+        <canvas id="cpu-sparkline" width="200" height="30" style="margin-top:6px;"></canvas>
     </div>
-    <div class="widget-box" style="flex: 1; min-width: 200px; background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-        <div style="font-size: 0.9rem; color: var(--muted); margin-bottom: 5px;">RAM Kullanımı</div>
-        <div style="display: flex; align-items: baseline; justify-content: space-between;">
-            <div id="sys-ram-val" style="font-size: 1.5rem; font-weight: bold;">--%</div>
-            <div id="sys-ram-text" style="font-size: 0.8rem; color: var(--muted);">-- / -- GB</div>
+
+    <div class="casa-sys-card">
+        <div class="casa-sys-header">
+            <span class="casa-sys-label">🧠 Bellek (RAM)</span>
+            <span id="sys-ram-val" class="casa-sys-value">--%</span>
         </div>
-        <div class="progress-bar" style="height: 6px; background: var(--border); border-radius: 3px; margin-top: 10px; overflow: hidden;">
-            <div id="sys-ram-bar" style="height: 100%; width: 0%; background: #8b5cf6; transition: width 0.5s;"></div>
+        <div class="casa-sys-bar-bg">
+            <div id="sys-ram-bar" class="casa-sys-bar-fill ram"></div>
         </div>
+        <div id="sys-ram-text" class="casa-sys-sub">-- / -- GB</div>
     </div>
-    <div class="widget-box" style="flex: 1; min-width: 200px; background: var(--bg); padding: 15px; border-radius: 8px; border: 1px solid var(--border);">
-        <div style="font-size: 0.9rem; color: var(--muted); margin-bottom: 5px;">Disk Alanı (Kök)</div>
-        <div style="display: flex; align-items: baseline; justify-content: space-between;">
-            <div id="sys-disk-val" style="font-size: 1.5rem; font-weight: bold;">--%</div>
-            <div id="sys-disk-text" style="font-size: 0.8rem; color: var(--muted);">-- / -- GB</div>
+
+    <div class="casa-sys-card">
+        <div class="casa-sys-header">
+            <span class="casa-sys-label">💾 Depolama (Disk)</span>
+            <span id="sys-disk-val" class="casa-sys-value">--%</span>
         </div>
-        <div class="progress-bar" style="height: 6px; background: var(--border); border-radius: 3px; margin-top: 10px; overflow: hidden;">
-            <div id="sys-disk-bar" style="height: 100%; width: 0%; background: #10b981; transition: width 0.5s;"></div>
+        <div class="casa-sys-bar-bg">
+            <div id="sys-disk-bar" class="casa-sys-bar-fill disk"></div>
+        </div>
+        <div id="sys-disk-text" class="casa-sys-sub">-- / -- GB</div>
+    </div>
+
+    <div class="casa-sys-card">
+        <div class="casa-sys-header">
+            <span class="casa-sys-label">🌐 Ağ &amp; Sistem</span>
+            <span class="casa-sys-value" style="font-size:0.95rem;">192.168.1.10</span>
+        </div>
+        <div class="casa-net-details" style="font-size:0.75rem; color:var(--muted); margin-top:6px; display:flex; flex-direction:column; gap:3px;">
+            <div>Aktif Portlar: <strong>9010 (Hub), 9011 (Net), 9013 (Note)</strong></div>
+            <div>Durum: <span style="color:#10b981; font-weight:700;">🟢 Tüm Mikroservisler Aktif</span></div>
         </div>
     </div>
 </div>
-
-
 
 <!-- Plugin Widgetleri -->
 <div style="display: flex; gap: 20px; flex-wrap: wrap;">
@@ -132,27 +159,46 @@
 </div>
 
 {% if not selected_cat %}
-<div class="section">
-    <h2>Öne Çıkanlar</h2>
-    <div class="app-grid">
+<div class="section" style="margin-bottom: 28px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="font-size:1.15rem; font-weight:700; color:var(--text);">📌 Öne Çıkan Uygulamalar</h2>
+        <span style="font-size:0.8rem; color:var(--muted);">{{ pinned|length }} Uygulama</span>
+    </div>
+    <div class="casa-apps-grid">
         {% for app in pinned %}
             {{ render_app_card(app) }}
-        {% else %}
-            <div class="empty-state">Öne çıkan uygulama yok.</div>
         {% endfor %}
+        <!-- CasaOS App Ekle Butonu -->
+        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis, Script veya Bağlantı Ekle">
+            <div class="casa-app-icon-wrap add-icon">➕</div>
+            <div class="casa-app-name" style="color:var(--accent);">Uygulama Ekle</div>
+            <div class="casa-app-meta"><span>Özel Servis / Link</span></div>
+        </div>
     </div>
 </div>
 {% endif %}
 
 <div class="section">
-    <h2>{% if selected_cat %}{{ selected_cat }} Uygulamaları{% else %}Diğer Uygulamalar{% endif %}</h2>
-    <div class="app-grid">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="font-size:1.15rem; font-weight:700; color:var(--text);">
+            {% if selected_cat %}📁 {{ selected_cat }} Uygulamaları{% else %}📦 Tüm Uygulamalar &amp; Servisler{% endif %}
+        </h2>
         {% set display_list = apps if selected_cat else unpinned %}
+        <span style="font-size:0.8rem; color:var(--muted);">{{ display_list|length }} Servis</span>
+    </div>
+    <div class="casa-apps-grid">
         {% for app in display_list %}
             {{ render_app_card(app) }}
         {% else %}
-            <div class="empty-state">Bu kategoride uygulama yok.</div>
+            <div class="empty-state" style="grid-column: 1 / -1;">Bu kategoride uygulama yok.</div>
         {% endfor %}
+        {% if selected_cat %}
+        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis veya Bağlantı Ekle">
+            <div class="casa-app-icon-wrap add-icon">➕</div>
+            <div class="casa-app-name" style="color:var(--accent);">Uygulama Ekle</div>
+            <div class="casa-app-meta"><span>Özel Servis / Link</span></div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -883,6 +929,33 @@ async function runSystemAudit() {
         document.getElementById('termOutput').textContent = "HATA: " + e;
     }
 }
+
+// ── CasaOS Kart & Menü Yönetimi ──
+function handleCardClick(e, url, appId) {
+    if (e.target.closest('.casa-app-top') || e.target.closest('.casa-dropdown-menu')) return;
+    if (url && url.trim() !== '') {
+        window.open(url, '_blank');
+    } else {
+        window.location.href = '/app/' + appId;
+    }
+}
+
+function toggleAppMenu(e, appId) {
+    e.stopPropagation();
+    const menu = document.getElementById('menu-' + appId);
+    if (!menu) return;
+    const isVisible = menu.style.display === 'block';
+    document.querySelectorAll('.casa-dropdown-menu').forEach(m => m.style.display = 'none');
+    if (!isVisible) {
+        menu.style.display = 'block';
+    }
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.casa-dropdown-menu') && !e.target.closest('.casa-app-menu-btn')) {
+        document.querySelectorAll('.casa-dropdown-menu').forEach(m => m.style.display = 'none');
+    }
+});
 
 </script>
 

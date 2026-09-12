@@ -35,7 +35,7 @@ fi
 # 3. Gereksinimleri yükle
 info "Python paketleri yükleniyor..."
 /opt/tinc-hub/venv/bin/pip install --quiet --upgrade pip
-/opt/tinc-hub/venv/bin/pip install --quiet flask python-dotenv requests psutil PyYAML
+/opt/tinc-hub/venv/bin/pip install --quiet flask python-dotenv requests psutil PyYAML beautifulsoup4 SpeechRecognition
 
 # 4. Shared modülü kopyala
 mkdir -p /opt/tinc-hub/shared
@@ -50,6 +50,16 @@ if [ -d "$SCRIPT_DIR/blueprints" ]; then
 fi
 cp -r "$SCRIPT_DIR/templates/"* "$INSTALL_DIR/templates/"
 cp -r "$SCRIPT_DIR/static/"* "$INSTALL_DIR/static/" 2>/dev/null || true
+
+# TNOTE modülünü kopyala
+if [ -d "$SCRIPT_DIR/../TNOTE" ]; then
+    mkdir -p /opt/tinc-hub/TNOTE
+    cp -r "$SCRIPT_DIR/../TNOTE/"* /opt/tinc-hub/TNOTE/
+    mkdir -p /var/lib/tinc-hub/tnote 2>/dev/null || true
+    chmod -R 777 /var/lib/tinc-hub/tnote 2>/dev/null || true
+    info "TNOTE modülü /opt/tinc-hub/TNOTE dizinine kopyalandı"
+fi
+
 if [ ! -f "$INSTALL_DIR/static/js/vis-network.min.js" ]; then
     mkdir -p "$INSTALL_DIR/static/js"
     curl -sL "https://unpkg.com/vis-network/standalone/umd/vis-network.min.js" -o "$INSTALL_DIR/static/js/vis-network.min.js" || true

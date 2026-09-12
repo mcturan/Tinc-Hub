@@ -1,0 +1,8 @@
+{
+  "appId": "com.tinchub.manager",
+  "appName": "TincNote",
+  "webDir": "www",
+  "server": {
+    "cleartext": true
+  }
+}

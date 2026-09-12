@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TincNote</string>
+    <string name="title_activity_main">TincNote</string>
+    <string name="package_name">com.tinchub.manager</string>
+    <string name="custom_url_scheme">com.tinchub.manager</string>
+    <string name="widget_name">TincNote Görevler</string>
+    <string name="widget_desc">TincNote bekleyen görevlerinizi ve listelerinizi gösterir</string>
+</resources>

@@ -722,3 +722,315 @@ footer {
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     z-index: 1000;
 }
+
+/* ─────────────────────────────────────────────────────────
+   CasaOS Style Dashboard & App Grid
+───────────────────────────────────────────────────────── */
+.casa-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 24px;
+  box-shadow: var(--shadow);
+}
+.casa-greeting-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.casa-greeting-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.casa-system-badge {
+  background: #3b82f6;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+.casa-greeting-sub {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.casa-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* System Widgets (CPU, RAM, Disk, Net) */
+.casa-system-widgets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.casa-sys-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: var(--transition);
+}
+.casa-sys-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+.casa-sys-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.casa-sys-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.casa-sys-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.casa-sys-sub {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-align: right;
+  margin-top: 4px;
+}
+.casa-sys-bar-bg {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.casa-sys-bar-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.5s ease;
+}
+.casa-sys-bar-fill.cpu { background: #3b82f6; }
+.casa-sys-bar-fill.ram { background: #8b5cf6; }
+.casa-sys-bar-fill.disk { background: #10b981; }
+
+/* CasaOS App Grid */
+.casa-apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.casa-app-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 10px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  position: relative;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  user-select: none;
+}
+.casa-app-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.1);
+}
+.casa-app-top {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.casa-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.casa-status-dot.healthy {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+.casa-status-dot.dead {
+  background: #ef4444;
+}
+.casa-status-dot.unknown {
+  background: #94a3b8;
+}
+.casa-pin-badge {
+  font-size: 0.75rem;
+  margin-left: 4px;
+}
+.casa-app-menu-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  opacity: 0.5;
+  transition: var(--transition);
+}
+.casa-app-card:hover .casa-app-menu-btn {
+  opacity: 1;
+}
+.casa-app-menu-btn:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.casa-app-icon-wrap {
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.9rem;
+  margin-top: 14px;
+  margin-bottom: 8px;
+  transition: transform 0.2s ease;
+}
+.casa-app-card:hover .casa-app-icon-wrap {
+  transform: scale(1.08);
+}
+.casa-app-icon-wrap.add-icon {
+  border: 2px dashed var(--border);
+  background: transparent;
+  font-size: 1.6rem;
+  color: var(--muted);
+}
+.casa-add-card:hover .casa-app-icon-wrap.add-icon {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.casa-app-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.casa-app-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.casa-port-tag {
+  background: var(--surface2);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-weight: 600;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+.casa-cpu-tag {
+  background: #eff6ff;
+  color: #2563eb;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+.casa-cat-tag {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+/* CasaOS Dropdown Menu */
+.casa-dropdown-menu {
+  position: absolute;
+  top: 32px;
+  right: 6px;
+  z-index: 100;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  min-width: 170px;
+  text-align: left;
+  padding: 4px;
+}
+.casa-menu-header {
+  padding: 6px 10px 4px 10px;
+  font-size: 0.78rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.casa-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition);
+  text-decoration: none;
+}
+.casa-menu-item:hover {
+  background: var(--surface2);
+  color: var(--accent);
+  text-decoration: none;
+}
+.casa-menu-item.danger {
+  color: #ef4444;
+}
+.casa-menu-item.danger:hover {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.casa-menu-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.casa-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}

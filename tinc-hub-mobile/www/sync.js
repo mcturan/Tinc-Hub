@@ -1,0 +1,486 @@
+/**
+ * TincNote Mobile — Senkronizasyon Motoru (Sync Engine)
+ * TincHub sunucusuyla iki yönlü çevrimdışı/çevrimiçi senkronizasyon sağlar.
+ */
+
+class TincNoteSync {
+    constructor(storage) {
+        this.storage = storage;
+        this.isSyncing = false;
+        this.status = 'offline'; // 'offline', 'online', 'syncing', 'error'
+        this.statusListeners = [];
+    }
+
+    onStatusChange(cb) {
+        this.statusListeners.push(cb);
+    }
+
+    setStatus(status, message = '') {
+        this.status = status;
+        this.statusListeners.forEach(cb => cb(status, message));
+    }
+
+    async getServerUrl() {
+        let url = await this.storage.getSetting('server_url', 'http://192.168.1.10:9013');
+        if (url) {
+            url = url.trim();
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'http://' + url;
+            }
+            if (url.endsWith('/')) {
+                url = url.slice(0, -1);
+            }
+        }
+        return url || 'http://192.168.1.10:9013';
+    }
+
+    async checkConnection() {
+        try {
+            const serverUrl = await this.getServerUrl();
+            if (!serverUrl) return false;
+
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 3500);
+
+            const res = await fetch(`${serverUrl}/notes/api/categories`, {
+                method: 'GET',
+                signal: controller.signal
+            });
+            clearTimeout(timeout);
+            return res.ok;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async syncNow() {
+        if (this.isSyncing) return;
+        this.isSyncing = true;
+        this.setStatus('syncing', 'Eşitleniyor...');
+
+        try {
+            const serverUrl = await this.getServerUrl();
+            if (!serverUrl) {
+                this.setStatus('offline', 'Sunucu URL ayarlanmamış');
+                this.isSyncing = false;
+                return false;
+            }
+
+            const isAlive = await this.checkConnection();
+            if (!isAlive) {
+                this.setStatus('offline', 'Sunucuya ulaşılamıyor (Çevrimdışı moddasınız)');
+                this.isSyncing = false;
+                return false;
+            }
+
+            // 0. Genel Bakış (Overview) Verilerini Çek
+            try {
+                const ovRes = await fetch(`${serverUrl}/notes/api/overview`);
+                if (ovRes.ok) {
+                    const ovData = await ovRes.json();
+                    if (ovData.overview) {
+                        await this.storage.saveOverview(ovData.overview);
+                    }
+                }
+            } catch (ovErr) {
+                console.warn("Overview alınamadı:", ovErr);
+            }
+
+            // 0.5 Not Defterlerini Çek & Birleştir
+            try {
+                const nbRes = await fetch(`${serverUrl}/notes/api/notebooks`);
+                if (nbRes.ok) {
+                    const nbData = await nbRes.json();
+                    if (nbData.notebooks) {
+                        for (const nb of nbData.notebooks) {
+                            const localNb = await this.storage.get('notebooks', nb.id);
+                            if (!localNb || !localNb._dirty) {
+                                await this.storage.put('notebooks', { ...nb, _dirty: false, _deleted: false });
+                            }
+                        }
+                    }
+                    if (nbData.active_notebook_id) {
+                        const curActive = await this.storage.getActiveNotebookId();
+                        if (!curActive) {
+                            await this.storage.setActiveNotebookId(nbData.active_notebook_id);
+                        }
+                    }
+                }
+            } catch (nbErr) {
+                console.warn("Notebooks alınamadı:", nbErr);
+            }
+
+            // 1. Kategorileri Çek & Birleştir
+            const catRes = await fetch(`${serverUrl}/notes/api/categories`);
+            if (catRes.ok) {
+                const catData = await catRes.json();
+                if (catData.categories) {
+                    for (const c of catData.categories) {
+                        const local = await this.storage.get('categories', c.id);
+                        if (!local || !local._dirty) {
+                            await this.storage.put('categories', { ...c, _dirty: false, _deleted: false });
+                        }
+                    }
+                }
+            }
+
+            // 2. Sayfaları Çek & Birleştir
+            const pageRes = await fetch(`${serverUrl}/notes/api/pages`);
+            if (pageRes.ok) {
+                const pageData = await pageRes.json();
+                if (pageData.pages) {
+                    for (const p of pageData.pages) {
+                        const local = await this.storage.get('pages', p.id);
+                        if (!local || !local._dirty) {
+                            await this.storage.put('pages', { ...p, _dirty: false, _deleted: false });
+
+                            // Sayfa türüne göre alt maddeleri veya finans kayıtlarını çek
+                            if (p.type === 'checklist' || p.type === 'note' || p.type === 'notes') {
+                                try {
+                                    const itemRes = await fetch(`${serverUrl}/notes/api/pages/${p.id}/items`);
+                                    if (itemRes.ok) {
+                                        const itemData = await itemRes.json();
+                                        if (itemData.items) {
+                                            for (const it of itemData.items) {
+                                                const localIt = await this.storage.get('items', it.id);
+                                                if (!localIt || !localIt._dirty) {
+                                                    await this.storage.put('items', { ...it, _dirty: false, _deleted: false });
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (itemErr) {
+                                    console.warn(`Maddeler alınamadı (sayfa ${p.id}):`, itemErr);
+                                }
+                            } else if (p.type === 'finance') {
+                                try {
+                                    const finRes = await fetch(`${serverUrl}/notes/api/pages/${p.id}/finance`);
+                                    if (finRes.ok) {
+                                        const finData = await finRes.json();
+                                        if (finData.entries) {
+                                            for (const fe of finData.entries) {
+                                                const localFe = await this.storage.get('finances', fe.id);
+                                                if (!localFe || !localFe._dirty) {
+                                                    await this.storage.put('finances', { ...fe, _dirty: false, _deleted: false });
+                                                }
+                                            }
+                                        }
+                                    }
+                                } catch (finErr) {
+                                    console.warn(`Finans kayıtları alınamadı (sayfa ${p.id}):`, finErr);
+                                }
+                            } else if (p.type === 'project') {
+                                try {
+                                    const projRes = await fetch(`${serverUrl}/notes/api/pages/${p.id}/project`);
+                                    if (projRes.ok) {
+                                        const projData = await projRes.json();
+                                        if (projData.ok && projData.project) {
+                                            await this.storage.saveProject({
+                                                id: p.id,
+                                                page_id: p.id,
+                                                data: projData.project
+                                            });
+                                        }
+                                    }
+                                } catch (projErr) {
+                                    console.warn(`Proje verisi alınamadı (sayfa ${p.id}):`, projErr);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Şifre Kasası Kayıtlarını Çek & Birleştir
+            try {
+                const vaultRes = await fetch(`${serverUrl}/notes/api/vault`);
+                if (vaultRes.ok) {
+                    const vaultData = await vaultRes.json();
+                    if (vaultData.entries) {
+                        for (const ve of vaultData.entries) {
+                            const localVe = await this.storage.get('vault', ve.id);
+                            if (!localVe || !localVe._dirty) {
+                                await this.storage.put('vault', { ...ve, _dirty: false, _deleted: false });
+                            }
+                        }
+                    }
+                    if (vaultData.folders) {
+                        for (const vf of vaultData.folders) {
+                            await this.storage.put('vault_folders', vf);
+                        }
+                    }
+                }
+            // 3.5 Hızlı Notları Çek & Birleştir
+            try {
+                const qnRes = await fetch(`${serverUrl}/notes/api/quick-notes`);
+                if (qnRes.ok) {
+                    const qnData = await qnRes.json();
+                    if (qnData.notes) {
+                        for (const qn of qnData.notes) {
+                            const localQn = await this.storage.get('quick_notes', qn.id);
+                            if (!localQn || !localQn._dirty) {
+                                await this.storage.put('quick_notes', { ...qn, _dirty: false, _deleted: false });
+                            }
+                        }
+                    }
+                }
+            } catch (qnErr) {
+                console.warn("Hızlı notlar alınamadı:", qnErr);
+            }
+
+            // 4. Yerelde Değişen (Dirty) Verileri Sunucuya Gönder
+            await this.pushDirtyDataToServer(serverUrl);
+
+            const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            await this.storage.setSetting('last_sync_time', nowStr);
+            this.setStatus('online', `Eşitlendi (${nowStr})`);
+            this.isSyncing = false;
+
+            if (typeof syncWidgetData === 'function') {
+                syncWidgetData();
+            }
+            return true;
+        } catch (e) {
+            console.error("Senkronizasyon hatası:", e);
+            this.setStatus('error', `Hata: ${e.message || 'Eşitlenemedi'}`);
+            this.isSyncing = false;
+            return false;
+        }
+    }
+
+    async pushDirtyDataToServer(serverUrl) {
+        // Yerelde değişen / eklenen kategoriler
+        const allCats = await this.storage.getAll('categories');
+        for (const cat of allCats) {
+            if (cat._deleted && typeof cat.id === 'number' && cat.id < 1000000000) {
+                try {
+                    await fetch(`${serverUrl}/notes/api/categories/${cat.id}`, { method: 'DELETE' });
+                    await this.storage.delete('categories', cat.id);
+                } catch (e) {}
+            } else if (cat._dirty && !cat._deleted) {
+                try {
+                    if (typeof cat.id === 'number' && cat.id >= 1000000000) {
+                        const res = await fetch(`${serverUrl}/notes/api/categories`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: cat.name,
+                                icon: cat.icon || '📁',
+                                color: cat.color || '#3b82f6',
+                                notebook_id: cat.notebook_id || 1
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.ok && data.category_id) {
+                            const oldId = cat.id;
+                            await this.storage.delete('categories', oldId);
+                            cat.id = data.category_id;
+                            cat._dirty = false;
+                            await this.storage.put('categories', cat);
+
+                            // Bu kategoriye ait sayfaların category_id'sini güncelle
+                            const allPages = await this.storage.getAll('pages');
+                            for (const p of allPages) {
+                                if (p.category_id == oldId) {
+                                    p.category_id = data.category_id;
+                                    await this.storage.put('pages', p);
+                                }
+                            }
+                        }
+                    } else {
+                        await fetch(`${serverUrl}/notes/api/categories/${cat.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: cat.name,
+                                icon: cat.icon || '📁',
+                                color: cat.color || '#3b82f6'
+                            })
+                        });
+                        cat._dirty = false;
+                        await this.storage.put('categories', cat);
+                    }
+                } catch (e) {
+                    console.warn("Kategori senkronizasyon hatası:", e);
+                }
+            }
+        }
+
+        // Yerelde silinmiş sayfalar
+        const allPages = await this.storage.getAll('pages');
+        for (const p of allPages) {
+            if (p._deleted && typeof p.id === 'number' && p.id < 1000000000) {
+                try {
+                    await fetch(`${serverUrl}/notes/api/pages/${p.id}`, { method: 'DELETE' });
+                    await this.storage.delete('pages', p.id);
+                } catch (e) {}
+            } else if (p._dirty && !p._deleted) {
+                try {
+                    if (typeof p.id === 'number' && p.id >= 1000000000) {
+                        // Yeni sayfa ekleme
+                        const res = await fetch(`${serverUrl}/notes/api/pages`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                category_id: p.category_id,
+                                title: p.title,
+                                type: p.type,
+                                icon: p.icon || '📝',
+                                content: p.content || ''
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.ok && data.page_id) {
+                            await this.storage.delete('pages', p.id);
+                            p.id = data.page_id;
+                            p._dirty = false;
+                            await this.storage.put('pages', p);
+                        }
+                    } else {
+                        // Var olan sayfayı güncelleme
+                        await fetch(`${serverUrl}/notes/api/pages/${p.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                title: p.title,
+                                icon: p.icon,
+                                content: p.content
+                            })
+                        });
+                        p._dirty = false;
+                        await this.storage.put('pages', p);
+                    }
+                } catch (e) {
+                    console.warn("Sayfa eşitleme hatası:", e);
+                }
+            }
+        }
+
+        // Yerelde değişen / eklenen maddeler (items)
+        const allItems = await this.storage.getAll('items');
+        for (const it of allItems) {
+            if (it._deleted && typeof it.id === 'number' && it.id < 1000000000) {
+                try {
+                    await fetch(`${serverUrl}/notes/api/items/${it.id}`, { method: 'DELETE' });
+                    await this.storage.delete('items', it.id);
+                } catch (e) {}
+            } else if (it._dirty && !it._deleted) {
+                try {
+                    if (typeof it.id === 'number' && it.id >= 1000000000) {
+                        const res = await fetch(`${serverUrl}/notes/api/pages/${it.page_id}/items`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                title: it.title,
+                                description: it.description || '',
+                                is_done: it.is_done ? 1 : 0
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.ok && data.item_id) {
+                            await this.storage.delete('items', it.id);
+                            it.id = data.item_id;
+                            it._dirty = false;
+                            await this.storage.put('items', it);
+                        }
+                    } else {
+                        await fetch(`${serverUrl}/notes/api/items/${it.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                title: it.title,
+                                description: it.description || '',
+                                is_done: it.is_done ? 1 : 0
+                            })
+                        });
+                        it._dirty = false;
+                        await this.storage.put('items', it);
+                    }
+                } catch (e) {
+                    console.warn("Madde eşitleme hatası:", e);
+                }
+            }
+        }
+
+        // Yerelde değişen / eklenen şifre kayıtları (vault)
+        const allVault = await this.storage.getAll('vault');
+        for (const v of allVault) {
+            if (v._deleted && typeof v.id === 'number' && v.id < 1000000000) {
+                try {
+                    await fetch(`${serverUrl}/notes/api/vault/${v.id}`, { method: 'DELETE' });
+                    await this.storage.delete('vault', v.id);
+                } catch (e) {}
+            } else if (v._dirty && !v._deleted) {
+                try {
+                    const payload = {
+                        title: v.title,
+                        category: v.category || 'web',
+                        scope: v.scope || 'personal',
+                        folder_name: v.folder || v.folder_name || '',
+                        profile_name: v.profile || v.profile_name || '',
+                        username: v.username || '',
+                        password: v.password || '',
+                        url: v.url || '',
+                        notes: v.notes || '',
+                        is_favorite: v.is_favorite ? 1 : 0
+                    };
+
+                    if (typeof v.id === 'number' && v.id >= 1000000000) {
+                        const res = await fetch(`${serverUrl}/notes/api/vault`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await res.json();
+                        if (data.ok && data.id) {
+                            await this.storage.delete('vault', v.id);
+                            v.id = data.id;
+                            v._dirty = false;
+                            await this.storage.put('vault', v);
+                        }
+                    } else {
+                        await fetch(`${serverUrl}/notes/api/vault/${v.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        v._dirty = false;
+                        await this.storage.put('vault', v);
+                    }
+                } catch (e) {
+                    console.warn("Kasa eşitleme hatası:", e);
+                }
+            }
+        }
+
+        // Yerelde değişen / eklenen / silinen hızlı notlar
+        const allQn = await this.storage.getAll('quick_notes');
+        for (const qn of allQn) {
+            if (qn._dirty) {
+                try {
+                    if (qn._deleted) {
+                        await fetch(`${serverUrl}/notes/api/quick-notes/${qn.id}`, { method: 'DELETE' });
+                        await this.storage.delete('quick_notes', qn.id);
+                    } else {
+                        const res = await fetch(`${serverUrl}/notes/api/quick-notes`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content: qn.content, notebook_id: qn.notebook_id, color: qn.color })
+                        });
+                        if (res.ok) {
+                            const d = await res.json();
+                            await this.storage.delete('quick_notes', qn.id);
+                            if (d.id) {
+                                await this.storage.put('quick_notes', { ...qn, id: d.id, _dirty: false });
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Hızlı not sunucuya iletilemedi (${qn.id}):`, e);
+                }
+            }
+        }
+    }
+}
+
+window.appSync = new TincNoteSync(window.appStorage);

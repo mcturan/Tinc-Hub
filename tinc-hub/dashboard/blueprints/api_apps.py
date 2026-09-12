@@ -164,6 +164,98 @@ def api_pin_app(app_id):
     return jsonify({"ok": bool(updated)})
 
 
+@bp.route("/api/app/<app_id>/configure", methods=["POST"])
+@admin_required
+def api_configure_app(app_id):
+    """CasaOS stili dinamik port ve uygulama yapılandırması"""
+    import json
+    data = request.get_json() or {}
+    app_data = get_app(app_id)
+    if not app_data:
+        return jsonify({"error": "Uygulama bulunamadı"}), 404
+
+    new_name = data.get("name", app_data.get("name"))
+    new_port = data.get("port")
+    new_url = data.get("url", app_data.get("url"))
+    new_icon = data.get("icon", app_data.get("icon"))
+    new_service = data.get("service", app_data.get("service"))
+    new_cat = data.get("category", app_data.get("category"))
+
+    updates = {
+        "name": new_name,
+        "icon": new_icon,
+        "service": new_service,
+        "category": new_cat,
+    }
+
+    port_changed = False
+    if new_port:
+        try:
+            p = int(new_port)
+            if p != app_data.get("port"):
+                updates["port"] = p
+                port_changed = True
+                old_port = app_data.get("port")
+                if old_port and new_url and f":{old_port}" in new_url:
+                    new_url = new_url.replace(f":{old_port}", f":{p}")
+                updates["url"] = new_url
+                updates["internal_url"] = f"http://127.0.0.1:{p}"
+                updates["health_url"] = f"http://127.0.0.1:{p}"
+        except ValueError:
+            pass
+
+    if "url" not in updates and new_url:
+        updates["url"] = new_url
+
+    update_app(app_id, updates)
+
+    service_restarted = False
+    if port_changed and new_port:
+        p = int(new_port)
+        if app_id in ("tnote", "tincnote"):
+            for cfg_dir in ("/opt/tinc-hub/TNOTE/data", "/home/turan/101/tinc-hub/TNOTE/data"):
+                try:
+                    os.makedirs(cfg_dir, exist_ok=True)
+                    with open(os.path.join(cfg_dir, "config.json"), "w") as f:
+                        json.dump({"port": p}, f, indent=2)
+                except Exception:
+                    pass
+            subprocess.run(["systemctl", "restart", "tincnote"], capture_output=True)
+            service_restarted = True
+        elif app_id == "tincnet":
+            for cfg_dir in ("/opt/tincnet", "/home/turan/101/tincnet"):
+                try:
+                    os.makedirs(cfg_dir, exist_ok=True)
+                    with open(os.path.join(cfg_dir, "config.json"), "w") as f:
+                        json.dump({"port": p}, f, indent=2)
+                except Exception:
+                    pass
+            subprocess.run(["systemctl", "restart", "tincnet"], capture_output=True)
+            service_restarted = True
+        elif new_service:
+            unit = new_service if new_service.endswith(".service") else f"{new_service}.service"
+            subprocess.run(["systemctl", "restart", unit], capture_output=True)
+            service_restarted = True
+
+    return jsonify({"ok": True, "app": get_app(app_id), "service_restarted": service_restarted})
+
+
+@bp.route("/api/system/check-port", methods=["POST"])
+@admin_required
+def api_check_port():
+    data = request.get_json() or {}
+    port = int(data.get("port", 0))
+    if port <= 0 or port > 65535:
+        return jsonify({"ok": False, "error": "Geçersiz port"}), 400
+    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(1.0)
+    res = sock.connect_ex(('127.0.0.1', port))
+    sock.close()
+    in_use = (res == 0)
+    return jsonify({"ok": True, "port": port, "in_use": in_use})
+
+
 # ── API: Discovery ───────────────────────────────────────────────────────────
 
 

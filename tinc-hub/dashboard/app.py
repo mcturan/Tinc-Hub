@@ -23,6 +23,9 @@ from flask import (Flask, render_template, jsonify, request,
 from dotenv import dotenv_values
 
 # ── Shared modüller ──────────────────────────────────────────────────────────
+ROOT_DIR = os.environ.get("TINC_HUB_ROOT", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 SHARED_DIR = os.environ.get("TINC_HUB_SHARED", "/opt/tinc-hub/shared")
 sys.path.insert(0, SHARED_DIR)
 try:
@@ -55,14 +58,17 @@ RUN_UID  = config.get("RUN_UID", "1000")
 # Initialize users if they don't exist
 init_users(PASSWORD)
 # ── Logging ──────────────────────────────────────────────────────────────────
-os.makedirs("/var/log/tinc-hub", exist_ok=True)
+_log_handlers = [logging.StreamHandler()]
+try:
+    os.makedirs("/var/log/tinc-hub", exist_ok=True)
+    _log_handlers.append(logging.FileHandler("/var/log/tinc-hub/dashboard.log"))
+except Exception:
+    pass
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [HUB] %(levelname)s %(message)s",
-    handlers=[
-        logging.FileHandler("/var/log/tinc-hub/dashboard.log"),
-        logging.StreamHandler(),
-    ],
+    handlers=_log_handlers,
 )
 log = logging.getLogger("tinc-hub-hub")
 
@@ -142,6 +148,11 @@ def register_blueprints():
     app.register_blueprint(api_terminal_bp)
     from blueprints.auth import bp as auth_bp
     app.register_blueprint(auth_bp)
+    try:
+        from TNOTE.blueprint import tnote_bp
+        app.register_blueprint(tnote_bp, url_prefix='/notes')
+    except Exception as e:
+        log.warning(f"TNOTE Blueprint yüklenemedi: {e}")
 
 if __name__ == "__main__":
     register_blueprints()
@@ -167,5 +178,16 @@ if __name__ == "__main__":
     metrics_collector.start_metrics_collector(get_monitored_ips)
 
     start_background_checker(load_apps, interval=30)
+
+    # TNOTE Servisleri
+    try:
+        from TNOTE import db as tnote_db, start_telegram_bot, start_reminder_engine
+        tnote_db.init_db()
+        if tnote_db.get_setting("telegram_enabled", "0") == "1":
+            start_telegram_bot()
+        start_reminder_engine()
+        log.info("TNOTE modülü ve servisleri aktif.")
+    except Exception as e:
+        log.warning(f"TNOTE servisleri başlatılamadı: {e}")
 
     app.run(host=HOST, port=PORT, debug=False, threaded=True)

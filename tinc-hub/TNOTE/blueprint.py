@@ -1,0 +1,1332 @@
+import os
+import io
+import json
+import zipfile
+from datetime import datetime
+from functools import wraps
+from flask import Blueprint, render_template, request, jsonify, redirect, session, send_from_directory, send_file, url_for
+from werkzeug.utils import secure_filename
+
+from . import db
+from .config import UPLOADS_DIR
+from .scraper import extract_first_url, scrape_url_metadata
+from .telegram_bot import (
+    is_bot_running, start_telegram_bot, stop_telegram_bot,
+    send_telegram_message, send_notification_to_all_chats
+)
+
+tnote_bp = Blueprint(
+    'tnote',
+    __name__,
+    template_folder='templates',
+    static_folder='static',
+    static_url_path='/static'
+)
+
+def auth_check(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # Tinc-Hub şifre koruması kontrolü
+        tinc_pw = os.environ.get("TINC_HUB_PASSWORD", "").strip()
+        if tinc_pw and not session.get("authenticated"):
+            auth_header = request.headers.get("Authorization", "")
+            api_key = request.headers.get("X-API-Key", "")
+            if (auth_header and auth_header.replace("Bearer ", "").strip() == tinc_pw) or (api_key and api_key == tinc_pw):
+                return f(*args, **kwargs)
+            if request.path.startswith("/notes/api/"):
+                return jsonify({"error": "Yetkisiz erişim"}), 401
+            return redirect(f"/login?next={request.path}")
+        return f(*args, **kwargs)
+    return decorated
+
+def get_current_user():
+    """
+    Mevcut kullanıcıyı belirler (Bearer token, X-Auth-Token, session).
+    """
+    token = None
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+    if not token:
+        token = request.headers.get("X-Auth-Token", "").strip()
+    if not token:
+        token = session.get("user_token")
+
+    if token:
+        user = db.get_user_by_token(token)
+        if user:
+            return user
+
+    if session.get("user_id"):
+        user = db.get_user_by_id(session.get("user_id"))
+        if user:
+            return user
+
+    return None
+
+def get_current_user_id():
+    u = get_current_user()
+    return u["id"] if u else None
+
+@tnote_bp.before_request
+def handle_options_preflight():
+    if request.method == "OPTIONS":
+        res = jsonify({"ok": True})
+        res.headers["Access-Control-Allow-Origin"] = "*"
+        res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, X-API-Key"
+        return res, 200
+
+@tnote_bp.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, X-API-Key"
+    return response
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Web Sayfaları
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Kimlik Doğrulama / Kullanıcı Yönetimi (Auth)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/auth/register', methods=['POST'])
+def api_register():
+    data = request.get_json() or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    display_name = data.get("display_name", "").strip()
+    email = data.get("email", "").strip()
+    if not username or not password:
+        return jsonify({"ok": False, "error": "Kullanıcı adı ve şifre zorunludur"}), 400
+    res = db.register_user(username, password, display_name=display_name, email=email)
+    if not res.get("ok"):
+        return jsonify(res), 400
+    session["user_id"] = res["user"]["id"]
+    session["user_token"] = res["token"]
+    session["username"] = res["user"]["username"]
+    return jsonify(res)
+
+@tnote_bp.route('/api/auth/login', methods=['POST'])
+def api_login():
+    data = request.get_json() or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    if not username or not password:
+        return jsonify({"ok": False, "error": "Kullanıcı adı ve şifre zorunludur"}), 400
+    res = db.login_user(username, password)
+    if not res.get("ok"):
+        return jsonify(res), 401
+    session["user_id"] = res["user"]["id"]
+    session["user_token"] = res["token"]
+    session["username"] = res["user"]["username"]
+    return jsonify(res)
+
+@tnote_bp.route('/api/auth/me', methods=['GET'])
+def api_me():
+    user = get_current_user()
+    if user:
+        return jsonify({"ok": True, "authenticated": True, "user": user})
+    return jsonify({"ok": True, "authenticated": False, "user": None})
+
+@tnote_bp.route('/api/auth/logout', methods=['POST'])
+def api_logout():
+    session.pop("user_id", None)
+    session.pop("user_token", None)
+    session.pop("username", None)
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/users', methods=['GET'])
+@auth_check
+def api_get_users():
+    user = get_current_user()
+    if user and user.get("role") != "admin":
+        return jsonify({"ok": False, "error": "Yalnızca yöneticiler kullanıcıları listeleyebilir"}), 403
+    return jsonify({"ok": True, "users": db.get_all_users()})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Web Sayfaları
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/')
+@auth_check
+def index():
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    active_nb_id = request.args.get('notebook_id', type=int)
+    if active_nb_id:
+        db.set_active_notebook_id(active_nb_id)
+    else:
+        active_nb_id = db.get_active_notebook_id()
+
+    notebooks = db.get_notebooks(user_id=user_id)
+    current_notebook = db.get_notebook(active_nb_id) or (notebooks[0] if notebooks else None)
+    categories = db.get_categories(active_nb_id)
+    pages = db.get_pages(notebook_id=active_nb_id)
+    settings = db.get_all_settings()
+    bot_status = is_bot_running()
+    return render_template(
+        'tnote/index.html',
+        notebooks=notebooks,
+        current_notebook=current_notebook,
+        categories=categories,
+        pages=pages,
+        settings=settings,
+        bot_status=bot_status,
+        user=user,
+        standalone=session.get("is_standalone", False)
+    )
+
+@tnote_bp.route('/settings')
+@auth_check
+def settings_page():
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    active_nb_id = db.get_active_notebook_id()
+    notebooks = db.get_notebooks(user_id=user_id)
+    current_notebook = db.get_notebook(active_nb_id) or (notebooks[0] if notebooks else None)
+    categories = db.get_categories(active_nb_id)
+    pages = db.get_pages(notebook_id=active_nb_id)
+    settings = db.get_all_settings()
+    bot_status = is_bot_running()
+    telegram_users = db.get_telegram_users()
+    return render_template(
+        'tnote/settings.html',
+        notebooks=notebooks,
+        current_notebook=current_notebook,
+        categories=categories,
+        pages=pages,
+        settings=settings,
+        bot_status=bot_status,
+        telegram_users=telegram_users,
+        user=user,
+        standalone=session.get("is_standalone", False)
+    )
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Not Defterleri (Notebooks)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/notebooks', methods=['GET'])
+@auth_check
+def api_get_notebooks():
+    user_id = get_current_user_id()
+    return jsonify({
+        "ok": True,
+        "notebooks": db.get_notebooks(user_id=user_id),
+        "active_notebook_id": db.get_active_notebook_id()
+    })
+
+@tnote_bp.route('/api/notebooks', methods=['POST'])
+@auth_check
+def api_add_notebook():
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "Not defteri adı gerekli"}), 400
+    icon = data.get("icon", "📓")
+    color = data.get("color", "#3b82f6")
+    desc = data.get("description", "")
+    user_id = get_current_user_id()
+    new_id = db.add_notebook(name, icon=icon, color=color, description=desc, user_id=user_id)
+    db.set_active_notebook_id(new_id)
+    return jsonify({
+        "ok": True,
+        "id": new_id,
+        "notebooks": db.get_notebooks(user_id=user_id),
+        "active_notebook_id": new_id
+    })
+
+@tnote_bp.route('/api/notebooks/<int:nb_id>', methods=['PUT'])
+@auth_check
+def api_update_notebook(nb_id):
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "Not defteri adı gerekli"}), 400
+    icon = data.get("icon", "📓")
+    color = data.get("color", "#3b82f6")
+    desc = data.get("description", "")
+    db.update_notebook(nb_id, name, icon, color, desc)
+    return jsonify({"ok": True, "notebook": db.get_notebook(nb_id), "notebooks": db.get_notebooks()})
+
+@tnote_bp.route('/api/notebooks/<int:nb_id>', methods=['DELETE'])
+@auth_check
+def api_delete_notebook(nb_id):
+    success = db.delete_notebook(nb_id)
+    if not success:
+        return jsonify({"ok": False, "error": "Son kalan not defteri silinemez"}), 400
+    return jsonify({
+        "ok": True,
+        "notebooks": db.get_notebooks(),
+        "active_notebook_id": db.get_active_notebook_id()
+    })
+
+@tnote_bp.route('/api/notebooks/switch', methods=['POST'])
+@auth_check
+def api_switch_notebook():
+    data = request.get_json() or {}
+    nb_id = data.get("notebook_id")
+    if not nb_id:
+        return jsonify({"ok": False, "error": "Geçersiz not defteri ID"}), 400
+    db.set_active_notebook_id(int(nb_id))
+    return jsonify({
+        "ok": True,
+        "active_notebook_id": int(nb_id),
+        "notebook": db.get_notebook(int(nb_id)),
+        "categories": db.get_categories(int(nb_id)),
+        "pages": db.get_pages(notebook_id=int(nb_id))
+    })
+
+@tnote_bp.route('/api/notebooks/<int:nb_id>/export', methods=['GET'])
+@auth_check
+def api_export_notebook(nb_id):
+    data = db.export_notebook_data(nb_id)
+    if not data:
+        return jsonify({"ok": False, "error": "Not defteri bulunamadı"}), 404
+    nb_name = data.get("notebook", {}).get("name", f"notebook_{nb_id}")
+    safe_name = "".join(c for c in nb_name if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
+    from flask import Response
+    json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode('utf-8')
+    return Response(
+        json_bytes,
+        mimetype="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_name}.tnote"',
+            "Content-Type": "application/json; charset=utf-8"
+        }
+    )
+
+@tnote_bp.route('/api/notebooks/import', methods=['POST'])
+@auth_check
+def api_import_notebook():
+    data = None
+    file = request.files.get("file")
+    if file:
+        try:
+            content = file.read().decode('utf-8')
+            data = json.loads(content)
+        except Exception as e:
+            return jsonify({"ok": False, "error": f"Geçersiz dosya içeriği: {str(e)}"}), 400
+    elif request.is_json:
+        data = request.get_json()
+
+    if not data or not isinstance(data, dict):
+        return jsonify({"ok": False, "error": "Geçerli bir .tnote JSON verisi veya dosyası yükleyin"}), 400
+
+    user_id = get_current_user_id() or 1
+    res = db.import_notebook_data(data, user_id=user_id)
+    if not res.get("ok"):
+        return jsonify(res), 400
+
+    new_id = res["notebook_id"]
+    db.set_active_notebook_id(new_id)
+    return jsonify({
+        "ok": True,
+        "id": new_id,
+        "notebooks": db.get_notebooks(user_id=user_id),
+        "active_notebook_id": new_id
+    })
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Genel Bakış & Özet
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/overview', methods=['GET'])
+@auth_check
+def api_get_overview():
+    nb_id = request.args.get('notebook_id', type=int)
+    return jsonify({"ok": True, "overview": db.get_overview_summary(nb_id)})
+
+@tnote_bp.route('/api/unified-tasks', methods=['GET'])
+@auth_check
+def api_get_unified_tasks():
+    nb_id = request.args.get('notebook_id', type=int)
+    tasks = db.get_unified_tasks(nb_id)
+    return jsonify({"ok": True, "tasks": tasks, "total_count": len(tasks)})
+
+@tnote_bp.route('/api/toggle-task', methods=['POST'])
+@auth_check
+def api_toggle_task():
+    data = request.get_json() or {}
+    task_type = data.get('type', 'checklist')
+    raw_id = data.get('raw_id') or data.get('id')
+    if isinstance(raw_id, str):
+        if raw_id.startswith('fin_'):
+            task_type = 'finance'
+            raw_id = int(raw_id.replace('fin_', ''))
+        elif raw_id.startswith('item_'):
+            task_type = 'checklist'
+            raw_id = int(raw_id.replace('item_', ''))
+        else:
+            raw_id = int(raw_id)
+    if not raw_id:
+        return jsonify({"ok": False, "error": "Geçersiz ID"}), 400
+    is_done = db.toggle_unified_task(task_type, int(raw_id))
+    return jsonify({"ok": True, "is_done": is_done})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Kategoriler
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/categories', methods=['GET'])
+@auth_check
+def api_get_categories():
+    nb_id = request.args.get('notebook_id', type=int)
+    return jsonify({"ok": True, "categories": db.get_categories(nb_id)})
+
+@tnote_bp.route('/api/categories', methods=['POST'])
+@auth_check
+def api_add_category():
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "Kategori adı gerekli"}), 400
+    nb_id = data.get("notebook_id")
+    cat_id = db.add_category(name, data.get("icon", "📁"), data.get("color", "#3b82f6"), notebook_id=nb_id)
+    return jsonify({"ok": True, "id": cat_id, "categories": db.get_categories(nb_id)})
+
+@tnote_bp.route('/api/categories/<int:cat_id>', methods=['PUT'])
+@auth_check
+def api_update_category(cat_id):
+    data = request.get_json() or {}
+    db.update_category(cat_id, data.get("name", ""), data.get("icon", "📁"), data.get("color", "#3b82f6"))
+    return jsonify({"ok": True, "categories": db.get_categories()})
+
+@tnote_bp.route('/api/categories/<int:cat_id>', methods=['DELETE'])
+@auth_check
+def api_delete_category(cat_id):
+    db.delete_category(cat_id)
+    return jsonify({"ok": True, "categories": db.get_categories()})
+
+@tnote_bp.route('/api/categories/reorder', methods=['POST'])
+@auth_check
+def api_reorder_categories():
+    data = request.get_json() or {}
+    category_ids = data.get("category_ids", [])
+    if category_ids:
+        db.reorder_categories([int(x) for x in category_ids])
+    return jsonify({"ok": True, "categories": db.get_categories()})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Sayfalar / Listeler
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/pages', methods=['GET'])
+@auth_check
+def api_get_pages():
+    cat_id = request.args.get('category_id', type=int)
+    return jsonify({"ok": True, "pages": db.get_pages(cat_id)})
+
+@tnote_bp.route('/api/pages/<int:page_id>', methods=['GET'])
+@auth_check
+def api_get_page(page_id):
+    page = db.get_page(page_id)
+    if not page:
+        return jsonify({"ok": False, "error": "Sayfa bulunamadı"}), 404
+    items = db.get_items(page_id)
+    return jsonify({"ok": True, "page": page, "items": items})
+
+@tnote_bp.route('/api/pages', methods=['POST'])
+@auth_check
+def api_add_page():
+    data = request.get_json() or {}
+    title = data.get("title", "").strip()
+    cat_id = data.get("category_id")
+    if not title or not cat_id:
+        return jsonify({"ok": False, "error": "Başlık ve kategori zorunludur"}), 400
+    page_id = db.add_page(
+        category_id=int(cat_id),
+        title=title,
+        page_type=data.get("type", "checklist"),
+        icon=data.get("icon", "📝"),
+        content=data.get("content", "")
+    )
+    return jsonify({"ok": True, "id": page_id, "pages": db.get_pages()})
+
+@tnote_bp.route('/api/pages/<int:page_id>', methods=['PUT'])
+@auth_check
+def api_update_page(page_id):
+    data = request.get_json() or {}
+    db.update_page(
+        page_id=page_id,
+        title=data.get("title"),
+        category_id=data.get("category_id"),
+        icon=data.get("icon"),
+        content=data.get("content"),
+        sort_order=data.get("sort_order")
+    )
+    return jsonify({"ok": True, "page": db.get_page(page_id)})
+
+@tnote_bp.route('/api/pages/reorder', methods=['POST'])
+@auth_check
+def api_reorder_pages():
+    data = request.get_json() or {}
+    category_id = data.get("category_id")
+    page_ids = data.get("page_ids", [])
+    if category_id is not None and page_ids:
+        db.reorder_pages(int(category_id), [int(x) for x in page_ids])
+    return jsonify({"ok": True, "categories": db.get_categories(), "pages": db.get_pages()})
+
+@tnote_bp.route('/api/pages/<int:page_id>/move', methods=['POST'])
+@auth_check
+def api_move_page(page_id):
+    data = request.get_json() or {}
+    category_id = data.get("category_id")
+    if not category_id:
+        return jsonify({"ok": False, "error": "Hedef kategori ID gereklidir"}), 400
+    db.move_page_to_category(page_id, int(category_id))
+    return jsonify({"ok": True, "categories": db.get_categories(), "pages": db.get_pages()})
+
+@tnote_bp.route('/api/pages/<int:page_id>', methods=['DELETE'])
+@auth_check
+def api_delete_page(page_id):
+    db.delete_page(page_id)
+    return jsonify({"ok": True, "pages": db.get_pages()})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Maddeler (Items)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/pages/<int:page_id>/items', methods=['GET'])
+@auth_check
+def api_get_items(page_id):
+    return jsonify({"ok": True, "items": db.get_items(page_id)})
+
+@tnote_bp.route('/api/pages/<int:page_id>/items', methods=['POST'])
+@auth_check
+def api_add_item(page_id):
+    data = request.get_json() or {}
+
+    # Toplu ekleme desteği (multi-line)
+    bulk_text = data.get("bulk_text", "").strip()
+    if bulk_text:
+        lines = [line.strip() for line in bulk_text.splitlines() if line.strip()]
+        added_ids = []
+        for line in lines:
+            # - [ ] veya - gibi işaretleri temizle
+            clean_title = line.lstrip("-*•1234567890.[] ").strip()
+            if clean_title:
+                aid = db.add_item(page_id=page_id, title=clean_title)
+                added_ids.append(aid)
+        return jsonify({"ok": True, "added_count": len(added_ids), "items": db.get_items(page_id)})
+
+    title = data.get("title", "").strip()
+    url = data.get("url", "").strip()
+
+    # Eğer başlık verilmediyse ama URL verildiyse scraper çalıştır
+    image_url = data.get("image_url", "").strip()
+    price = data.get("price", "").strip()
+    description = data.get("description", "").strip()
+
+    if url and not title:
+        meta = scrape_url_metadata(url)
+        title = meta.get("title") or url
+        image_url = image_url or meta.get("image_url", "")
+        price = price or meta.get("price", "")
+        description = description or meta.get("description", "")
+
+    if not title:
+        return jsonify({"ok": False, "error": "Madde başlığı veya link gereklidir"}), 400
+
+    item_id = db.add_item(
+        page_id=page_id,
+        title=title,
+        description=description,
+        url=url,
+        image_url=image_url,
+        price=price,
+        quantity=data.get("quantity", "").strip()
+    )
+
+    # Hatırlatma varsa ayarla
+    remind_at = data.get("remind_at")
+    if remind_at:
+        db.set_reminder("item", item_id, remind_at, data.get("recurrence", "none"))
+
+    return jsonify({"ok": True, "item_id": item_id, "items": db.get_items(page_id)})
+
+@tnote_bp.route('/api/items/<int:item_id>', methods=['PUT'])
+@auth_check
+def api_update_item(item_id):
+    data = request.get_json() or {}
+    db.update_item(item_id, **data)
+
+    if "remind_at" in data:
+        rem_time = data["remind_at"]
+        if rem_time:
+            db.set_reminder("item", item_id, rem_time, data.get("recurrence", "none"))
+        else:
+            db.delete_reminder("item", item_id)
+
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/items/<int:item_id>', methods=['DELETE'])
+@auth_check
+def api_delete_item(item_id):
+    db.delete_item(item_id)
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/pages/<int:page_id>/clear_completed', methods=['POST'])
+@auth_check
+def api_clear_completed(page_id):
+    db.clear_completed_items(page_id)
+    return jsonify({"ok": True, "items": db.get_items(page_id)})
+
+@tnote_bp.route('/api/pages/<int:page_id>/reorder', methods=['POST'])
+@auth_check
+def api_reorder_items(page_id):
+    data = request.get_json() or {}
+    item_ids = data.get("item_ids", [])
+    if item_ids:
+        db.reorder_items(item_ids)
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/pages/<int:page_id>/reset', methods=['POST'])
+@auth_check
+def api_reset_page_items(page_id):
+    db.reset_page_items(page_id)
+    return jsonify({"ok": True, "items": db.get_items(page_id)})
+
+@tnote_bp.route('/api/pages/<int:page_id>/send_telegram', methods=['POST'])
+@auth_check
+def api_send_page_telegram(page_id):
+    from .telegram_bot import send_page_to_telegram
+    data = request.get_json() or {}
+    chat_id = data.get("chat_id")
+    if not chat_id:
+        users = db.get_telegram_users()
+        allowed = [u for u in users if u.get("is_allowed") == 1]
+        if allowed:
+            chat_id = allowed[0]["chat_id"]
+        else:
+            chat_id = db.get_setting("telegram_chat_ids", "").split(",")[0].strip()
+    if not chat_id:
+        return jsonify({"ok": False, "error": "Hedef Telegram kullanıcısı bulunamadı"}), 400
+    ok = send_page_to_telegram(chat_id, page_id)
+    return jsonify({"ok": ok})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Finans & Düzenli Ödeme Takibi
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/pages/<int:page_id>/finance', methods=['GET'])
+@auth_check
+def api_get_finance_entries(page_id):
+    period = request.args.get("period") or datetime.now().strftime("%Y-%m")
+    entries = db.get_finance_entries(page_id, period)
+    incomes = [e for e in entries if e['entry_type'] == 'income']
+    expenses = [e for e in entries if e['entry_type'] == 'expense']
+    tot_inc = sum(e['amount'] for e in incomes)
+    tot_exp = sum(e['amount'] for e in expenses)
+    unpaid_exp = sum(e['amount'] for e in expenses if not e['is_paid'])
+    summary = {
+        "period": period,
+        "total_income": tot_inc,
+        "total_expense": tot_exp,
+        "net_balance": tot_inc - tot_exp,
+        "unpaid_expense": unpaid_exp,
+        "paid_expense": tot_exp - unpaid_exp,
+        "income_count": len(incomes),
+        "expense_count": len(expenses)
+    }
+    return jsonify({"ok": True, "entries": entries, "summary": summary})
+
+@tnote_bp.route('/api/pages/<int:page_id>/finance', methods=['POST'])
+@auth_check
+def api_add_finance_entry(page_id):
+    data = request.get_json() or {}
+    title = data.get("title", "").strip()
+    try:
+        amount = float(data.get("amount", 0.0))
+    except (ValueError, TypeError):
+        amount = 0.0
+    entry_type = data.get("entry_type", "expense")
+    if not title or amount <= 0:
+        return jsonify({"ok": False, "error": "Geçerli bir başlık ve tutar girin"}), 400
+    entry_id = db.add_finance_entry(
+        page_id=page_id,
+        entry_type=entry_type,
+        title=title,
+        amount=amount,
+        category=data.get("category", "Genel"),
+        due_day=int(data.get("due_day", 1)),
+        due_date=data.get("due_date"),
+        is_recurring=1 if data.get("is_recurring", True) else 0,
+        end_period=data.get("end_period", ""),
+        reminder_days=int(data.get("reminder_days", 0)),
+        reminder_time=data.get("reminder_time", "09:00"),
+        period=data.get("period"),
+        notes=data.get("notes", "")
+    )
+    return jsonify({"ok": True, "id": entry_id})
+
+@tnote_bp.route('/api/finance/<int:entry_id>', methods=['PUT'])
+@auth_check
+def api_update_finance_entry(entry_id):
+    data = request.get_json() or {}
+    db.update_finance_entry(entry_id, **data)
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/finance/<int:entry_id>/toggle', methods=['POST'])
+@auth_check
+def api_toggle_finance_paid(entry_id):
+    new_val = db.toggle_finance_paid(entry_id)
+    return jsonify({"ok": True, "is_paid": new_val})
+
+@tnote_bp.route('/api/finance/<int:entry_id>', methods=['DELETE'])
+@auth_check
+def api_delete_finance_entry(entry_id):
+    db.delete_finance_entry(entry_id)
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/pages/<int:page_id>/finance/copy_recurring', methods=['POST'])
+@auth_check
+def api_copy_recurring_finance(page_id):
+    data = request.get_json() or {}
+    source_period = data.get("source_period")
+    target_period = data.get("target_period")
+    if not source_period or not target_period:
+        return jsonify({"ok": False, "error": "Kaynak ve hedef dönem gereklidir"}), 400
+    copied = db.copy_recurring_to_period(page_id, source_period, target_period)
+    return jsonify({"ok": True, "copied_count": copied})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Proje Yönetim & Atölye / İnşa / AR-GE
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/pages/<int:page_id>/project', methods=['GET'])
+@auth_check
+def api_get_project_data(page_id):
+    data = db.get_project_data(page_id)
+    return jsonify({"ok": True, "project": data})
+
+@tnote_bp.route('/api/pages/<int:page_id>/project', methods=['PUT'])
+@auth_check
+def api_update_project(page_id):
+    data = request.get_json() or {}
+    db.update_project_details(page_id, **data)
+    return jsonify({"ok": True})
+
+# Proje Aşamaları (Milestones / Zaman Çizelgesi)
+@tnote_bp.route('/api/pages/<int:page_id>/project/milestones', methods=['POST'])
+@auth_check
+def api_add_project_milestone(page_id):
+    data = request.get_json() or {}
+    title = data.get("title", "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "Aşama başlığı gereklidir"}), 400
+    mid = db.add_project_milestone(
+        page_id=page_id,
+        title=title,
+        target_date=data.get("target_date", ""),
+        status=data.get("status", "pending"),
+        description=data.get("description", ""),
+        requirements=data.get("requirements", "")
+    )
+    return jsonify({"ok": True, "id": mid})
+
+@tnote_bp.route('/api/milestones/<int:milestone_id>', methods=['PUT'])
+@auth_check
+def api_update_project_milestone(milestone_id):
+    data = request.get_json() or {}
+    db.update_project_milestone(milestone_id, **data)
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/milestones/<int:milestone_id>/toggle', methods=['POST'])
+@auth_check
+def api_toggle_milestone(milestone_id):
+    new_status = db.toggle_milestone_status(milestone_id)
+    return jsonify({"ok": True, "status": new_status})
+
+@tnote_bp.route('/api/milestones/<int:milestone_id>', methods=['DELETE'])
+@auth_check
+def api_delete_milestone(milestone_id):
+    db.delete_project_milestone(milestone_id)
+    return jsonify({"ok": True})
+
+# Proje Malzemeleri (BOM)
+@tnote_bp.route('/api/pages/<int:page_id>/project/materials', methods=['POST'])
+@auth_check
+def api_add_project_material(page_id):
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "Malzeme adı gereklidir"}), 400
+    mid = db.add_project_material(
+        page_id=page_id,
+        name=name,
+        quantity=data.get("quantity", "1"),
+        unit_price=float(data.get("unit_price", 0.0) or 0.0),
+        status=data.get("status", "needed"),
+        url=data.get("url", ""),
+        notes=data.get("notes", "")
+    )
+    return jsonify({"ok": True, "id": mid})
+
+@tnote_bp.route('/api/materials/<int:material_id>', methods=['PUT'])
+@auth_check
+def api_update_project_material(material_id):
+    data = request.get_json() or {}
+    db.update_project_material(material_id, **data)
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/materials/<int:material_id>/toggle', methods=['POST'])
+@auth_check
+def api_toggle_material(material_id):
+    new_status = db.toggle_material_status(material_id)
+    return jsonify({"ok": True, "status": new_status})
+
+@tnote_bp.route('/api/materials/<int:material_id>', methods=['DELETE'])
+@auth_check
+def api_delete_material(material_id):
+    db.delete_project_material(material_id)
+    return jsonify({"ok": True})
+
+# Proje Gelişim Günlüğü (Logs)
+@tnote_bp.route('/api/pages/<int:page_id>/project/logs', methods=['POST'])
+@auth_check
+def api_add_project_log(page_id):
+    data = request.get_json() or {}
+    title = data.get("title", "").strip()
+    content = data.get("content", "").strip()
+    if not title or not content:
+        return jsonify({"ok": False, "error": "Başlık ve içerik gereklidir"}), 400
+    lid = db.add_project_log(
+        page_id=page_id,
+        title=title,
+        content=content,
+        log_type=data.get("log_type", "progress"),
+        image_url=data.get("image_url", ""),
+        log_date=data.get("log_date")
+    )
+    return jsonify({"ok": True, "id": lid})
+
+@tnote_bp.route('/api/logs/<int:log_id>', methods=['DELETE'])
+@auth_check
+def api_delete_log(log_id):
+    db.delete_project_log(log_id)
+    return jsonify({"ok": True})
+
+# Çizimler / Şemalar
+@tnote_bp.route('/api/pages/<int:page_id>/project/drawings', methods=['POST'])
+@auth_check
+def api_add_project_drawing(page_id):
+    data = request.get_json() or {}
+    title = data.get("title", "").strip()
+    url = data.get("url", "").strip()
+    if not title or not url:
+        return jsonify({"ok": False, "error": "Başlık ve görsel bağlantısı gereklidir"}), 400
+    item = db.add_project_drawing(page_id, title, url, desc=data.get("desc", ""))
+    return jsonify({"ok": True, "drawing": item})
+
+@tnote_bp.route('/api/pages/<int:page_id>/project/drawings/<int:drawing_id>', methods=['DELETE'])
+@auth_check
+def api_delete_project_drawing(page_id, drawing_id):
+    db.delete_project_drawing(page_id, drawing_id)
+    return jsonify({"ok": True})
+
+# Dosya Yükleme (Görsel, Şema, Kroki)
+@tnote_bp.route('/api/pages/<int:page_id>/project/upload', methods=['POST'])
+@auth_check
+def api_upload_project_file(page_id):
+    if 'file' not in request.files:
+        return jsonify({"ok": False, "error": "Dosya seçilmedi"}), 400
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({"ok": False, "error": "Geçersiz dosya"}), 400
+    
+    import time
+    ext = os.path.splitext(file.filename)[1].lower()
+    allowed_exts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.pdf']
+    if ext not in allowed_exts:
+        return jsonify({"ok": False, "error": "Desteklenmeyen dosya türü (PNG, JPG, WEBP, SVG, PDF)"}), 400
+
+    filename = f"p{page_id}_{int(time.time())}_{secure_filename(file.filename)}"
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
+    save_path = os.path.join(UPLOADS_DIR, filename)
+    file.save(save_path)
+    file_url = f"/notes/uploads/{filename}"
+
+    # Çizimler listesine de ekle
+    title = request.form.get("title") or file.filename
+    desc = request.form.get("desc") or ""
+    item = db.add_project_drawing(page_id, title, file_url, desc=desc)
+
+    return jsonify({"ok": True, "url": file_url, "drawing": item})
+
+@tnote_bp.route('/uploads/<path:filename>')
+def serve_uploaded_file(filename):
+    return send_from_directory(UPLOADS_DIR, filename)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Veri İçe Aktarma (Google Keep, Evernote, Microsoft To-Do)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/import', methods=['POST'])
+@auth_check
+def api_import_data():
+    if 'file' not in request.files:
+        return jsonify({"ok": False, "error": "Lütfen içe aktarılacak bir dosya seçin (.zip, .enex, .json, .csv, .md)"}), 400
+    file = request.files['file']
+    if not file or file.filename == '':
+        return jsonify({"ok": False, "error": "Geçersiz dosya"}), 400
+    source_type = request.form.get("source_type", "auto")
+    target_category_id = request.form.get("target_category_id")
+    if target_category_id:
+        try:
+            target_category_id = int(target_category_id)
+        except Exception:
+            target_category_id = None
+    from .importer import process_uploaded_import_file
+    result = process_uploaded_import_file(file, source_type=source_type, target_category_id=target_category_id)
+    return jsonify(result)
+
+@tnote_bp.route('/api/export/backup', methods=['GET'])
+@auth_check
+def api_export_backup():
+    try:
+        data = db.get_full_export_data()
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # 1. Tam JSON veritabanı dökümü
+            json_str = json.dumps(data, ensure_ascii=False, indent=2)
+            zf.writestr("tincnote_backup.json", json_str.encode("utf-8"))
+
+            # 2. Markdown dosyaları (Kategori klasörlerine göre organize)
+            cat_map = {c["id"]: c["name"] for c in data.get("categories", [])}
+            items_by_page = {}
+            for item in data.get("items", []):
+                items_by_page.setdefault(item["page_id"], []).append(item)
+
+            for page in data.get("pages", []):
+                cat_name = cat_map.get(page.get("category_id"), "Genel")
+                safe_cat = "".join(c for c in cat_name if c.isalnum() or c in " _-ğüşıöçĞÜŞİÖÇ").strip() or "Genel"
+                safe_title = "".join(c for c in page.get("title", "Sayfa") if c.isalnum() or c in " _-ğüşıöçĞÜŞİÖÇ").strip() or f"Sayfa_{page.get('id')}"
+
+                md_lines = [f"# {page.get('title', 'Başlıksız')}", ""]
+                ptype = page.get("type", "notes")
+                md_lines.append(f"> Tür: {ptype} | Oluşturulma: {page.get('created_at', '')}")
+                md_lines.append("")
+
+                if page.get("content"):
+                    md_lines.append(page["content"])
+                    md_lines.append("")
+
+                p_items = items_by_page.get(page["id"], [])
+                if p_items:
+                    for it in p_items:
+                        checked = "[x]" if it.get("is_checked") else "[ ]"
+                        title = it.get("title") or ""
+                        md_lines.append(f"- {checked} {title}")
+                        if it.get("notes"):
+                            md_lines.append(f"  > {it['notes']}")
+                    md_lines.append("")
+
+                md_content = "\n".join(md_lines)
+                zf.writestr(f"markdown/{safe_cat}/{safe_title}.md", md_content.encode("utf-8"))
+
+        zip_buffer.seek(0)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"tincnote_backup_{timestamp}.zip"
+        return send_file(
+            zip_buffer,
+            mimetype="application/zip",
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Yedekleme oluşturulamadı: {str(e)}"}), 500
+
+@tnote_bp.route('/api/scrape', methods=['POST'])
+@auth_check
+def api_scrape_url():
+    data = request.get_json() or {}
+    text = data.get("url", "").strip()
+    url = extract_first_url(text) or text
+    if not url:
+        return jsonify({"ok": False, "error": "Geçerli bir URL bulunamadı"}), 400
+    meta = scrape_url_metadata(url)
+    return jsonify({"ok": True, "metadata": meta})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Çöp Kutusu (Trash & Restore)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/trash', methods=['GET'])
+@auth_check
+def api_get_trash():
+    trash = db.get_trash_pages()
+    return jsonify({"ok": True, "trash": trash, "count": len(trash)})
+
+@tnote_bp.route('/api/trash/<int:page_id>/restore', methods=['POST'])
+@auth_check
+def api_restore_trash(page_id):
+    db.restore_page(page_id)
+    return jsonify({
+        "ok": True,
+        "categories": db.get_categories(),
+        "pages": db.get_pages(),
+        "trash": db.get_trash_pages()
+    })
+
+@tnote_bp.route('/api/trash/<int:page_id>', methods=['DELETE'])
+@auth_check
+def api_delete_trash_permanent(page_id):
+    db.delete_page(page_id, permanent=True)
+    return jsonify({"ok": True, "trash": db.get_trash_pages()})
+
+@tnote_bp.route('/api/trash/empty', methods=['POST'])
+@auth_check
+def api_empty_trash():
+    cnt = db.empty_trash()
+    return jsonify({"ok": True, "deleted_count": cnt, "trash": []})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: İşlem Geçmişi & Geri Alma (Undo History - Son 100 İşlem)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/history', methods=['GET'])
+@auth_check
+def api_get_history():
+    history = db.get_action_history(100)
+    return jsonify({"ok": True, "history": history, "count": len(history)})
+
+@tnote_bp.route('/api/undo', methods=['POST'])
+@auth_check
+def api_undo_latest():
+    res = db.undo_action()
+    res["categories"] = db.get_categories()
+    res["pages"] = db.get_pages()
+    return jsonify(res)
+
+@tnote_bp.route('/api/history/<int:history_id>/undo', methods=['POST'])
+@auth_check
+def api_undo_specific(history_id):
+    res = db.undo_action(history_id)
+    res["categories"] = db.get_categories()
+    res["pages"] = db.get_pages()
+    return jsonify(res)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Global Arama (Spotlight Search - Ctrl+K)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/search', methods=['GET'])
+@auth_check
+def api_global_search():
+    q = request.args.get("q", "").strip()
+    results = db.global_search(q)
+    return jsonify({"ok": True, "results": results})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Şifreler & Kimlik Bilgileri Kasası (Vault)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/vault', methods=['GET'])
+@auth_check
+def api_get_vault():
+    scope = request.args.get("scope")
+    category = request.args.get("category")
+    profile = request.args.get("profile")
+    folder = request.args.get("folder")
+    tag = request.args.get("tag")
+    search = request.args.get("q")
+    entries = db.get_vault_entries(scope=scope, category=category, profile_name=profile, folder_name=folder, tag=tag, search=search)
+    profiles = db.get_vault_profiles()
+    folders = db.get_vault_folders()
+    tags = db.get_vault_tags()
+    return jsonify({
+        "ok": True,
+        "entries": entries,
+        "profiles": profiles,
+        "folders": folders,
+        "tags": tags,
+        "count": len(entries)
+    })
+
+@tnote_bp.route('/api/vault/folders', methods=['GET', 'POST'])
+@auth_check
+def api_vault_folders():
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        name = data.get("name", "").strip()
+        icon = data.get("icon", "📁")
+        color = data.get("color", "#3b82f6")
+        if not name:
+            return jsonify({"ok": False, "error": "Klasör adı zorunludur"}), 400
+        fid = db.add_vault_folder(name, icon, color)
+        return jsonify({"ok": True, "id": fid, "folders": db.get_vault_folders()})
+    return jsonify({"ok": True, "folders": db.get_vault_folders()})
+
+@tnote_bp.route('/api/vault/folders/rename', methods=['POST'])
+@auth_check
+def api_rename_vault_folder():
+    data = request.get_json() or {}
+    old_name = data.get("old_name", "").strip()
+    new_name = data.get("new_name", "").strip()
+    if not old_name or not new_name:
+        return jsonify({"ok": False, "error": "Geçerli isimler giriniz"}), 400
+    ok = db.rename_vault_folder(old_name, new_name)
+    return jsonify({"ok": ok, "folders": db.get_vault_folders()})
+
+@tnote_bp.route('/api/vault/folders/delete', methods=['POST'])
+@auth_check
+def api_delete_vault_folder():
+    data = request.get_json() or {}
+    name = data.get("name", "").strip()
+    if not name:
+        return jsonify({"ok": False, "error": "Klasör adı zorunludur"}), 400
+    ok = db.delete_vault_folder(name)
+    return jsonify({"ok": ok, "folders": db.get_vault_folders()})
+
+@tnote_bp.route('/api/vault/<int:entry_id>/related', methods=['GET'])
+@auth_check
+def api_get_vault_related(entry_id):
+    data = db.get_related_vault_entries(entry_id)
+    return jsonify({"ok": True, **data})
+
+@tnote_bp.route('/api/vault/<int:entry_id>', methods=['GET'])
+@auth_check
+def api_get_vault_entry(entry_id):
+    entry = db.get_vault_entry(entry_id)
+    if not entry:
+        return jsonify({"ok": False, "error": "Kayıt bulunamadı"}), 404
+    return jsonify({"ok": True, "entry": entry})
+
+@tnote_bp.route('/api/vault', methods=['POST'])
+@auth_check
+def api_create_vault_entry():
+    data = request.get_json() or {}
+    title = data.get("title", "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "Başlık alanı zorunludur"}), 400
+
+    new_id = db.add_vault_entry(
+        title=title,
+        category=data.get("category", "web"),
+        scope=data.get("scope", "personal"),
+        profile_name=data.get("profile_name", ""),
+        folder_name=data.get("folder_name", ""),
+        tags=data.get("tags", ""),
+        username=data.get("username", ""),
+        password=data.get("password", ""),
+        url=data.get("url", ""),
+        secondary_info=data.get("secondary_info", ""),
+        notes=data.get("notes", ""),
+        icon=data.get("icon", "🔐"),
+        color=data.get("color", "#3b82f6"),
+        is_favorite=int(data.get("is_favorite", 0))
+    )
+    return jsonify({"ok": True, "id": new_id, "entry": db.get_vault_entry(new_id)})
+
+@tnote_bp.route('/api/vault/<int:entry_id>', methods=['PUT'])
+@auth_check
+def api_update_vault_entry(entry_id):
+    data = request.get_json() or {}
+    db.update_vault_entry(entry_id, **data)
+    return jsonify({"ok": True, "entry": db.get_vault_entry(entry_id)})
+
+@tnote_bp.route('/api/vault/<int:entry_id>', methods=['DELETE'])
+@auth_check
+def api_delete_vault_entry(entry_id):
+    permanent = request.args.get("permanent", "0") == "1"
+    db.delete_vault_entry(entry_id, permanent=permanent)
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/vault/<int:entry_id>/favorite', methods=['POST'])
+@auth_check
+def api_toggle_vault_favorite(entry_id):
+    fav = db.toggle_vault_favorite(entry_id)
+    return jsonify({"ok": True, "is_favorite": fav})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Hatırlatıcılar & Ayarlar
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/settings', methods=['GET'])
+@auth_check
+def api_get_settings():
+    settings = db.get_all_settings()
+    settings["bot_running"] = is_bot_running()
+    return jsonify({"ok": True, "settings": settings})
+
+@tnote_bp.route('/api/settings', methods=['POST'])
+@auth_check
+def api_save_settings():
+    data = request.get_json() or {}
+    db.update_settings(data)
+
+    # Bot durumu güncelle
+    if data.get("telegram_enabled") == "1":
+        start_telegram_bot()
+    else:
+        stop_telegram_bot()
+
+    return jsonify({"ok": True, "settings": db.get_all_settings(), "bot_running": is_bot_running()})
+
+@tnote_bp.route('/api/telegram/test', methods=['POST'])
+@auth_check
+def api_test_telegram():
+    token = db.get_setting("telegram_bot_token", "").strip()
+    if not token:
+        return jsonify({"ok": False, "error": "Telegram Bot Token tanımlanmamış"}), 400
+
+    chat_ids_str = db.get_setting("telegram_chat_ids", "").strip()
+    if not chat_ids_str:
+        return jsonify({"ok": False, "error": "Hiçbir Telegram Chat ID tanımlanmamış"}), 400
+
+    test_msg = (
+        "🚀 *Tinc-Hub TincNote Bağlantı Testi*\n\n"
+        "Tebrikler! Telegram botu TincNote modülüne başarıyla bağlandı.\n"
+        "Artık buraya ürün linkleri ve notlar gönderebilirsiniz."
+    )
+    sent_count = send_notification_to_all_chats(test_msg)
+    if sent_count > 0:
+        return jsonify({"ok": True, "sent_count": sent_count, "message": f"{sent_count} sohbete test mesajı iletildi."})
+    else:
+        return jsonify({"ok": False, "error": "Mesaj iletilemedi. Token ve Chat ID'leri kontrol edin."}), 400
+
+@tnote_bp.route('/api/telegram/toggle', methods=['POST'])
+@auth_check
+def api_toggle_telegram():
+    current = is_bot_running()
+    if current:
+        stop_telegram_bot()
+        db.set_setting("telegram_enabled", "0")
+    else:
+        db.set_setting("telegram_enabled", "1")
+        start_telegram_bot()
+    return jsonify({"ok": True, "bot_running": is_bot_running()})
+
+@tnote_bp.route('/api/telegram/users', methods=['GET'])
+@auth_check
+def api_get_telegram_users():
+    return jsonify({"ok": True, "users": db.get_telegram_users()})
+
+@tnote_bp.route('/api/telegram/users', methods=['POST'])
+@auth_check
+def api_add_telegram_user():
+    data = request.get_json() or {}
+    target = data.get("target", "").strip()
+    if not target:
+        return jsonify({"ok": False, "error": "ID veya kullanıcı adı giriniz"}), 400
+    db.add_allowed_target(target)
+    return jsonify({"ok": True, "users": db.get_telegram_users()})
+
+@tnote_bp.route('/api/telegram/users/<chat_id>/toggle', methods=['POST'])
+@auth_check
+def api_toggle_telegram_user(chat_id):
+    users = db.get_telegram_users()
+    cur_user = next((u for u in users if str(u["chat_id"]) == str(chat_id)), None)
+    if cur_user:
+        new_val = 0 if cur_user["is_allowed"] == 1 else 1
+        db.set_telegram_user_allowed(chat_id, new_val)
+    return jsonify({"ok": True, "users": db.get_telegram_users()})
+
+@tnote_bp.route('/api/telegram/users/<chat_id>', methods=['DELETE'])
+@auth_check
+def api_delete_telegram_user(chat_id):
+    db.delete_telegram_user(chat_id)
+    return jsonify({"ok": True, "users": db.get_telegram_users()})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HIZLI NOTLAR & HIZLI GÖREVLER API (Quick Notes & Tasks Hub)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/quick-notes', methods=['GET'])
+@auth_check
+def api_get_quick_notes():
+    nb_id = request.args.get('notebook_id') or db.get_active_notebook_id()
+    notes = db.get_quick_notes(notebook_id=nb_id)
+    return jsonify({"ok": True, "notes": notes})
+
+@tnote_bp.route('/api/quick-notes', methods=['POST'])
+@auth_check
+def api_add_quick_note():
+    data = request.get_json() or {}
+    content = data.get('content', '').strip()
+    if not content:
+        return jsonify({"ok": False, "error": "Not içeriği boş olamaz"}), 400
+    nb_id = data.get('notebook_id') or db.get_active_notebook_id()
+    color = data.get('color', '#ffffff')
+    note_id = db.add_quick_note(content=content, notebook_id=nb_id, color=color)
+    notes = db.get_quick_notes(notebook_id=nb_id)
+    return jsonify({"ok": True, "id": note_id, "notes": notes})
+
+@tnote_bp.route('/api/quick-notes/<int:note_id>', methods=['DELETE'])
+@auth_check
+def api_delete_quick_note(note_id):
+    db.delete_quick_note(note_id)
+    nb_id = db.get_active_notebook_id()
+    return jsonify({"ok": True, "notes": db.get_quick_notes(notebook_id=nb_id)})
+
+@tnote_bp.route('/api/quick-notes/<int:note_id>/move', methods=['POST'])
+@auth_check
+def api_move_quick_note(note_id):
+    data = request.get_json() or {}
+    target_page_id = data.get('target_page_id')
+    target_category_id = data.get('target_category_id')
+    new_page_title = data.get('new_page_title')
+
+    ok, msg, res_page_id = db.move_quick_note(
+        note_id=note_id,
+        target_page_id=target_page_id,
+        target_category_id=target_category_id,
+        new_page_title=new_page_title
+    )
+    if not ok:
+        return jsonify({"ok": False, "error": msg}), 400
+
+    nb_id = db.get_active_notebook_id()
+    return jsonify({
+        "ok": True,
+        "message": msg,
+        "target_page_id": res_page_id,
+        "notes": db.get_quick_notes(notebook_id=nb_id)
+    })
+
+@tnote_bp.route('/api/quick-tasks', methods=['POST'])
+@auth_check
+def api_add_quick_task():
+    data = request.get_json() or {}
+    title = data.get('title', '').strip()
+    if not title:
+        return jsonify({"ok": False, "error": "Görev başlığı boş olamaz"}), 400
+    nb_id = data.get('notebook_id') or db.get_active_notebook_id()
+    res = db.add_quick_task(title=title, notebook_id=nb_id)
+    tasks = db.get_unified_tasks(notebook_id=nb_id)
+    return jsonify({
+        "ok": True,
+        "item_id": res["item_id"],
+        "page_id": res["page_id"],
+        "category_id": res["category_id"],
+        "tasks": tasks
+    })
+
+@tnote_bp.route('/api/app-version')
+def api_app_version():
+    return jsonify({
+        "version": "1.5.3",
+        "versionCode": 108,
+        "download_url": url_for('tnote.download_apk'),
+        "notes": "v1.5.3:\n- Hızlı Notlar ve Görevler: Ayrı ayrı not ekleme, listeleme ve sayfalara/kategorilere aktarma (taşıma) özelliği\n- Android Widget: Bağımsız kaydırılabilir görev listesi düzeltildi, kök tıklama engeli kaldırıldı, doğrudan widget içi görev tamamlama\n- Hızlı Görev ve Hızlı Notlar Web ve Mobil tam senkronize edildi"
+    })
+
+@tnote_bp.route('/download/apk')
+def download_apk():
+    apk_paths = [
+        "/home/turan/Masaüstü/TincNote-v1.5.3.apk",
+        "/home/turan/Masaüstü/TincNote-v1.5.2.apk",
+        os.path.join(os.path.dirname(__file__), 'static', 'tincnote.apk'),
+        "/opt/tinc-hub/TNOTE/static/tincnote.apk",
+        "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/debug/app-debug.apk",
+        "/home/turan/101/tinc-hub/TNOTE/static/tincnote.apk",
+    ]
+    for p in apk_paths:
+        if os.path.exists(p):
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.5.3.apk")
+    return "APK dosyası bulunamadı", 404
+
+
