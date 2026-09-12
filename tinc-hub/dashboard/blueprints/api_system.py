@@ -119,11 +119,21 @@ def _system_summary() -> dict:
     import shutil
     try:
         import psutil
+        import socket
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            local_ip = s.getsockname()[0]
+            s.close()
+        except Exception:
+            local_ip = "127.0.0.1"
+
         ram  = psutil.virtual_memory()
         swap = psutil.swap_memory()
         cpu  = psutil.cpu_percent(interval=0.2)
         disk = shutil.disk_usage("/")
         return {
+            "ip": local_ip,
             "cpu_percent":  round(cpu, 1),
             "ram_percent":  round(ram.percent, 1),
             "ram_used_gb":  round(ram.used  / 1024**3, 1),

@@ -70,24 +70,14 @@
     <header>
         <div class="header-inner">
             <a href="/" class="logo">
-                <span class="logo-icon">⚙</span>
-                <span class="logo-text">TINC <strong>Hub</strong></span>
+                <span class="logo-icon" style="animation:none;">🌐</span>
+                <span class="logo-text">Tinc<strong>Net</strong> <span style="font-size:0.75rem; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; padding:2px 8px; border-radius:12px; font-weight:600; margin-left:4px;">Ağ Topolojisi</span></span>
             </a>
             <nav>
-                <a href="/" class="{% if request.path == '/' %}active{% endif %}">Hub</a>
-                <a href="/logs" class="{% if request.path.startswith('/logs') %}active{% endif %}">Loglar</a>
-                <a href="/taskmanager" class="{% if request.path.startswith('/taskmanager') %}active{% endif %}">Görev Yöneticisi</a>
-                <a href="/rules" class="{% if request.path.startswith('/rules') %}active{% endif %}">Otomasyon</a>
-                <a href="/network" class="{% if request.path.startswith('/network') %}active{% endif %}">Ağ Haritası</a>
-                <a href="/multi" class="{% if request.path.startswith('/multi') %}active{% endif %}">Makineler</a>
-                <a href="/agents" class="{% if request.path.startswith('/agents') %}active{% endif %}">Ajanlar</a>
-                <a href="/notes" class="{% if request.path.startswith('/notes') %}active{% endif %}">TincNote</a>
-                <a href="/settings" class="{% if request.path.startswith('/settings') %}active{% endif %}">Ayarlar</a>
+                <a href="/" class="active">🌐 Ağ Haritası &amp; Analizör</a>
+                <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9010';" style="font-weight:600; color:var(--accent);" title="TincHub Merkezi Yönetim Paneline Dön">🏠 TincHub'a Dön</a>
             </nav>
             <div class="header-actions">
-                <div class="notification-bell" onclick="toggleNotifications()">
-                    🔔 <span id="notif-badge" class="badge hidden">0</span>
-                </div>
                 <div class="header-time">{{ now }}</div>
                 {% if has_auth %}
                 <a href="/logout" class="btn btn-sm">Çıkış</a>
@@ -101,7 +91,7 @@
     </main>
 
     <footer>
-        <span>Tinc Hub {{ app_version or 'v2' }} · Sistem Yönetim Merkezi</span>
+        <span>TincNet · Ağ Topolojisi, Port Tarayıcı ve Sistem Analizörü</span>
     </footer>
 
     {% block scripts %}{% endblock %}

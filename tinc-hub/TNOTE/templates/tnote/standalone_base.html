@@ -90,7 +90,7 @@
         <nav class="header-nav">
             <a href="/notes" class="{% if request.path == '/notes' or request.path == '/notes/' %}active{% endif %}">📋 Notlar &amp; Listeler</a>
             <a href="/notes/settings" class="{% if request.path.startswith('/notes/settings') %}active{% endif %}">⚙️ Ayarlar</a>
-            <a href="http://192.168.1.10:9010" style="color: var(--muted); font-size: 0.85rem;" title="TincHub Ana Panosuna Dön">🏠 TincHub</a>
+            <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9010';" style="color: var(--muted); font-size: 0.85rem;" title="TincHub Ana Panosuna Dön">🏠 TincHub</a>
         </nav>
     </header>
     <div class="standalone-container">

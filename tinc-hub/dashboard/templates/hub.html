@@ -143,7 +143,7 @@
     <div class="casa-sys-card">
         <div class="casa-sys-header">
             <span class="casa-sys-label">🌐 Ağ &amp; Sistem</span>
-            <span class="casa-sys-value" style="font-size:0.95rem;">192.168.1.10</span>
+            <span id="sys-ip-val" class="casa-sys-value" style="font-size:0.95rem;">{{ system.ip or '192.168.1.10' }}</span>
         </div>
         <div class="casa-net-details" style="font-size:0.75rem; color:var(--muted); margin-top:6px; display:flex; flex-direction:column; gap:3px;">
             <div>Aktif Portlar: <strong>9010 (Hub), 9011 (Net), 9013 (Note), 9014 (Process)</strong></div>
@@ -286,28 +286,6 @@
     </div>
     {% else %}
     <div class="info-box">Çalışan Docker container bulunamadı.</div>
-    {% endif %}
-
-    <!-- Keşfedilen Systemd Servisleri -->
-    <h2 style="margin-top: 30px;">Keşfedilen Systemd (User) Servisleri</h2>
-    {% if system_services %}
-    <div class="table-wrap">
-        <table>
-            <thead><tr><th>Servis Adı</th><th>İşlemler</th></tr></thead>
-            <tbody>
-                {% for srv in system_services %}
-                <tr>
-                    <td><strong>{{ srv }}</strong></td>
-                    <td>
-                        <button onclick="openAddModal('{{ srv }}')" class="btn btn-sm" title="Hub Panosuna Ekle">➕ Panoya Ekle</button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <div class="info-box">Panoya ekli olmayan çalışan user servisi bulunamadı.</div>
     {% endif %}
 </div>
 
@@ -525,8 +503,7 @@ async function takeBackup() {
     try {
         const r = await fetch('/api/settings/backup', {method: 'POST'});
         const res = await r.json();
-        if(r.ok) alert("✅ Yedek başarıyla alındı!
-Dosya: " + res.file);
+        if(r.ok) alert("✅ Yedek başarıyla alındı!\nDosya: " + res.file);
         else alert("❌ Hata: " + res.error);
     } catch(e) { alert("Bağlantı Hatası: " + e); }
 }
@@ -595,6 +572,11 @@ async function updateSystemMetrics() {
             document.getElementById('sys-disk-text').innerText = data.disk_used_gb + ' / ' + data.disk_total_gb + ' GB';
             document.getElementById('sys-disk-bar').style.width = data.disk_percent + '%';
             document.getElementById('sys-disk-bar').style.background = data.disk_percent > 90 ? '#ef4444' : '#10b981';
+
+            if (data.ip) {
+                const ipEl = document.getElementById('sys-ip-val');
+                if (ipEl) ipEl.innerText = data.ip;
+            }
         }
     } catch(e) {}
     setTimeout(updateSystemMetrics, 5000);

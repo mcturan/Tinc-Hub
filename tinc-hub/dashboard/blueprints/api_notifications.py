@@ -17,11 +17,11 @@ from app import auth_required
 @bp.route('')
 @auth_required
 def api_notifications():
-    """Son 50 bildirimi döner."""
+    """Son 50 bildirimi döner (TincNote bildirimleri hariç)."""
     if not tinchub_db:
         return jsonify([])
     events = tinchub_db.get_recent_events(limit=50, hours=48)
-    notifications = [e for e in events if e.get('level') in ('WARN', 'ERROR', 'CRITICAL')]
+    notifications = [e for e in events if e.get('level') in ('WARN', 'ERROR', 'CRITICAL') and e.get('agent_id') != 'tnote']
     return jsonify(notifications)
 
 @bp.route('/count')
@@ -31,5 +31,5 @@ def api_notification_count():
     if not tinchub_db:
         return jsonify({"count": 0})
     events = tinchub_db.get_recent_events(limit=100, hours=1)
-    critical = [e for e in events if e.get('level') in ('WARN', 'ERROR', 'CRITICAL')]
+    critical = [e for e in events if e.get('level') in ('WARN', 'ERROR', 'CRITICAL') and e.get('agent_id') != 'tnote']
     return jsonify({"count": len(critical)})
