@@ -1,17 +1,18 @@
 :root {
-    --bg-main: #0f172a;
-    --bg-card: #1e293b;
-    --bg-hover: #334155;
-    --border: #334155;
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --primary: #3b82f6;
-    --primary-hover: #2563eb;
-    --danger: #ef4444;
-    --danger-hover: #dc2626;
-    --warning: #f59e0b;
-    --success: #10b981;
-    --purple: #8b5cf6;
+    --bg-main: #f1f5f9;
+    --bg-card: #ffffff;
+    --bg-hover: #f8fafc;
+    --border: #e2e8f0;
+    --border-light: #f1f5f9;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --danger: #dc2626;
+    --danger-hover: #b91c1c;
+    --warning: #d97706;
+    --success: #059669;
+    --purple: #7c3aed;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -41,6 +42,7 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .brand {
@@ -79,18 +81,24 @@ body {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 12px;
     padding: 16px 24px;
-    background: rgba(30, 41, 59, 0.5);
+    background: var(--bg-card);
     border-bottom: 1px solid var(--border);
 }
 
 .stat-box {
-    background: var(--bg-card);
+    background: #f8fafc;
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 10px 14px;
+    padding: 12px 16px;
     display: flex;
     flex-direction: column;
     gap: 4px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-box:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
 }
 
 .stat-label {
@@ -102,15 +110,16 @@ body {
 }
 
 .stat-value {
-    font-size: 1.25rem;
+    font-size: 1.3rem;
     font-weight: 800;
     font-family: var(--font-mono);
+    color: var(--text-main);
 }
 
 .stat-bar {
     width: 100%;
     height: 6px;
-    background: rgba(255, 255, 255, 0.1);
+    background: #e2e8f0;
     border-radius: 3px;
     overflow: hidden;
     margin-top: 4px;
@@ -136,23 +145,24 @@ body {
 .search-box {
     position: relative;
     flex: 1;
-    max-width: 400px;
+    max-width: 440px;
 }
 
 .search-input {
     width: 100%;
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    border: 1px solid #cbd5e1;
     color: var(--text-main);
     padding: 8px 12px 8px 34px;
     border-radius: 6px;
     font-size: 0.88rem;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .search-input:focus {
     border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .search-icon {
@@ -172,8 +182,8 @@ body {
 
 .btn {
     background: var(--bg-card);
-    border: 1px solid var(--border);
-    color: var(--text-main);
+    border: 1px solid #cbd5e1;
+    color: #334155;
     padding: 6px 12px;
     border-radius: 6px;
     font-size: 0.82rem;
@@ -183,15 +193,24 @@ body {
     align-items: center;
     gap: 6px;
     transition: all 0.2s;
+    text-decoration: none;
 }
 
 .btn:hover {
     background: var(--bg-hover);
+    border-color: #94a3b8;
+    color: var(--text-main);
 }
 
 .btn.active {
     background: var(--primary);
     border-color: var(--primary);
+    color: #fff;
+}
+
+.btn.active:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
     color: #fff;
 }
 
@@ -203,6 +222,7 @@ body {
 
 .btn-primary:hover {
     background: var(--primary-hover);
+    border-color: var(--primary-hover);
 }
 
 .btn-danger {
@@ -213,6 +233,7 @@ body {
 
 .btn-danger:hover {
     background: var(--danger-hover);
+    border-color: var(--danger-hover);
 }
 
 /* Process Explorer Table */
@@ -230,11 +251,12 @@ body {
     border: 1px solid var(--border);
     border-radius: 8px;
     overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .proc-table th {
-    background: #182234;
-    color: var(--text-muted);
+    background: #f8fafc;
+    color: #475569;
     font-weight: 700;
     text-align: left;
     padding: 10px 14px;
@@ -246,21 +268,22 @@ body {
 
 .proc-table th:hover {
     color: var(--text-main);
+    background: #f1f5f9;
 }
 
 .proc-table td {
     padding: 8px 14px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--border-light);
     white-space: nowrap;
     vertical-align: middle;
 }
 
 .proc-row:hover {
-    background: rgba(59, 130, 246, 0.08);
+    background: #f8fafc;
 }
 
 .proc-row.selected {
-    background: rgba(59, 130, 246, 0.2) !important;
+    background: #dbeafe !important;
 }
 
 /* Tree Structure Elements */
@@ -290,7 +313,7 @@ body {
 
 .proc-name {
     font-weight: 600;
-    color: #e2e8f0;
+    color: var(--text-main);
 }
 
 .pid-badge {
@@ -300,9 +323,9 @@ body {
 }
 
 .port-badge {
-    background: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+    background: #eff6ff;
+    color: var(--primary);
+    border: 1px solid #bfdbfe;
     padding: 2px 6px;
     border-radius: 4px;
     font-family: var(--font-mono);
@@ -318,7 +341,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(15, 23, 42, 0.45);
     backdrop-filter: blur(4px);
     display: none;
     align-items: center;
@@ -335,7 +358,7 @@ body {
     max-height: 85vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     overflow: hidden;
 }
 
@@ -345,11 +368,13 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    background: #f8fafc;
 }
 
 .modal-title {
     font-size: 1.1rem;
     font-weight: 700;
+    color: var(--text-main);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -370,7 +395,7 @@ body {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    background: rgba(0, 0, 0, 0.2);
+    background: #f8fafc;
 }
 
 .detail-grid {
@@ -388,4 +413,5 @@ body {
 .detail-value {
     font-family: var(--font-mono);
     word-break: break-all;
+    color: var(--text-main);
 }

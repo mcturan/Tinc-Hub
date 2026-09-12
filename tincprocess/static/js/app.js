@@ -164,7 +164,7 @@ function createProcessRow(p, depth, hasChildren, isCollapsed) {
         const leaf = document.createElement('span');
         leaf.className = 'tree-toggle';
         leaf.innerText = '•';
-        leaf.style.color = '#475569';
+        leaf.style.color = '#94a3b8';
         tdName.appendChild(leaf);
     }
 
