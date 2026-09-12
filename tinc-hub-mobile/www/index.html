@@ -516,6 +516,47 @@
                 <div id="connection-diag-box" style="display:none; margin-top:10px; font-size:0.82rem; padding:8px; border-radius:8px; background:var(--surface2);"></div>
             </div>
 
+            <!-- Kullanıcı Hesabı & Oturum -->
+            <div class="settings-section">
+                <h4 class="settings-section-title">👤 Kullanıcı Hesabı (Çoklu Kullanıcı)</h4>
+                <div id="mobile-auth-logged-in" style="display:none; padding:10px; background:var(--surface2); border-radius:8px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div id="mobile-user-name" style="font-weight:700; font-size:1rem;">Kullanıcı</div>
+                            <div id="mobile-user-role" style="font-size:0.75rem; color:var(--muted);">Giriş Yapıldı</div>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="handleMobileLogout()">🚪 Çıkış Yap</button>
+                    </div>
+                </div>
+
+                <div id="mobile-auth-form" style="display:block;">
+                    <div style="display:flex; gap:6px; margin-bottom:10px;">
+                        <button class="btn btn-sm btn-primary" id="btn-m-tab-login" onclick="switchMobileAuthTab('login')" style="flex:1;">Giriş Yap</button>
+                        <button class="btn btn-sm btn-secondary" id="btn-m-tab-reg" onclick="switchMobileAuthTab('reg')" style="flex:1;">Kayıt Ol</button>
+                    </div>
+
+                    <div id="mobile-reg-group" style="display:none; margin-bottom:8px;">
+                        <label class="form-label">Ad Soyad</label>
+                        <input type="text" id="m-auth-display" class="input-text" placeholder="Adınız">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:8px;">
+                        <label class="form-label">Kullanıcı Adı</label>
+                        <input type="text" id="m-auth-user" class="input-text" placeholder="Kullanıcı Adı">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label class="form-label">Şifre</label>
+                        <input type="password" id="m-auth-pass" class="input-text" placeholder="Şifreniz">
+                    </div>
+
+                    <button class="btn btn-primary" id="btn-m-auth-submit" onclick="handleMobileAuthSubmit()" style="width:100%;">
+                        🔑 Giriş Yap
+                    </button>
+                    <div id="m-auth-msg" style="display:none; margin-top:8px; font-size:0.8rem;"></div>
+                </div>
+            </div>
+
             <!-- Güncellemeler -->
             <div class="settings-section">
                 <h4 class="settings-section-title">🚀 Sürüm & Güncellemeler</h4>

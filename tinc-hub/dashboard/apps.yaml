@@ -156,6 +156,19 @@ apps:
     health_check: http
     pinned: true
 
+  - id: tincprocess
+    name: TincProcess
+    description: Hiyerarşik süreç ağacı, PID/port dedektifi ve kaynak yöneticisi
+    url: http://192.168.1.10:9014
+    internal_url: http://127.0.0.1:9014
+    health_url: http://127.0.0.1:9014/api/system
+    service: tincprocess
+    port: 9014
+    category: Sistem
+    icon: "🔬"
+    health_check: http
+    pinned: true
+
   - id: socies
     name: Socies Game
     description: Socies oyun sunucusu ve arayüzü

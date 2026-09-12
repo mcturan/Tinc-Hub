@@ -26,6 +26,22 @@ tnote_bp = Blueprint(
 def auth_check(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+        # SSO Token query param
+        sso_token = request.args.get("sso_token")
+        if sso_token:
+            u = db.get_user_by_token(sso_token)
+            if u:
+                session["user_id"] = u["id"]
+                session["user_token"] = sso_token
+                session["username"] = u["username"]
+                session["authenticated"] = True
+            else:
+                tinc_pw = os.environ.get("TINC_HUB_PASSWORD", "").strip()
+                if tinc_pw and sso_token == tinc_pw:
+                    session["authenticated"] = True
+                    session["user_id"] = 1
+                    session["username"] = "admin"
+
         # Tinc-Hub şifre koruması kontrolü
         tinc_pw = os.environ.get("TINC_HUB_PASSWORD", "").strip()
         if tinc_pw and not session.get("authenticated"):
@@ -41,12 +57,13 @@ def auth_check(f):
 
 def get_current_user():
     """
-    Mevcut kullanıcıyı belirler (Bearer token, X-Auth-Token, session).
+    Mevcut kullanıcıyı belirler (Bearer token, X-Auth-Token, session, sso_token).
     """
-    token = None
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:].strip()
+    token = request.args.get("sso_token")
+    if not token:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
     if not token:
         token = request.headers.get("X-Auth-Token", "").strip()
     if not token:

@@ -34,6 +34,72 @@ class TincNoteSync {
         return url || 'http://192.168.1.10:9013';
     }
 
+    async getHeaders(customHeaders = {}) {
+        const token = await this.storage.getSetting('auth_token', '');
+        const headers = { ...customHeaders };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+            headers['X-Auth-Token'] = token;
+        }
+        return headers;
+    }
+
+    async apiFetch(path, options = {}) {
+        const serverUrl = await this.getServerUrl();
+        const headers = await this.getHeaders(options.headers || {});
+        return fetch(`${serverUrl}${path}`, {
+            ...options,
+            headers
+        });
+    }
+
+    async login(username, password) {
+        try {
+            const res = await this.apiFetch('/notes/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.ok && data.token) {
+                await this.storage.setSetting('auth_token', data.token);
+                await this.storage.setSetting('user_profile', JSON.stringify(data.user));
+                return { ok: true, user: data.user };
+            }
+            return { ok: false, error: data.error || 'Giriş başarısız' };
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
+    }
+
+    async register(username, password, displayName) {
+        try {
+            const res = await this.apiFetch('/notes/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password, display_name: displayName })
+            });
+            const data = await res.json();
+            if (data.ok && data.token) {
+                await this.storage.setSetting('auth_token', data.token);
+                await this.storage.setSetting('user_profile', JSON.stringify(data.user));
+                return { ok: true, user: data.user };
+            }
+            return { ok: false, error: data.error || 'Kayıt başarısız' };
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
+    }
+
+    async logout() {
+        try {
+            await this.apiFetch('/notes/api/auth/logout', { method: 'POST' });
+        } catch (e) {}
+        await this.storage.setSetting('auth_token', '');
+        await this.storage.setSetting('user_profile', '');
+        return { ok: true };
+    }
+
     async checkConnection() {
         try {
             const serverUrl = await this.getServerUrl();

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TincProcess — Process Explorer & Görev Yöneticisi</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="brand">
+            <span class="brand-icon">🔬</span>
+            <div>
+                <div class="brand-title">
+                    TincProcess
+                    <span style="font-size:0.75rem; background:rgba(59,130,246,0.2); color:#60a5fa; padding:2px 8px; border-radius:12px; font-weight:600;">Process Explorer</span>
+                </div>
+                <div class="brand-subtitle">Linux Hiyerarşik Süreç & Port Analizörü</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <a href="http://192.168.1.10:9010" class="btn" title="TincHub Ana Sayfasına Dön">🏠 Hub'a Dön</a>
+            <button class="btn" onclick="openPortsModal()" title="Tüm Dinlenen Portları İncele">🌐 Port Dedektifi</button>
+            <button class="btn active" id="btn-auto-refresh" onclick="toggleAutoRefresh()">⏸️ Canlı: Açık</button>
+        </div>
+    </header>
+
+    <!-- Hero Stats Bar -->
+    <div class="hero-stats">
+        <div class="stat-box">
+            <div class="stat-label">İşlemci Yükü (CPU)</div>
+            <div class="stat-value" id="stat-cpu">--%</div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="bar-cpu" style="width: 0%; background: var(--primary);"></div></div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Bellek Kullanımı (RAM)</div>
+            <div class="stat-value" id="stat-ram">-- MB</div>
+            <div class="stat-bar"><div class="stat-bar-fill" id="bar-ram" style="width: 0%; background: var(--purple);"></div></div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Toplam Süreç (Procs)</div>
+            <div class="stat-value" id="stat-procs">--</div>
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Aktif çalışan / uykuda</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Sistem Çalışma Süresi</div>
+            <div class="stat-value" id="stat-uptime">--</div>
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Uptime (Son Açılıştan Beri)</div>
+        </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" class="search-input" placeholder="Süreç adı, PID, kullanıcı veya port ile ara... (Örn: python, 9013, root)">
+        </div>
+
+        <div class="toolbar-actions">
+            <div style="display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden;">
+                <button class="btn active" id="btn-mode-tree" onclick="setViewMode('tree')" style="border:none; border-radius:0;">🌳 Ağaç Görünümü</button>
+                <button class="btn" id="btn-mode-flat" onclick="setViewMode('flat')" style="border:none; border-radius:0;">📋 Düz Liste</button>
+            </div>
+            <button class="btn" onclick="loadData(true)" title="Şimdi Yenile">🔄</button>
+        </div>
+    </div>
+
+    <!-- Process Table -->
+    <div class="table-container">
+        <table class="proc-table">
+            <thead>
+                <tr>
+                    <th style="min-width: 280px;">Süreç Adı (Process)</th>
+                    <th>PID</th>
+                    <th>CPU %</th>
+                    <th>RAM (RSS)</th>
+                    <th>Kullanıcı</th>
+                    <th>Threads</th>
+                    <th>Nice</th>
+                    <th style="text-align: right;">Eylemler</th>
+                </tr>
+            </thead>
+            <tbody id="proc-tbody">
+                <tr>
+                    <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">
+                        Süreç ağacı taranıyor ve yükleniyor...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal: Süreç Detayları & Eylemler -->
+    <div class="modal-backdrop" id="modal-proc-detail" onclick="closeModal('modal-proc-detail')">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="detail-modal-title">🔍 Süreç İnceleme</div>
+                <button class="btn" onclick="closeModal('modal-proc-detail')" style="padding:2px 8px;">✕</button>
+            </div>
+            <div class="modal-body" id="detail-modal-body">
+                <!-- Javascript ile doldurulur -->
+            </div>
+            <div class="modal-footer" id="detail-modal-footer">
+                <button class="btn" onclick="closeModal('modal-proc-detail')">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Port & Soket Dedektifi -->
+    <div class="modal-backdrop" id="modal-ports" onclick="closeModal('modal-ports')">
+        <div class="modal" style="max-width: 780px;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">🌐 Port & Soket Dedektifi (Dinlenen Portlar)</div>
+                <button class="btn" onclick="closeModal('modal-ports')" style="padding:2px 8px;">✕</button>
+            </div>
+            <div class="modal-body" style="padding:0;">
+                <table class="proc-table" style="border:none; border-radius:0;">
+                    <thead>
+                        <tr>
+                            <th>Port</th>
+                            <th>IP & Protokol</th>
+                            <th>PID</th>
+                            <th>Süreç Adı</th>
+                            <th>Kullanıcı</th>
+                            <th>Eylem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ports-tbody">
+                        <!-- JS ile doldurulur -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal('modal-ports')">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

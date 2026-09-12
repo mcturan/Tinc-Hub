@@ -85,8 +85,9 @@
     <div class="casa-header-actions">
         {% if role == "admin" %}
         <button onclick="runSystemAudit()" class="btn btn-sm" style="background-color: #f59e0b; color: white;" title="Sistemi Denetle (Akıllı Ajan)">🔍 Denetle</button>
+        <button onclick="openBackupModal()" class="btn btn-sm" style="background-color: #059669; color: white;" title="Tam Sistem Yedeği & Kurtarma">💾 Yedekle / Kurtar</button>
         <button onclick="openSettingsModal()" class="btn btn-sm" style="background-color: #475569; color: white;">⚙️ Ayarlar</button>
-        <button onclick="openStoreModal()" class="btn btn-sm" style="background-color: #8b5cf6; color: white;" title="Uygulama Mağazası">🛒 App Store</button>
+        <button onclick="openStoreModal()" class="btn btn-sm" style="background-color: #8b5cf6; color: white;" title="Uygulama Mağazası (App Store)">🛒 App Store</button>
         <button onclick="openAddModal()" class="btn btn-primary btn-sm" title="Yeni uygulama, mikroservis veya web linki ekle">➕ Uygulama Ekle</button>
         {% endif %}
     </div>
@@ -951,6 +952,57 @@ function toggleAppMenu(e, appId) {
     }
 }
 
+// ── Full Hub Disaster Recovery ──
+function openBackupModal() {
+    document.getElementById('backupModal').classList.remove('hidden');
+}
+
+function closeBackupModal() {
+    document.getElementById('backupModal').classList.add('hidden');
+}
+
+function triggerDownloadBackup() {
+    window.location.href = '/api/system/backup';
+}
+
+async function handleRestoreBackup(inputEl) {
+    const file = inputEl.files[0];
+    if (!file) return;
+
+    if (!confirm("⚠️ DİKKAT: Yedeği geri yüklemek mevcut ayarları ve veritabanlarını yedekteki verilerle güncelleyecektir. Onaylıyor musunuz?")) {
+        inputEl.value = '';
+        return;
+    }
+
+    const statusEl = document.getElementById('restore-status');
+    statusEl.innerText = "Yedek yükleniyor ve doğrulanıyor...";
+    statusEl.style.display = "block";
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch('/api/system/restore', {
+            method: 'POST',
+            body: formData
+        });
+        const d = await res.json();
+        if (d.ok) {
+            statusEl.innerText = "✅ " + d.message;
+            alert(d.message);
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            statusEl.innerText = "❌ Hata: " + (d.error || 'Yedek yüklenemedi');
+            alert(d.error || 'Yedek yüklenemedi');
+        }
+    } catch (err) {
+        statusEl.innerText = "❌ Bağlantı hatası: " + err.message;
+        alert("Bağlantı hatası: " + err.message);
+    } finally {
+        inputEl.value = '';
+    }
+}
+
 document.addEventListener('click', function(e) {
     if (!e.target.closest('.casa-dropdown-menu') && !e.target.closest('.casa-app-menu-btn')) {
         document.querySelectorAll('.casa-dropdown-menu').forEach(m => m.style.display = 'none');
@@ -958,5 +1010,45 @@ document.addEventListener('click', function(e) {
 });
 
 </script>
+
+<!-- Modal: Full Hub Disaster Recovery (Yedekle & Kurtar) -->
+<div id="backupModal" class="modal-backdrop hidden" onclick="closeBackupModal()">
+    <div class="modal" style="max-width: 520px; background: var(--card-bg, #1e293b); border: 1px solid var(--border); border-radius: 12px; padding: 24px;" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="margin:0; font-size:1.15rem; display:flex; align-items:center; gap:8px;">
+                💾 Tam Sistem Yedeği & Kurtarma
+            </h3>
+            <button onclick="closeBackupModal()" class="btn btn-sm">✕</button>
+        </div>
+
+        <p style="font-size:0.85rem; color:var(--text-muted, #94a3b8); line-height:1.5; margin-bottom:20px;">
+            Tüm TincHub platformunu (kayıtlı uygulamalar, mikroservis portları, TincNote not defterleri & veritabanları, TincNet ve TincProcess ayarları) tek bir <strong>.thub.tar.gz</strong> paketinde arşivleyin veya felaket anında tek tıkla geri yükleyin.
+        </p>
+
+        <!-- Yedek İndir Bölümü -->
+        <div style="background: rgba(5, 150, 105, 0.1); border: 1px solid rgba(5, 150, 105, 0.3); border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+            <div style="font-weight:700; font-size:0.9rem; color:#10b981; margin-bottom:4px;">1. Tam Sistem Yedeğini İndir</div>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Mevcut tüm ayarları ve SQLite veri tabanlarını tek dosya olarak indirir.</div>
+            <button class="btn btn-primary" onclick="triggerDownloadBackup()" style="background:#059669; border-color:#059669; width:100%;">
+                📥 Şimdi Yedeği İndir (.thub.tar.gz)
+            </button>
+        </div>
+
+        <!-- Geri Yükle Bölümü -->
+        <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 14px;">
+            <div style="font-weight:700; font-size:0.9rem; color:#f59e0b; margin-bottom:4px;">2. Yedekten Geri Yükle</div>
+            <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px;">Daha önce indirdiğiniz bir .thub.tar.gz yedeğini seçin.</div>
+            <input type="file" id="hub-restore-file" accept=".tar.gz,.gz" style="display:none;" onchange="handleRestoreBackup(this)">
+            <button class="btn btn-secondary" onclick="document.getElementById('hub-restore-file').click()" style="width:100%;">
+                📂 Yedek Dosyası Seç ve Geri Yükle
+            </button>
+            <div id="restore-status" style="display:none; margin-top:8px; font-size:0.8rem; font-weight:600;"></div>
+        </div>
+
+        <div style="margin-top: 20px; display:flex; justify-content:flex-end;">
+            <button class="btn btn-secondary" onclick="closeBackupModal()">Kapat</button>
+        </div>
+    </div>
+</div>
 
 {% endblock %}

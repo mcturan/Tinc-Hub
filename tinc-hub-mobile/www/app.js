@@ -2073,6 +2073,9 @@ async function loadSettingsUI() {
         const v = await window.appStorage.getAll('vault');
         statsEl.innerText = `${p.length} Sayfa, ${it.length} Madde, ${v.length} Şifre (Yerel IndexedDB)`;
     }
+
+    // Kullanıcı Oturum Bilgisi
+    await refreshMobileAuthUI();
 }
 
 function quickFillHostIP() {
@@ -2375,4 +2378,107 @@ function escapeHtml(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+// ── Mobil Çoklu Kullanıcı & Oturum ──
+let currentMobileAuthTab = 'login';
+
+function switchMobileAuthTab(tab) {
+    currentMobileAuthTab = tab;
+    const btnLogin = document.getElementById('btn-m-tab-login');
+    const btnReg = document.getElementById('btn-m-tab-reg');
+    const regGroup = document.getElementById('mobile-reg-group');
+    const submitBtn = document.getElementById('btn-m-auth-submit');
+    const msg = document.getElementById('m-auth-msg');
+    if (msg) msg.style.display = 'none';
+
+    if (tab === 'login') {
+        if (btnLogin) { btnLogin.classList.add('btn-primary'); btnLogin.classList.remove('btn-secondary'); }
+        if (btnReg) { btnReg.classList.add('btn-secondary'); btnReg.classList.remove('btn-primary'); }
+        if (regGroup) regGroup.style.display = 'none';
+        if (submitBtn) submitBtn.innerText = '🔑 Giriş Yap';
+    } else {
+        if (btnLogin) { btnLogin.classList.add('btn-secondary'); btnLogin.classList.remove('btn-primary'); }
+        if (btnReg) { btnReg.classList.add('btn-primary'); btnReg.classList.remove('btn-secondary'); }
+        if (regGroup) regGroup.style.display = 'block';
+        if (submitBtn) submitBtn.innerText = '✨ Hesap Oluştur';
+    }
+}
+
+async function refreshMobileAuthUI() {
+    const token = await window.appStorage.getSetting('auth_token', '');
+    const userJson = await window.appStorage.getSetting('user_profile', '');
+    const loggedInBox = document.getElementById('mobile-auth-logged-in');
+    const formBox = document.getElementById('mobile-auth-form');
+
+    if (token && userJson) {
+        try {
+            const user = JSON.parse(userJson);
+            const nameEl = document.getElementById('mobile-user-name');
+            const roleEl = document.getElementById('mobile-user-role');
+            if (nameEl) nameEl.innerText = user.display_name || user.username;
+            if (roleEl) roleEl.innerText = `@${user.username} (${user.role || 'Kullanıcı'})`;
+            if (loggedInBox) loggedInBox.style.display = 'block';
+            if (formBox) formBox.style.display = 'none';
+            return;
+        } catch (e) {}
+    }
+
+    if (loggedInBox) loggedInBox.style.display = 'none';
+    if (formBox) formBox.style.display = 'block';
+}
+
+async function handleMobileAuthSubmit() {
+    const uInput = document.getElementById('m-auth-user');
+    const pInput = document.getElementById('m-auth-pass');
+    const dInput = document.getElementById('m-auth-display');
+    const msg = document.getElementById('m-auth-msg');
+
+    const u = uInput ? uInput.value.trim() : '';
+    const p = pInput ? pInput.value.trim() : '';
+    const displayName = dInput ? dInput.value.trim() : '';
+
+    if (!u || !p) {
+        if (msg) {
+            msg.innerText = 'Lütfen kullanıcı adı ve şifre girin';
+            msg.style.color = 'var(--danger)';
+            msg.style.display = 'block';
+        }
+        return;
+    }
+
+    if (msg) {
+        msg.innerText = 'İşlem yapılıyor...';
+        msg.style.color = 'var(--primary)';
+        msg.style.display = 'block';
+    }
+
+    let res;
+    if (currentMobileAuthTab === 'login') {
+        res = await window.appSync.login(u, p);
+    } else {
+        res = await window.appSync.register(u, p, displayName);
+    }
+
+    if (res.ok) {
+        if (msg) {
+            msg.innerText = 'Başarılı! Oturum açıldı.';
+            msg.style.color = 'var(--success)';
+        }
+        if (pInput) pInput.value = '';
+        await refreshMobileAuthUI();
+        window.appSync.syncNow();
+    } else {
+        if (msg) {
+            msg.innerText = res.error || 'İşlem başarısız';
+            msg.style.color = 'var(--danger)';
+        }
+    }
+}
+
+async function handleMobileLogout() {
+    if (confirm('Oturumu kapatmak istediğinize emin misiniz?')) {
+        await window.appSync.logout();
+        await refreshMobileAuthUI();
+    }
 }

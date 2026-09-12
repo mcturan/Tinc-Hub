@@ -299,6 +299,124 @@ def api_mobile_info():
         "system": _system_summary()
     })
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Full Hub Disaster Recovery Backup & Restore
+# ─────────────────────────────────────────────────────────────────────────────
+
+import tarfile
+import tempfile
+import io
+import time
+import shutil
+from pathlib import Path
+
+@bp.route("/api/system/backup", methods=["GET"])
+@auth_required
+def api_system_backup():
+    """Tüm TincHub durumunu (apps.yaml, configs, DB'ler, ayarlar) .thub.tar.gz olarak paketler."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    mem_file = io.BytesIO()
+
+    with tarfile.open(fileobj=mem_file, mode="w:gz") as tar:
+        # 1. /etc/tinc-hub/
+        etc_dir = Path("/etc/tinc-hub")
+        if etc_dir.exists():
+            for p in etc_dir.glob("*"):
+                if p.is_file():
+                    tar.add(str(p), arcname=f"etc/tinc-hub/{p.name}")
+
+        # 2. TincNote DB & data (/var/lib/tinc-hub/tnote and /opt/tinc-hub/TNOTE/data/)
+        for db_dir in [Path("/var/lib/tinc-hub/tnote"), Path("/opt/tinc-hub/TNOTE/data")]:
+            if db_dir.exists():
+                for p in db_dir.glob("*"):
+                    if p.is_file():
+                        tar.add(str(p), arcname=f"tnote_data/{p.name}")
+
+        # 3. /opt/tincnet/config.json
+        tincnet_cfg = Path("/opt/tincnet/config.json")
+        if tincnet_cfg.exists():
+            tar.add(str(tincnet_cfg), arcname="tincnet/config.json")
+
+        # 4. /opt/tincprocess/config.json
+        tincproc_cfg = Path("/opt/tincprocess/config.json")
+        if tincproc_cfg.exists():
+            tar.add(str(tincproc_cfg), arcname="tincprocess/config.json")
+
+        # 5. Metadata JSON
+        meta = {
+            "created_at": datetime.now().isoformat(),
+            "hostname": os.uname().nodename,
+            "version": "2.0.0",
+            "type": "tinchub_disaster_recovery"
+        }
+        meta_bytes = json.dumps(meta, indent=2).encode('utf-8')
+        ti = tarfile.TarInfo(name="backup_meta.json")
+        ti.size = len(meta_bytes)
+        ti.mtime = int(time.time())
+        tar.addfile(ti, io.BytesIO(meta_bytes))
+
+    mem_file.seek(0)
+    filename = f"tinchub_backup_{timestamp}.thub.tar.gz"
+    return Response(
+        mem_file.getvalue(),
+        mimetype="application/gzip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Type": "application/gzip"
+        }
+    )
+
+@bp.route("/api/system/restore", methods=["POST"])
+@admin_required
+def api_system_restore():
+    """Yüklenen .thub.tar.gz arşivini doğrular ve sisteme geri yükler."""
+    file = request.files.get("file")
+    if not file:
+        return jsonify({"ok": False, "error": "Yedek dosyası seçilmedi"}), 400
+
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tar_path = Path(tmpdir) / "restore.tar.gz"
+            file.save(str(tar_path))
+
+            with tarfile.open(tar_path, mode="r:gz") as tar:
+                names = tar.getnames()
+                if "backup_meta.json" not in names:
+                    return jsonify({"ok": False, "error": "Geçersiz TincHub yedeği (metadata eksik)"}), 400
+
+                tar.extractall(path=tmpdir)
+
+            # Restore etc files
+            extracted_etc = Path(tmpdir) / "etc/tinc-hub"
+            if extracted_etc.exists():
+                for p in extracted_etc.glob("*"):
+                    shutil.copy2(str(p), f"/etc/tinc-hub/{p.name}")
+
+            # Restore TNOTE data to both active runtime locations
+            extracted_tnote = Path(tmpdir) / "tnote_data"
+            if extracted_tnote.exists():
+                for target_tnote in [Path("/var/lib/tinc-hub/tnote"), Path("/opt/tinc-hub/TNOTE/data")]:
+                    target_tnote.mkdir(parents=True, exist_ok=True)
+                    for p in extracted_tnote.glob("*"):
+                        shutil.copy2(str(p), str(target_tnote / p.name))
+
+            # Restore TincNet config
+            extracted_net = Path(tmpdir) / "tincnet/config.json"
+            if extracted_net.exists():
+                shutil.copy2(str(extracted_net), "/opt/tincnet/config.json")
+
+            # Restore TincProcess config
+            extracted_proc = Path(tmpdir) / "tincprocess/config.json"
+            if extracted_proc.exists():
+                shutil.copy2(str(extracted_proc), "/opt/tincprocess/config.json")
+
+        # Restart services in background
+        subprocess.Popen(["bash", "-c", "sleep 1 && systemctl restart tinc-hub tincnet tincnote tincprocess"])
+
+        return jsonify({"ok": True, "message": "Yedek başarıyla geri yüklendi! Servisler yeniden başlatılıyor..."})
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Geri yükleme hatası: {str(e)}"}), 500
+
 
 
 
