@@ -148,6 +148,8 @@ def register_blueprints():
     app.register_blueprint(api_terminal_bp)
     from blueprints.auth import bp as auth_bp
     app.register_blueprint(auth_bp)
+    from blueprints.api_agent_ops import bp as api_agent_ops_bp
+    app.register_blueprint(api_agent_ops_bp)
     try:
         from TNOTE.blueprint import tnote_bp
         app.register_blueprint(tnote_bp, url_prefix='/notes')

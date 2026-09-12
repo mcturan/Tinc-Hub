@@ -34,6 +34,23 @@ def index():
         pinned.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
         unpinned.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
         
+    tinc_core_ids = {'tinc-hub', 'tincnet', 'terminal', 'tnote', 'tincprocess', 'aprs-beacon', 'socies'}
+    def is_tinc_core(a):
+        if a.get('id') in tinc_core_ids or a.get('id', '').startswith('tinc'):
+            return True
+        p = a.get('port')
+        if p and str(p).isdigit() and 9010 <= int(p) <= 9019:
+            return True
+        return False
+
+    tinc_core = [a for a in enriched if is_tinc_core(a)]
+    system_services = [a for a in enriched if not is_tinc_core(a) and (a.get('service') or a.get('category') in ['Sistem', 'Araç', 'Güvenlik'])]
+    web_external = [a for a in enriched if not is_tinc_core(a) and a not in system_services]
+
+    tinc_core.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('port') or 9999))
+    system_services.sort(key=lambda a: a.get('name', ''))
+    web_external.sort(key=lambda a: a.get('name', ''))
+
     disc = _get_discovery()
     docker = disc.get("docker", [])
     known_services = {a.get("service") for a in all_apps if a.get("service")}
@@ -57,6 +74,9 @@ def index():
         apps=display_apps,
         pinned=pinned, 
         unpinned=unpinned,
+        tinc_core=tinc_core,
+        system_services=system_services,
+        web_external=web_external,
         categories=categories,
         selected_cat=cat_filter,
         docker=docker,

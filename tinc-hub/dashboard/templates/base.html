@@ -103,34 +103,56 @@
 
     {% block scripts %}{% endblock %}
     
-    <!-- Terminal Log Modal -->
+    <!-- Live Streaming Terminal Modal -->
     <div id="termModal" class="modal-overlay hidden" style="z-index: 10000;">
-        <div class="modal" style="max-width: 800px; width: 90%;">
-            <div class="modal-header">
-                <div class="modal-title">İşlem Çıktısı (Terminal)</div>
-                <button class="modal-close" onclick="document.getElementById('termModal').classList.add('hidden'); location.reload();">&times;</button>
+        <div class="modal" style="max-width: 850px; width: 92%; background: #0f172a; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div class="modal-header" style="background: #1e293b; padding: 12px 18px; border-bottom: 1px solid #334155; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#ef4444;"></span>
+                    <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#f59e0b;"></span>
+                    <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:#10b981;"></span>
+                    <strong id="termModalTitle" style="color: #f8fafc; font-family: monospace; font-size: 0.95rem; margin-left: 8px;">💻 Tinc Canlı Terminal &amp; Komut Çıktısı</strong>
+                </div>
+                <button class="modal-close" style="color:#94a3b8;" onclick="closeLiveTerminal()">&times;</button>
             </div>
-            <div class="modal-body">
-                <pre id="termOutput" style="background: #1e1e1e; color: #00ff00; padding: 15px; border-radius: 6px; height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; margin-bottom: 15px;"></pre>
-                <button class="btn btn-primary" onclick="document.getElementById('termModal').classList.add('hidden'); location.reload();" style="width: 100%">Kapat ve Sayfayı Yenile</button>
+            <div class="modal-body" style="padding: 16px;">
+                <pre id="termOutput" style="background: #020617; color: #38bdf8; padding: 16px; border-radius: 8px; border: 1px solid #1e293b; height: 420px; overflow-y: auto; font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; margin: 0 0 14px 0;"></pre>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button id="termCloseBtn" class="btn btn-primary" onclick="closeLiveTerminal()" style="padding: 8px 24px; font-weight: 600;">Kapat ve Panoyu Yenile</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Delete Modal -->
-    <div id="deleteModal" class="modal-overlay hidden">
-        <div class="modal">
+    <!-- Upgraded Delete Modal with 3 Clear Levels -->
+    <div id="deleteModal" class="modal-overlay hidden" style="z-index: 9999;">
+        <div class="modal" style="max-width: 540px;">
             <div class="modal-header">
-                <div class="modal-title">Uygulamayı Sil</div>
+                <div class="modal-title">🗑️ Uygulama / Servis Kaldırma</div>
                 <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <p id="deleteModalText">Bu uygulamayı silmek istiyorsunuz. Lütfen bir seçenek belirleyin:</p>
-                <div id="deleteModalWarning" class="info-box warn hidden" style="margin-top:10px;"></div>
-                <div style="display:flex; flex-direction:column; gap:10px; margin-top:20px;">
-                    <button class="btn btn-danger" onclick="executeDelete(true)" style="width:100%">🗑️ Sistemden Tamamen Kaldır (Durdur & Sil)</button>
-                    <button class="btn" onclick="executeDelete(false)" style="width:100%">👁️ Sadece Hub Panosundan Gizle / Sil</button>
-                    <button class="btn" onclick="closeDeleteModal()" style="width:100%">❌ İptal</button>
+                <p id="deleteModalText" style="font-weight: 600; font-size: 1.05rem; margin-bottom: 6px;"></p>
+                <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 16px;">Lütfen gerçekleştirmek istediğiniz kaldırma seviyesini seçin:</p>
+                <div id="deleteModalWarning" class="info-box warn hidden" style="margin-bottom:15px;"></div>
+
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div onclick="executeUninstallLevel('purge')" style="cursor:pointer; padding:12px; border:1px solid #ef4444; border-radius:8px; background:rgba(239,68,68,0.06); transition: all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.15)'" onmouseout="this.style.background='rgba(239,68,68,0.06)'">
+                        <div style="font-weight:700; color:#ef4444; margin-bottom:3px;">💣 1. Sistemden Kökten Temizle (Tam Kaldırma)</div>
+                        <div style="font-size:0.8rem; color:var(--text);">Servisi durdurur, devre dışı bırakır, systemd birim dosyasını siler, daemon-reload yapar ve panodan tamamen temizler. Canlı terminalde izleyebilirsiniz.</div>
+                    </div>
+
+                    <div onclick="executeUninstallLevel('disable')" style="cursor:pointer; padding:12px; border:1px solid #f59e0b; border-radius:8px; background:rgba(245,158,11,0.06); transition: all 0.2s;" onmouseover="this.style.background='rgba(245,158,11,0.15)'" onmouseout="this.style.background='rgba(245,158,11,0.06)'">
+                        <div style="font-weight:700; color:#f59e0b; margin-bottom:3px;">⏹️ 2. Servisi Durdur ve Panodan Kaldır</div>
+                        <div style="font-size:0.8rem; color:var(--text);">Servis durdurulur ve otomatik başlama kapatılır. Dosyalar sistemde korunur, sadece Hub panosundan kaldırılır.</div>
+                    </div>
+
+                    <div onclick="executeUninstallLevel('board')" style="cursor:pointer; padding:12px; border:1px solid #3b82f6; border-radius:8px; background:rgba(59,130,246,0.06); transition: all 0.2s;" onmouseover="this.style.background='rgba(59,130,246,0.15)'" onmouseout="this.style.background='rgba(59,130,246,0.06)'">
+                        <div style="font-weight:700; color:#3b82f6; margin-bottom:3px;">👁️ 3. Sadece Panodan Gizle / Kısayolu Sil</div>
+                        <div style="font-size:0.8rem; color:var(--text);">Arka plan servisi çalışmaya devam eder; sadece TincHub ana ekranındaki kart kaldırılır.</div>
+                    </div>
+
+                    <button class="btn" onclick="closeDeleteModal()" style="width:100%; margin-top:5px;">❌ İptal</button>
                 </div>
             </div>
         </div>
@@ -208,12 +230,84 @@
     });
 
     let currentDeleteId = null;
+    let currentDeleteName = null;
     let currentDeleteType = null; // 'app' or 'docker'
+    let activeEventSource = null;
+
+    function openLiveTerminal(title) {
+        const modal = document.getElementById('termModal');
+        const titleEl = document.getElementById('termModalTitle');
+        const outEl = document.getElementById('termOutput');
+        const closeBtn = document.getElementById('termCloseBtn');
+        if (titleEl) titleEl.textContent = title || '💻 Tinc Canlı Terminal';
+        if (outEl) outEl.textContent = '⏳ Konsol başlatılıyor...\n';
+        if (closeBtn) closeBtn.classList.remove('hidden');
+        modal.classList.remove('hidden');
+    }
+
+    function appendLiveTerminal(text) {
+        const outEl = document.getElementById('termOutput');
+        if (!outEl) return;
+        outEl.textContent += text + '\n';
+        outEl.scrollTop = outEl.scrollHeight;
+    }
+
+    function closeLiveTerminal() {
+        if (activeEventSource) {
+            activeEventSource.close();
+            activeEventSource = null;
+        }
+        document.getElementById('termModal').classList.add('hidden');
+        window.location.reload();
+    }
+
+    function runLiveCommands(title, commands) {
+        openLiveTerminal(title || "Sistem Görevi");
+        const outEl = document.getElementById('termOutput');
+        outEl.textContent = `🚀 [BAŞLADI] ${commands.length} adet komut icra edilecek...\n`;
+
+        fetch('/api/system/task-stream', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title: title, commands: commands})
+        }).then(response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            function read() {
+                reader.read().then(({done, value}) => {
+                    if (done) {
+                        appendLiveTerminal('\n════════════════════════════════════════');
+                        appendLiveTerminal('🏁 Görev akışı tamamlandı.');
+                        return;
+                    }
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                if (data.type === 'log') appendLiveTerminal(data.text);
+                                else if (data.type === 'done') {
+                                    appendLiveTerminal('\n════════════════════════════════════════');
+                                    appendLiveTerminal('🏁 ' + (data.message || 'Tamamlandı.'));
+                                }
+                            } catch(e) {}
+                        }
+                    }
+                    read();
+                });
+            }
+            read();
+        }).catch(err => {
+            appendLiveTerminal('❌ Bağlantı hatası: ' + err.message);
+        });
+    }
 
     async function deleteApp(appId, appName) {
         currentDeleteId = appId;
+        currentDeleteName = appName || appId;
         currentDeleteType = 'app';
-        document.getElementById('deleteModalText').textContent = `'${appName}' uygulamasını silmek üzeresiniz.`;
+        document.getElementById('deleteModalText').textContent = `'${appName}' uygulamasını sistemden kaldırmak üzeresiniz.`;
         
         try {
             const rApps = await fetch('/api/settings/apps');
@@ -222,19 +316,22 @@
             const warnBox = document.getElementById('deleteModalWarning');
             if (children.length > 0) {
                 const childNames = children.map(c => c.name).join(', ');
-                warnBox.textContent = `DİKKAT: Şu uygulamalar ona bağlı: ${childNames}`;
+                warnBox.textContent = `⚠️ DİKKAT: Şu uygulamalar ona bağlı: ${childNames}`;
                 warnBox.classList.remove('hidden');
             } else {
                 warnBox.classList.add('hidden');
             }
             document.getElementById('deleteModal').classList.remove('hidden');
-        } catch(e) { alert("Hata: "+e); }
+        } catch(e) { 
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
     }
     
     function deleteDocker(containerId, containerName) {
         currentDeleteId = containerId;
+        currentDeleteName = containerName || containerId;
         currentDeleteType = 'docker';
-        document.getElementById('deleteModalText').textContent = `'${containerName}' (Docker Container) silmek üzeresiniz.`;
+        document.getElementById('deleteModalText').textContent = `'${containerName}' (Docker Konteyneri) silmek üzeresiniz.`;
         document.getElementById('deleteModalWarning').classList.add('hidden');
         document.getElementById('deleteModal').classList.remove('hidden');
     }
@@ -242,57 +339,53 @@
     function closeDeleteModal() {
         document.getElementById('deleteModal').classList.add('hidden');
         currentDeleteId = null;
+        currentDeleteName = null;
     }
 
-    async function executeDelete(fullUninstall) {
+    function executeUninstallLevel(level) {
         if (!currentDeleteId) return;
-        
         const id = currentDeleteId;
+        const name = currentDeleteName || id;
         const type = currentDeleteType;
         closeDeleteModal();
 
-        try {
-            if (type === 'app') {
-                const r = await fetch(`/api/settings/apps/${id}?uninstall=${fullUninstall}`, {method: 'DELETE'});
-                if(r.ok) {
-                    const res = await r.json();
-                    if(res.log) {
-                        document.getElementById('termOutput').textContent = res.log;
-                        document.getElementById('termModal').classList.remove('hidden');
-                    } else {
-                        location.reload();
-                    }
+        if (type === 'docker') {
+            runLiveCommands(`🐳 Docker Silme: ${name}`, [
+                `docker stop ${id}`,
+                `docker rm -f ${id}`
+            ]);
+            return;
+        }
+
+        openLiveTerminal(`🗑️ ${name} Kaldırılıyor...`);
+        const url = `/api/apps/${id}/uninstall-stream?level=${level}`;
+        
+        if (activeEventSource) activeEventSource.close();
+        activeEventSource = new EventSource(url);
+
+        activeEventSource.onmessage = function(e) {
+            try {
+                const data = JSON.parse(e.data);
+                if (data.type === 'log') {
+                    appendLiveTerminal(data.text);
+                } else if (data.type === 'done') {
+                    appendLiveTerminal('\n════════════════════════════════════════');
+                    appendLiveTerminal('🏁 ' + (data.message || 'Kaldırma tamamlandı.'));
+                    activeEventSource.close();
+                    activeEventSource = null;
                 }
-                else {
-                    const res = await r.json();
-                    if(res.log) {
-                        document.getElementById('termOutput').textContent = "HATA:\n" + res.error + "\n\nLOGS:\n" + res.log;
-                        document.getElementById('termModal').classList.remove('hidden');
-                    } else {
-                        alert(`Hata: ${res.error || 'Silinemedi!'}`);
-                    }
-                }
-            } else if (type === 'docker') {
-                if (fullUninstall) {
-                    const r = await fetch(`/api/docker/${id}`, {method: 'DELETE'});
-                    if(r.ok) {
-                        const res = await r.json();
-                        if(res.log) {
-                            document.getElementById('termOutput').textContent = res.log;
-                            document.getElementById('termModal').classList.remove('hidden');
-                        } else {
-                            location.reload();
-                        }
-                    } else {
-                        const res = await r.json();
-                        document.getElementById('termOutput').textContent = "HATA:\n" + res.error + "\n\nLOGS:\n" + (res.log || "");
-                        document.getElementById('termModal').classList.remove('hidden');
-                    }
-                } else {
-                    alert("Docker container'ları Hub panosunda otomatik keşfedilir. Sadece sistemden kaldırma işlemi yapılabilir.");
-                }
+            } catch(err) {
+                appendLiveTerminal(e.data);
             }
-        } catch(e) { alert("Hata: "+e); }
+        };
+
+        activeEventSource.onerror = function() {
+            appendLiveTerminal('\n🏁 Bağlantı sonlandı. İşlem tamamlandı.');
+            if (activeEventSource) {
+                activeEventSource.close();
+                activeEventSource = null;
+            }
+        };
     }
     </script>
 </body>

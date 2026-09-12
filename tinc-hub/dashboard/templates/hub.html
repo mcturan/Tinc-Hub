@@ -96,6 +96,7 @@
     </div>
     <div class="casa-header-actions">
         {% if role == "admin" %}
+        <button onclick="openAIAgentModal()" class="btn btn-sm" style="background: linear-gradient(135deg, #4f46e5, #9333ea); color: white; font-weight: 600; box-shadow: 0 4px 12px rgba(99,102,241,0.35);" title="TincOps Yapay Zeka Görev Ajanı">🤖 TincOps Ajanı</button>
         <button onclick="runSystemAudit()" class="btn btn-sm" style="background-color: #f59e0b; color: white;" title="Sistemi Denetle (Akıllı Ajan)">🔍 Denetle</button>
         <button onclick="openBackupModal()" class="btn btn-sm" style="background-color: #059669; color: white;" title="Tam Sistem Yedeği & Kurtarma">💾 Yedekle / Kurtar</button>
         <button onclick="openSettingsModal()" class="btn btn-sm" style="background-color: #475569; color: white;">⚙️ Ayarlar</button>
@@ -146,7 +147,7 @@
             <span class="casa-sys-value" style="font-size:0.95rem;">192.168.1.10</span>
         </div>
         <div class="casa-net-details" style="font-size:0.75rem; color:var(--muted); margin-top:6px; display:flex; flex-direction:column; gap:3px;">
-            <div>Aktif Portlar: <strong>9010 (Hub), 9011 (Net), 9013 (Note)</strong></div>
+            <div>Aktif Portlar: <strong>9010 (Hub), 9011 (Net), 9013 (Note), 9014 (Process)</strong></div>
             <div>Durum: <span style="color:#10b981; font-weight:700;">🟢 Tüm Mikroservisler Aktif</span></div>
         </div>
     </div>
@@ -172,17 +173,85 @@
 </div>
 
 {% if not selected_cat %}
-<div class="section" style="margin-bottom: 28px;">
+<!-- 1. TINC EKOSİSTEMİ (ÇEKİRDEK UYGULAMALAR) -->
+<div class="section" style="margin-bottom: 32px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-        <h2 style="font-size:1.15rem; font-weight:700; color:var(--text);">📌 Öne Çıkan Uygulamalar</h2>
-        <span style="font-size:0.8rem; color:var(--muted);">{{ pinned|length }} Uygulama</span>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <h2 style="font-size:1.15rem; font-weight:700; color:var(--text); margin:0;">🏠 Tinc Ekosistemi (Çekirdek Uygulamalar)</h2>
+            <span class="badge" style="background:#6366f1; color:white; font-size:0.7rem; padding:2px 8px; border-radius:12px;">Port 9010-9019</span>
+        </div>
+        <span style="font-size:0.8rem; color:var(--muted);">{{ tinc_core|length }} Modül</span>
     </div>
     <div class="casa-apps-grid">
-        {% for app in pinned %}
+        {% for app in tinc_core %}
             {{ render_app_card(app) }}
         {% endfor %}
         <!-- CasaOS App Ekle Butonu -->
-        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis, Script veya Bağlantı Ekle">
+        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Tinc Servisi Ekle">
+            <div class="casa-app-icon-wrap add-icon">➕</div>
+            <div class="casa-app-name" style="color:var(--accent);">Modül Ekle</div>
+            <div class="casa-app-meta"><span>Özel Tinc Servisi</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. SİSTEM VE ALTYAPI SERVİSLERİ -->
+<div class="section" style="margin-bottom: 32px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <h2 style="font-size:1.15rem; font-weight:700; color:var(--text); margin:0;">🖥️ Sistem &amp; Altyapı Servisleri (Host)</h2>
+            <span class="badge" style="background:#0284c7; color:white; font-size:0.7rem; padding:2px 8px; border-radius:12px;">Linux Daemon</span>
+        </div>
+        <span style="font-size:0.8rem; color:var(--muted);">{{ system_services|length }} Servis</span>
+    </div>
+    <div class="casa-apps-grid">
+        {% for app in system_services %}
+            {{ render_app_card(app) }}
+        {% endfor %}
+        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Sistem Servisi Tanımla">
+            <div class="casa-app-icon-wrap add-icon">➕</div>
+            <div class="casa-app-name" style="color:var(--accent);">Servis Ekle</div>
+            <div class="casa-app-meta"><span>Daemon / Proxy</span></div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. WEB VE HARİCİ UYGULAMALAR -->
+{% if web_external|length > 0 %}
+<div class="section" style="margin-bottom: 28px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+            <h2 style="font-size:1.15rem; font-weight:700; color:var(--text); margin:0;">🌐 Web &amp; Harici Uygulamalar</h2>
+            <span class="badge" style="background:#10b981; color:white; font-size:0.7rem; padding:2px 8px; border-radius:12px;">Web Linkleri</span>
+        </div>
+        <span style="font-size:0.8rem; color:var(--muted);">{{ web_external|length }} Uygulama</span>
+    </div>
+    <div class="casa-apps-grid">
+        {% for app in web_external %}
+            {{ render_app_card(app) }}
+        {% endfor %}
+        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Web Kısayolu Ekle">
+            <div class="casa-app-icon-wrap add-icon">➕</div>
+            <div class="casa-app-name" style="color:var(--accent);">Link Ekle</div>
+            <div class="casa-app-meta"><span>Harici Port / URL</span></div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% else %}
+<!-- Kategori Seçildiğinde Filtrelenmiş Liste -->
+<div class="section">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="font-size:1.15rem; font-weight:700; color:var(--text);">📁 {{ selected_cat }} Uygulamaları</h2>
+        <span style="font-size:0.8rem; color:var(--muted);">{{ apps|length }} Servis</span>
+    </div>
+    <div class="casa-apps-grid">
+        {% for app in apps %}
+            {{ render_app_card(app) }}
+        {% else %}
+            <div class="empty-state" style="grid-column: 1 / -1;">Bu kategoride uygulama yok.</div>
+        {% endfor %}
+        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis veya Bağlantı Ekle">
             <div class="casa-app-icon-wrap add-icon">➕</div>
             <div class="casa-app-name" style="color:var(--accent);">Uygulama Ekle</div>
             <div class="casa-app-meta"><span>Özel Servis / Link</span></div>
@@ -190,30 +259,6 @@
     </div>
 </div>
 {% endif %}
-
-<div class="section">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-        <h2 style="font-size:1.15rem; font-weight:700; color:var(--text);">
-            {% if selected_cat %}📁 {{ selected_cat }} Uygulamaları{% else %}📦 Tüm Uygulamalar &amp; Servisler{% endif %}
-        </h2>
-        {% set display_list = apps if selected_cat else unpinned %}
-        <span style="font-size:0.8rem; color:var(--muted);">{{ display_list|length }} Servis</span>
-    </div>
-    <div class="casa-apps-grid">
-        {% for app in display_list %}
-            {{ render_app_card(app) }}
-        {% else %}
-            <div class="empty-state" style="grid-column: 1 / -1;">Bu kategoride uygulama yok.</div>
-        {% endfor %}
-        {% if selected_cat %}
-        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis veya Bağlantı Ekle">
-            <div class="casa-app-icon-wrap add-icon">➕</div>
-            <div class="casa-app-name" style="color:var(--accent);">Uygulama Ekle</div>
-            <div class="casa-app-meta"><span>Özel Servis / Link</span></div>
-        </div>
-        {% endif %}
-    </div>
-</div>
 
 {% if not selected_cat %}
 <!-- Docker Containerları -->
@@ -304,7 +349,14 @@
             <div class="form-group"><label>Github Repo / Kaynak</label><input type="text" id="edit-repo" placeholder="github.com/mcturan/..."></div>
             <div class="form-row">
                 <div class="form-group"><label>Systemd Servis / Container Adı</label><input type="text" id="edit-service"></div>
-                <div class="form-group"><label>Port</label><input type="number" id="edit-port"></div>
+                <div class="form-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <label style="margin:0;">Port</label>
+                        <button type="button" onclick="testPortAvailability()" class="btn btn-sm" style="padding:1px 6px; font-size:0.72rem; background:var(--surface2);">🔬 Portu Test Et</button>
+                    </div>
+                    <input type="number" id="edit-port" placeholder="Örn: 9015">
+                    <div id="port-check-result" style="font-size:0.75rem; margin-top:3px; display:none;"></div>
+                </div>
             </div>
             <div class="form-group"><label>Harici URL</label><input type="text" id="edit-url" placeholder="https://..."></div>
             <div class="form-row">
@@ -386,6 +438,62 @@
         </div>
     </div>
 </div>
+
+<!-- Modal: TincOps AI Görev Ajanı -->
+<div id="aiAgentModal" class="modal-overlay hidden" style="z-index: 9998;" onclick="closeAIAgentModal()">
+    <div class="modal" style="max-width: 680px; width: 92%; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px;" onclick="event.stopPropagation()">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:1.5rem;">🤖</span>
+                <div>
+                    <h3 style="margin:0; font-size:1.15rem; color:var(--text);">TincOps AI Görev Ajanı</h3>
+                    <div style="font-size:0.78rem; color:var(--muted);">Doğal dille görev verin; sistem analiz etsin ve komutları canlı çalıştırsın.</div>
+                </div>
+            </div>
+            <button class="modal-close" onclick="closeAIAgentModal()">&times;</button>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+            <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px;">Hızlı Görev Önerileri:</label>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                <button type="button" class="btn btn-sm" onclick="setAIPrompt('Ollama servisini sistemden tamamen kaldır ve temizle')" style="font-size:0.75rem; background:var(--surface2);">🗑️ Ollama'yı Kökten Kaldır</button>
+                <button type="button" class="btn btn-sm" onclick="setAIPrompt('Port 9015 boş mu, kim dinliyor?')" style="font-size:0.75rem; background:var(--surface2);">🔌 Port 9015 Boş mu?</button>
+                <button type="button" class="btn btn-sm" onclick="setAIPrompt('TincNet servisini yeniden başlat ve durumuna bak')" style="font-size:0.75rem; background:var(--surface2);">⟳ TincNet'i Yeniden Başlat</button>
+                <button type="button" class="btn btn-sm" onclick="setAIPrompt('3 günden eski logları ve diskteki gereksiz paketleri temizle')" style="font-size:0.75rem; background:var(--surface2);">🧹 Disk &amp; Log Temizliği</button>
+                <button type="button" class="btn btn-sm" onclick="setAIPrompt('En çok RAM tüketen süreçleri listele')" style="font-size:0.75rem; background:var(--surface2);">📊 RAM Tüketen İlk 5 Süreç</button>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
+            <input type="text" id="aiAgentInput" placeholder="Örn: Ollama servisini tamamen kaldır, 9015 portunu test et..." style="flex:1; padding:10px 14px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:0.9rem;" onkeydown="if(event.key==='Enter') analyzeAITask()">
+            <button type="button" id="btn-ai-analyze" onclick="analyzeAITask()" class="btn btn-primary" style="padding:10px 18px; font-weight:600; display:flex; align-items:center; gap:6px;">
+                <span>🚀 Analiz Et</span>
+            </button>
+        </div>
+
+        <div id="ai-task-loading" style="display:none; text-align:center; padding:20px; color:var(--muted); font-size:0.9rem;">
+            ⏳ TincOps görevi analiz ediyor ve sistem planını hazırlıyor...
+        </div>
+
+        <!-- Task Plan Output Card -->
+        <div id="ai-plan-card" style="display:none; background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:14px; margin-top:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <strong id="ai-plan-title" style="font-size:0.95rem; color:var(--text);"></strong>
+                <span id="ai-plan-risk" class="badge" style="padding:3px 8px; border-radius:4px; font-size:0.75rem;"></span>
+            </div>
+            <p id="ai-plan-desc" style="font-size:0.85rem; color:var(--muted); margin-bottom:10px;"></p>
+            <div style="margin-bottom:12px;">
+                <div style="font-size:0.75rem; font-weight:700; color:var(--muted); margin-bottom:4px; text-transform:uppercase;">Çalıştırılacak Bash Komutları:</div>
+                <pre id="ai-plan-cmds" style="background:#020617; color:#38bdf8; padding:10px; border-radius:6px; font-family:monospace; font-size:0.8rem; line-height:1.4; margin:0; max-height:160px; overflow-y:auto;"></pre>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn" onclick="document.getElementById('ai-plan-card').style.display='none'">İptal</button>
+                <button type="button" class="btn btn-danger" id="ai-plan-exec-btn" onclick="executeAITaskPlan()" style="font-weight:700;">▶️ Onayla &amp; Canlı Terminalde Çalıştır</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Store Modal -->
 <div id="storeModal" class="modal-overlay hidden">
     <div class="modal" style="max-width: 800px; width: 90%;">
@@ -623,12 +731,11 @@ function closeStoreModal() {
 }
 
 async function installFromStore(appId, appName, repo) {
-    if(!confirm(`${appName} uygulamasını kurmak istiyor musunuz?\n\nBu işlem github reposunu (${repo}) çekecek ve arka planda kurulum (install.sh) yapacaktır. 1-2 dakika sürebilir.`)) return;
-    
-    document.getElementById('store-loading').innerHTML = '<div class="info-box" style="background:#3b82f6; color:white;">⏳ Kuruluyor... Lütfen bekleyin, sayfayı kapatmayın.</div>';
-    document.getElementById('store-loading').style.display = 'block';
-    document.getElementById('store-grid').style.display = 'none';
-    
+    if(!confirm(`${appName} uygulamasını kurmak istiyor musunuz?`)) return;
+    closeStoreModal();
+    openLiveTerminal(`⬇️ ${appName} Kurulumu`);
+    appendLiveTerminal(`📦 [MAĞAZA] ${appName} paketi için kurulum başlatılıyor...\n`);
+
     try {
         const r = await fetch('/api/store/install', {
             method: 'POST',
@@ -636,16 +743,112 @@ async function installFromStore(appId, appName, repo) {
             body: JSON.stringify({id: appId})
         });
         const res = await r.json();
-        if(r.ok) {
-            alert("✅ " + res.message);
-            location.reload();
+        if(res.ok) {
+            if (res.log) appendLiveTerminal(res.log);
+            appendLiveTerminal(`\n════════════════════════════════════════`);
+            appendLiveTerminal(`✅ ${res.message || 'Kurulum başarıyla tamamlandı!'}`);
         } else {
-            alert("❌ Kurulum Hatası: \n" + res.error);
-            closeStoreModal();
+            appendLiveTerminal(`\n❌ Kurulum Hatası: ${res.error || 'Bilinmeyen hata'}`);
         }
     } catch (e) {
-        alert("Bağlantı Hatası: " + e);
-        closeStoreModal();
+        appendLiveTerminal(`\n❌ Bağlantı Hatası: ${e}`);
+    }
+}
+
+// ── TincOps AI Görev Ajanı Denetleyicisi ──
+let currentAITask = null;
+
+function openAIAgentModal() {
+    document.getElementById('aiAgentModal').classList.remove('hidden');
+    document.getElementById('aiAgentInput').focus();
+}
+
+function closeAIAgentModal() {
+    document.getElementById('aiAgentModal').classList.add('hidden');
+    document.getElementById('ai-plan-card').style.display = 'none';
+    document.getElementById('ai-task-loading').style.display = 'none';
+}
+
+function setAIPrompt(text) {
+    document.getElementById('aiAgentInput').value = text;
+    analyzeAITask();
+}
+
+async function analyzeAITask() {
+    const prompt = document.getElementById('aiAgentInput').value.trim();
+    if (!prompt) return;
+
+    const loadEl = document.getElementById('ai-task-loading');
+    const planCard = document.getElementById('ai-plan-card');
+    loadEl.style.display = 'block';
+    planCard.style.display = 'none';
+
+    try {
+        const r = await fetch('/api/ai/agent-task', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({prompt})
+        });
+        const data = await r.json();
+        loadEl.style.display = 'none';
+
+        if (data.ok) {
+            currentAITask = data;
+            document.getElementById('ai-plan-title').textContent = data.title;
+            document.getElementById('ai-plan-desc').textContent = data.explanation;
+            
+            const riskEl = document.getElementById('ai-plan-risk');
+            if (data.risk_level === 'high') {
+                riskEl.textContent = 'Yüksek Risk ⚠️';
+                riskEl.style.background = '#ef4444';
+                riskEl.style.color = 'white';
+            } else if (data.risk_level === 'medium') {
+                riskEl.textContent = 'Orta Risk ⚠️';
+                riskEl.style.background = '#f59e0b';
+                riskEl.style.color = 'white';
+            } else {
+                riskEl.textContent = 'Güvenli ✓';
+                riskEl.style.background = '#10b981';
+                riskEl.style.color = 'white';
+            }
+
+            document.getElementById('ai-plan-cmds').textContent = data.commands.join('\n');
+            planCard.style.display = 'block';
+        } else {
+            alert("Ajan Hatası: " + (data.error || 'Analiz yapılamadı.'));
+        }
+    } catch(err) {
+        loadEl.style.display = 'none';
+        alert("Bağlantı hatası: " + err.message);
+    }
+}
+
+function executeAITaskPlan() {
+    if (!currentAITask || !currentAITask.commands || currentAITask.commands.length === 0) return;
+    const title = currentAITask.title;
+    const cmds = currentAITask.commands;
+    closeAIAgentModal();
+    runLiveCommands(`🤖 TincOps: ${title}`, cmds);
+}
+
+// ── Canlı Port Test Fonksiyonu ──
+async function testPortAvailability() {
+    const port = document.getElementById('edit-port').value;
+    const resEl = document.getElementById('port-check-result');
+    if (!port) { alert("Lütfen test etmek için bir port numarası girin."); return; }
+    resEl.style.display = 'block';
+    resEl.innerHTML = '<span style="color:var(--muted);">⏳ Port taranıyor...</span>';
+    try {
+        const r = await fetch(`/api/apps/port-check/${port}`);
+        const d = await r.json();
+        if (d.in_use) {
+            resEl.innerHTML = `<span style="color:#ef4444; font-weight:700;">❌ Port ${port} DOLU!</span> (Kullanan: ${d.process || 'Bilinmiyor'} ${d.pid ? 'PID: ' + d.pid : ''})`;
+        } else {
+            let note = d.is_tinc_reserved ? ` (Rezerve: ${d.reserved_name})` : '';
+            resEl.innerHTML = `<span style="color:#10b981; font-weight:700;">✅ Port ${port} BOŞ &amp; Müsait!</span>${note}`;
+        }
+    } catch(e) {
+        resEl.innerHTML = `<span style="color:#f59e0b;">Test hatası: ${e}</span>`;
     }
 }
 
