@@ -179,15 +179,4 @@ if __name__ == "__main__":
 
     start_background_checker(load_apps, interval=30)
 
-    # TNOTE Servisleri
-    try:
-        from TNOTE import db as tnote_db, start_telegram_bot, start_reminder_engine
-        tnote_db.init_db()
-        if tnote_db.get_setting("telegram_enabled", "0") == "1":
-            start_telegram_bot()
-        start_reminder_engine()
-        log.info("TNOTE modülü ve servisleri aktif.")
-    except Exception as e:
-        log.warning(f"TNOTE servisleri başlatılamadı: {e}")
-
     app.run(host=HOST, port=PORT, debug=False, threaded=True)

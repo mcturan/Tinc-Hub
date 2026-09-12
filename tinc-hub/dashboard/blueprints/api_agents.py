@@ -9,7 +9,7 @@ bp = Blueprint('api_agents', __name__)
 def api_agents_list():
     if not tinchub_db:
         return jsonify([])
-    agents = tinchub_db.get_all_agents()
+    agents = [a for a in tinchub_db.get_all_agents() if a.get('id') != 'tnote']
     for agent in agents:
         # Add latest metrics
         if agent['id'] == 'disk-sentinel':
@@ -62,8 +62,8 @@ def agents_page():
         agents = []
         events = []
     else:
-        agents = tinchub_db.get_all_agents()
-        events = tinchub_db.get_recent_events(limit=20, hours=24)
+        agents = [a for a in tinchub_db.get_all_agents() if a.get('id') != 'tnote']
+        events = [e for e in tinchub_db.get_recent_events(limit=20, hours=24) if e.get('agent_id') != 'tnote']
     return render_template('agents.html', agents=agents, events=events, now=_now(), has_auth=bool(PASSWORD))
 
 

@@ -14,23 +14,6 @@ _reminder_thread = None
 _stop_event = threading.Event()
 _is_running = False
 
-def _notify_tinc_hub_event(level: str, category: str, message: str, data: dict = None):
-    """Eğer Tinc-Hub shared db mevcutsa bildirim ziline olay ekler."""
-    try:
-        shared_dir = os.environ.get("TINC_HUB_SHARED", "/opt/tinc-hub/shared")
-        if shared_dir not in sys.path:
-            sys.path.insert(0, shared_dir)
-        import db as tinchub_db
-        tinchub_db.log_event(
-            agent_id="tnote",
-            level=level,
-            category=category,
-            message=message,
-            data=data or {}
-        )
-    except Exception:
-        pass
-
 def _process_due_reminders():
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     due_list = db.get_due_reminders(now_str)
@@ -109,7 +92,6 @@ def _process_due_bills():
             buttons.append([{"text": f"✓ {b['title']} Ödendi", "callback_data": f"tn:fin_paid:{b['id']}:{b['page_id']}"}])
         keyboard = {"inline_keyboard": buttons}
         send_notification_to_all_chats(msg, reply_markup=keyboard)
-        _notify_tinc_hub_event(level="WARN", category="task", message=f"TNOTE: {len(unpaid)} adet ödenmemiş faturanın vadesi geldi/yaklaştı.")
     _last_bill_check_day = today_str
 
 def _process_price_drop_checks():
@@ -149,7 +131,6 @@ def _process_price_drop_checks():
                     f"🔗 [Ürünü Görüntüle]({url})"
                 )
                 send_notification_to_all_chats(alert_text)
-                _notify_tinc_hub_event(level="INFO", category="task", message=f"Fiyat Düştü: {item['title']} ({old_price_str} -> {new_price_str})")
         except Exception as err:
             log.debug(f"Fiyat kontrol hatası: {err}")
 
