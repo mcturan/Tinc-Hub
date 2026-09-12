@@ -975,6 +975,7 @@ footer {
 
 /* CasaOS Dropdown Menu */
 .casa-dropdown-menu {
+  display: none;
   position: absolute;
   top: 32px;
   right: 6px;

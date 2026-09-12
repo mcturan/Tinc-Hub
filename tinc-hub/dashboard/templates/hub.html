@@ -11,7 +11,7 @@
         <button class="casa-app-menu-btn" onclick="toggleAppMenu(event, '{{ app.id }}')" title="Seçenekler">⋮</button>
         
         <!-- CasaOS 3-Dots Dropdown Menu -->
-        <div class="casa-dropdown-menu" id="menu-{{ app.id }}" onclick="event.stopPropagation()">
+        <div class="casa-dropdown-menu" id="menu-{{ app.id }}" style="display: none;" onclick="event.stopPropagation()">
             <div class="casa-menu-header">
                 <strong>{{ app.name }}</strong>
                 {% if app.port %}<span class="casa-port-tag">:{{ app.port }}</span>{% endif %}
