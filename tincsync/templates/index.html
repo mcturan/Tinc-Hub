@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TincSync — P2P Bulut &amp; Dağıtık Dosya Eşitleme</title>
+    <link rel="stylesheet" href="/static/css/tinc_theme.css">
+    <style>
+        :root {
+            --primary: var(--tinc-primary, #0284c7);
+            --primary-hover: var(--tinc-primary-dark, #0369a1);
+            --bg: var(--tinc-bg, #f8fafc);
+            --surface: var(--tinc-surface, #ffffff);
+            --border: var(--tinc-border, #e2e8f0);
+            --text: var(--tinc-text, #0f172a);
+            --text-muted: var(--tinc-text-muted, #64748b);
+            --success: var(--tinc-success, #10b981);
+            --danger: var(--tinc-danger, #ef4444);
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+        
+        /* Header */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; }
+        .brand-icon {
+            font-size: 1.8rem;
+            background: #e0f2fe;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+        }
+        .brand-title { font-size: 1.25rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+        .brand-subtitle { font-size: 0.8rem; color: var(--text-muted); }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        
+        .btn {
+            background: var(--surface);
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .btn:hover { background: #f1f5f9; }
+        .btn-primary { background: var(--primary); color: #fff; border: none; }
+        .btn-primary:hover { background: var(--primary-hover); }
+
+        /* Container */
+        .main-container { max-width: 1380px; margin: 0 auto; padding: 24px; }
+
+        /* Device ID Strip */
+        .device-id-badge {
+            background: var(--surface);
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            padding: 12px 18px;
+            font-size: 0.85rem;
+            color: #475569;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .device-id-code {
+            font-family: monospace;
+            font-weight: 600;
+            color: var(--primary);
+            background: #f0f9ff;
+            padding: 3px 8px;
+            border-radius: 6px;
+            user-select: all;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        .stat-icon {
+            width: 46px;
+            height: 46px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+        .icon-blue { background: #f0f9ff; color: #0284c7; }
+        .icon-green { background: #ecfdf5; color: #059669; }
+        .icon-purple { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+        .icon-amber { background: #fffbeb; color: #d97706; }
+        .stat-card h3 { font-size: 1.3rem; font-weight: 700; line-height: 1.2; }
+        .stat-card p { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+
+        /* Section */
+        .section-header {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .item-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .item-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        .item-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .item-card-title { font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        
+        .badge { font-size: 0.7rem; font-weight: 600; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; }
+        .badge-idle { background: #dcfce7; color: #15803d; }
+        .badge-syncing { background: #e0f2fe; color: #0369a1; }
+        .badge-error { background: #fee2e2; color: #b91c1c; }
+        .badge-local { background: #f1f5f9; color: #475569; }
+        .badge-connected { background: #dcfce7; color: #15803d; }
+        .badge-disconnected { background: #f1f5f9; color: #94a3b8; }
+
+        .item-path {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            background: #f8fafc;
+            padding: 6px 10px;
+            border-radius: 6px;
+            word-break: break-all;
+            margin-bottom: 12px;
+        }
+        .item-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; font-size: 0.8rem; }
+        .metric-row { color: var(--text-muted); }
+        .metric-row strong { color: var(--text); }
+        .item-card-footer {
+            border-top: 1px solid #f1f5f9;
+            padding-top: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .footer-btn-group { display: flex; gap: 6px; }
+
+        /* Modals */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(2px);
+        }
+        .modal.active { display: flex; }
+        .modal-box {
+            background: var(--surface);
+            border-radius: 12px;
+            width: 90%;
+            max-width: 580px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .modal-box.large { max-width: 860px; }
+        .modal-body { overflow-y: auto; flex: 1; margin: 14px 0; }
+        .modal-box h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: #475569; margin-bottom: 4px; }
+        .form-control {
+            width: 100%;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.85rem;
+            color: var(--text);
+            box-sizing: border-box;
+        }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
+
+        /* Picker */
+        .picker-path-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            font-size: 0.8rem;
+        }
+        .picker-list { border: 1px solid #e2e8f0; border-radius: 6px; max-height: 280px; overflow-y: auto; }
+        .picker-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+        .picker-item:hover { background: #f1f5f9; }
+        .picker-item:last-child { border-bottom: none; }
+
+        /* Table */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .data-table th { background: #f8fafc; text-align: left; padding: 10px 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; }
+        .data-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+        .data-table tr:hover td { background: #f8fafc; }
+        .device-origin-tag {
+            display: inline-block;
+            background: #e0f2fe;
+            color: #0369a1;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="brand">
+            <div class="brand-icon">🔄</div>
+            <div>
+                <div class="brand-title">
+                    TincSync
+                    <span style="font-size:0.75rem; background:#eff6ff; color:#0284c7; border:1px solid #bae6fd; padding:2px 8px; border-radius:12px; font-weight:600;">P2P Cloud &amp; Drive</span>
+                </div>
+                <div class="brand-subtitle">Özel Donanımlar Arası Dağıtık Bulut &amp; Dosya Ağı</div>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-primary" onclick="openFolderModal()">📁 Yeni Klasör Paylaş</button>
+            <button class="btn" onclick="openDeviceModal()">💻 Cihaz Eşle</button>
+            <button class="btn" onclick="loadSyncData(true)">⚡ Yenile</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+
+        <!-- Device ID Strip -->
+        <div class="device-id-badge">
+            <div>
+                <strong>Bu Düğümün Kimliği (Device ID):</strong>
+                <span class="device-id-code" id="myDeviceIdDisplay">Yükleniyor...</span>
+            </div>
+            <div style="font-size:0.75rem; color:#64748b;">
+                Diğer şube, merkez veya telefon istemcilerinden bu ID ile bağlanabilirsiniz.
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon icon-blue">📁</div>
+                <div>
+                    <h3 id="statFolderCount">0</h3>
+                    <p>Paylaşılan Klasör</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon icon-green">💻</div>
+                <div>
+                    <h3 id="statDeviceCount">0</h3>
+                    <p>Eşleşen Cihaz (Peer)</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon icon-purple">📦</div>
+                <div>
+                    <h3 id="statTotalBytes">0 MB</h3>
+                    <p>Eşitlenen Toplam Alan</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon icon-amber">⚡</div>
+                <div>
+                    <h3 id="statSyncStatus">Çevrimiçi</h3>
+                    <p>P2P Mesh Motoru</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paylaşılan Klasörler -->
+        <div class="section-header">
+            <span>📁 Paylaşılan Klasörler (Senkronizasyon &amp; Dağıtım Alanları)</span>
+        </div>
+        <div class="cards-grid" id="foldersGrid">
+            <div style="grid-column: 1/-1; text-align:center; padding:30px; color:#64748b;">Klasörler taranıyor...</div>
+        </div>
+
+        <!-- Eşleşen Cihazlar -->
+        <div class="section-header">
+            <span>💻 Eşleşen Düğümler (Tinc-Hub Noktaları &amp; Mobil Cihazlar)</span>
+        </div>
+        <div class="cards-grid" id="devicesGrid">
+            <div style="grid-column: 1/-1; text-align:center; padding:30px; color:#64748b;">Cihazlar taranıyor...</div>
+        </div>
+
+    </div>
+
+    <!-- Yeni Klasör Modal -->
+    <div class="modal" id="folderModal">
+        <div class="modal-box">
+            <h2>📁 Yeni Klasör Paylaş <button class="btn" style="padding:2px 8px;" onclick="closeFolderModal()">&times;</button></h2>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Klasör Tanımı / Etiket</label>
+                    <input type="text" id="folderLabelInput" class="form-control" placeholder="Örn: Muhasebe Belgeleri">
+                </div>
+                <div class="form-group">
+                    <label>Klasör ID (Tekil Kod)</label>
+                    <input type="text" id="folderIdInput" class="form-control" placeholder="Örn: muhasebe-2026">
+                </div>
+                <div class="form-group">
+                    <label>Diskteki Dizin Yolu</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="folderPathInput" class="form-control" placeholder="/home/turan/...">
+                        <button class="btn" onclick="openDirPicker()">🔍 Diski Tara</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Senkronizasyon Türü</label>
+                    <select id="folderTypeInput" class="form-control">
+                        <option value="sendreceive">İki Yönlü (Gönder &amp; Al) - Çift Taraflı Eşitleme</option>
+                        <option value="sendonly">Yalnızca Gönder (Master Sunucu / Dağıtıcı)</option>
+                        <option value="receiveonly">Yalnızca Al (Şube Terminali / Kasa)</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display:flex; align-items:center; gap:8px;">
+                    <input type="checkbox" id="folderTrashCheckbox" checked>
+                    <label for="folderTrashCheckbox" style="margin:0; cursor:pointer;">
+                        🗑️ Sürümleme &amp; Çöp Kutusu Etkinleştir (Silinen dosyalar 30 gün kurtarılabilir)
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeFolderModal()">Vazgeç</button>
+                <button class="btn btn-primary" onclick="submitNewFolder()">Kaydet ve Paylaş</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dizin Seçici Modal -->
+    <div class="modal" id="pickerModal" style="z-index: 10000;">
+        <div class="modal-box">
+            <h2>🔍 Dizin Seç <button class="btn" style="padding:2px 8px;" onclick="closeDirPicker()">&times;</button></h2>
+            <div class="modal-body">
+                <div class="picker-path-bar">
+                    <button class="btn" style="padding:2px 6px;" onclick="navigatePickerParent()">⬆️ Üst Dizin</button>
+                    <span id="pickerCurrentPath">/home/turan</span>
+                </div>
+                <div class="picker-list" id="pickerItemsList"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeDirPicker()">İptal</button>
+                <button class="btn btn-primary" onclick="confirmDirSelection()">Bu Klasörü Seç</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dosya Gezgini Modal -->
+    <div class="modal" id="filesModal">
+        <div class="modal-box large">
+            <h2>
+                <span id="filesModalTitle">📂 Dosyalar</span>
+                <button class="btn" style="padding:2px 8px;" onclick="closeFilesModal()">&times;</button>
+            </h2>
+            <div class="modal-body">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Dosya Adı</th>
+                            <th>Boyut</th>
+                            <th>Son Değişiklik Tarihi</th>
+                            <th>Ekleyen / Değiştiren Düğüm</th>
+                        </tr>
+                    </thead>
+                    <tbody id="filesTableBody">
+                        <tr><td colspan="4" style="text-align:center; color:#64748b;">Yükleniyor...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeFilesModal()">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Çöp Kutusu Modal -->
+    <div class="modal" id="trashModal">
+        <div class="modal-box large">
+            <h2>
+                <span id="trashModalTitle">🗑️ Çöp Kutusu &amp; Silinen Dosyalar</span>
+                <button class="btn" style="padding:2px 8px;" onclick="closeTrashModal()">&times;</button>
+            </h2>
+            <div class="modal-body">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Dosya</th>
+                            <th>Boyut</th>
+                            <th>Silinme Tarihi</th>
+                            <th>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trashTableBody">
+                        <tr><td colspan="4" style="text-align:center; color:#64748b;">Yükleniyor...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeTrashModal()">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Yedek Al & Paylaş Modal -->
+    <div class="modal" id="exportModal">
+        <div class="modal-box">
+            <h2>📦 Yedek Al &amp; Aktar <button class="btn" style="padding:2px 8px;" onclick="closeExportModal()">&times;</button></h2>
+            <div class="modal-body">
+                <input type="hidden" id="exportFolderId">
+                <div class="form-group">
+                    <label>1. Doğrudan İndirme Formatı</label>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn" style="flex:1;" onclick="downloadArchive('zip')">📥 ZIP Olarak İndir</button>
+                        <button class="btn" style="flex:1;" onclick="downloadArchive('tar.gz')">📥 TAR.GZ Olarak İndir</button>
+                    </div>
+                </div>
+                <hr style="border:0; border-top:1px solid #e2e8f0; margin:16px 0;">
+                <div class="form-group">
+                    <label>2. Kanala Gönder / Paylaş</label>
+                    <select id="exportChannelSelect" class="form-control" onchange="onChannelChange()">
+                        <option value="telegram">✈️ Telegram (Bot Mesajı Olarak Gönder)</option>
+                        <option value="whatsapp">💬 WhatsApp (Hızlı Paylaşım Linki)</option>
+                        <option value="email">📧 E-Posta (SMTP İle Gönder)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="recipientGroup">
+                    <label id="recipientLabel">Telegram Chat ID (Boşsa .env içindeki varsayılan)</label>
+                    <input type="text" id="recipientInput" class="form-control" placeholder="Örn: 12345678 veya telefon">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeExportModal()">Kapat</button>
+                <button class="btn btn-primary" onclick="executeShare()">🚀 Gönder / Paylaş</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Yeni Cihaz Modal -->
+    <div class="modal" id="deviceModal">
+        <div class="modal-box">
+            <h2>💻 Yeni Cihaz / Düğüm Eşle <button class="btn" style="padding:2px 8px;" onclick="closeDeviceModal()">&times;</button></h2>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Cihaz Adı / Lokasyon</label>
+                    <input type="text" id="deviceNameInput" class="form-control" placeholder="Örn: Şube-1 Kasa PC">
+                </div>
+                <div class="form-group">
+                    <label>Cihaz ID (Device ID)</label>
+                    <input type="text" id="deviceIdInput" class="form-control" placeholder="Örn: XXXXXXX-XXXXXXX-XXXXXXX-XXXXXXX...">
+                    <small style="color:#64748b; font-size:0.75rem;">Diğer cihazın TincSync sayfasındaki kimlik kodunu buraya yapıştırın.</small>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeDeviceModal()">Vazgeç</button>
+                <button class="btn btn-primary" onclick="submitNewDevice()">Cihazı Eşle</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    let currentPickerPath = '/home/turan';
+    let parentPickerPath = '/home';
+
+    function formatBytes(bytes, decimals = 2) {
+        if (!+bytes) return '0 B';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    }
+
+    function formatDate(isoStr) {
+        if (!isoStr) return '-';
+        try {
+            const d = new Date(isoStr);
+            return d.toLocaleString('tr-TR');
+        } catch {
+            return isoStr;
+        }
+    }
+
+    function openFolderModal() { document.getElementById('folderModal').classList.add('active'); }
+    function closeFolderModal() { document.getElementById('folderModal').classList.remove('active'); }
+    function openDeviceModal() { document.getElementById('deviceModal').classList.add('active'); }
+    function closeDeviceModal() { document.getElementById('deviceModal').classList.remove('active'); }
+
+    function openDirPicker() {
+        document.getElementById('pickerModal').classList.add('active');
+        loadDirPicker(document.getElementById('folderPathInput').value.trim() || '/home/turan');
+    }
+    function closeDirPicker() { document.getElementById('pickerModal').classList.remove('active'); }
+
+    async function loadDirPicker(path) {
+        try {
+            const res = await fetch(`/api/fs/browse?path=${encodeURIComponent(path)}`);
+            const data = await res.json();
+            if (data.error) {
+                alert('Dizin okunamadı: ' + data.error);
+                return;
+            }
+            currentPickerPath = data.current;
+            parentPickerPath = data.parent;
+            document.getElementById('pickerCurrentPath').textContent = currentPickerPath;
+            
+            const listEl = document.getElementById('pickerItemsList');
+            listEl.innerHTML = '';
+            
+            if (data.items.length === 0) {
+                listEl.innerHTML = '<div style="padding:16px; text-align:center; color:#94a3b8;">Bu dizin boş</div>';
+                return;
+            }
+            
+            data.items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'picker-item';
+                div.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>${item.isDir ? '📁' : '📄'}</span>
+                        <strong>${item.name}</strong>
+                    </div>
+                    <div style="font-size:0.75rem; color:#64748b;">
+                        ${item.isDir ? 'Klasör' : formatBytes(item.size)}
+                    </div>
+                `;
+                div.onclick = () => {
+                    if (item.isDir) {
+                        loadDirPicker(item.path);
+                    }
+                };
+                listEl.appendChild(div);
+            });
+        } catch (e) {
+            alert('Dizin listeleme hatası: ' + e);
+        }
+    }
+
+    function navigatePickerParent() {
+        if (parentPickerPath) {
+            loadDirPicker(parentPickerPath);
+        }
+    }
+
+    function confirmDirSelection() {
+        document.getElementById('folderPathInput').value = currentPickerPath;
+        if (!document.getElementById('folderLabelInput').value) {
+            const parts = currentPickerPath.split('/').filter(Boolean);
+            document.getElementById('folderLabelInput').value = parts[parts.length - 1] || 'Klasör';
+        }
+        if (!document.getElementById('folderIdInput').value) {
+            const parts = currentPickerPath.split('/').filter(Boolean);
+            const name = parts[parts.length - 1] || 'klasor';
+            document.getElementById('folderIdInput').value = name.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+        }
+        closeDirPicker();
+    }
+
+    async function openFilesModal(folderId, label) {
+        document.getElementById('filesModalTitle').textContent = `📂 ${label} — Dosya Listesi & Kaynaklar`;
+        document.getElementById('filesModal').classList.add('active');
+        const tbody = document.getElementById('filesTableBody');
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#64748b;">Dosyalar listeleniyor...</td></tr>';
+        
+        try {
+            const res = await fetch(`/api/files/list?folder=${folderId}`);
+            const data = await res.json();
+            const files = data.files || [];
+            
+            if (files.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#64748b;">Klasörde dosya bulunmuyor.</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            files.forEach(f => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${f.isDir ? '📁' : '📄'} ${f.name}</strong></td>
+                    <td>${f.isDir ? '-' : formatBytes(f.size)}</td>
+                    <td>${formatDate(f.modTime)}</td>
+                    <td><span class="device-origin-tag">💻 ${f.modifiedBy}</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#dc2626;">Hata: ${e}</td></tr>`;
+        }
+    }
+    function closeFilesModal() { document.getElementById('filesModal').classList.remove('active'); }
+
+    let currentTrashFolder = 'default';
+    async function openTrashModal(folderId, label) {
+        currentTrashFolder = folderId;
+        document.getElementById('trashModalTitle').textContent = `🗑️ ${label} — Çöp Kutusu & Kurtarma`;
+        document.getElementById('trashModal').classList.add('active');
+        const tbody = document.getElementById('trashTableBody');
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#64748b;">Silinen dosyalar taranıyor...</td></tr>';
+        
+        try {
+            const res = await fetch(`/api/trash/list?folder=${folderId}`);
+            const data = await res.json();
+            const items = data.items || [];
+            
+            if (items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#64748b;">Çöp kutusu boş (Silinen dosya yok).</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = '';
+            items.forEach(it => {
+                const tr = document.createElement('tr');
+                const dStr = new Date(it.deletedTime * 1000).toLocaleString('tr-TR');
+                tr.innerHTML = `
+                    <td><strong>📄 ${it.name}</strong></td>
+                    <td>${formatBytes(it.size)}</td>
+                    <td>${dStr}</td>
+                    <td>
+                        <button class="btn btn-primary" style="padding:3px 8px; font-size:0.75rem;" onclick="restoreTrash('${it.relPath}')">
+                            ♻️ Kurtar
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#dc2626;">Hata: ${e}</td></tr>`;
+        }
+    }
+    function closeTrashModal() { document.getElementById('trashModal').classList.remove('active'); }
+
+    async function restoreTrash(relPath) {
+        if (!confirm(`'${relPath}' dosyasını geri yüklemek istiyor musunuz?`)) return;
+        try {
+            const res = await fetch('/api/trash/restore', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({folder: currentTrashFolder, relPath})
+            });
+            const data = await res.json();
+            if (data.ok) {
+                alert(data.message);
+                openTrashModal(currentTrashFolder, 'Geri Yüklenen');
+                loadSyncData();
+            } else {
+                alert('Hata: ' + data.error);
+            }
+        } catch (e) {
+            alert('Geri yükleme hatası: ' + e);
+        }
+    }
+
+    function openExportModal(folderId, label) {
+        document.getElementById('exportFolderId').value = folderId;
+        document.getElementById('exportModal').classList.add('active');
+        onChannelChange();
+    }
+    function closeExportModal() { document.getElementById('exportModal').classList.remove('active'); }
+
+    function onChannelChange() {
+        const ch = document.getElementById('exportChannelSelect').value;
+        const label = document.getElementById('recipientLabel');
+        const input = document.getElementById('recipientInput');
+        if (ch === 'telegram') {
+            label.textContent = 'Telegram Chat ID (Boşsa .env içindeki varsayılan)';
+            input.placeholder = 'Örn: 987654321';
+        } else if (ch === 'whatsapp') {
+            label.textContent = 'WhatsApp Telefon Numarası (Boşsa genel paylaşım)';
+            input.placeholder = 'Örn: +905321234567';
+        } else if (ch === 'email') {
+            label.textContent = 'Alıcı E-Posta Adresi';
+            input.placeholder = 'Örn: ornek@alanadi.com';
+        }
+    }
+
+    function downloadArchive(fmt) {
+        const fId = document.getElementById('exportFolderId').value;
+        window.open(`/api/backup/download?folder=${fId}&format=${fmt}`, '_blank');
+    }
+
+    async function executeShare() {
+        const fId = document.getElementById('exportFolderId').value;
+        const ch = document.getElementById('exportChannelSelect').value;
+        const recipient = document.getElementById('recipientInput').value.trim();
+        
+        try {
+            const res = await fetch('/api/share/send', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({folder: fId, channel: ch, recipient})
+            });
+            const data = await res.json();
+            if (data.ok) {
+                if (data.action === 'redirect' && data.url) {
+                    window.open(data.url, '_blank');
+                } else {
+                    alert(data.message || 'Gönderim başarılı!');
+                }
+                closeExportModal();
+            } else {
+                alert('Paylaşım hatası: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        } catch (e) {
+            alert('İstek başarısız: ' + e);
+        }
+    }
+
+    async function loadSyncData(manual = false) {
+        try {
+            const stRes = await fetch('/api/status');
+            const stData = await stRes.json();
+            
+            if (stData.online) {
+                document.getElementById('myDeviceIdDisplay').textContent = stData.myID || 'Belirlenemedi';
+                document.getElementById('statSyncStatus').textContent = 'Çevrimiçi';
+                document.getElementById('statSyncStatus').style.color = '#16a34a';
+            } else {
+                document.getElementById('statSyncStatus').textContent = 'Çevrimdışı';
+                document.getElementById('statSyncStatus').style.color = '#dc2626';
+            }
+
+            const foRes = await fetch('/api/folders');
+            const foData = await foRes.json();
+            const folders = foData.folders || [];
+            document.getElementById('statFolderCount').textContent = folders.length;
+            
+            let totalBytes = 0;
+            const foldersGrid = document.getElementById('foldersGrid');
+            if (folders.length === 0) {
+                foldersGrid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:#64748b;">Henüz paylaşılan klasör bulunmuyor.</div>';
+            } else {
+                foldersGrid.innerHTML = '';
+                folders.forEach(f => {
+                    totalBytes += (f.globalBytes || 0);
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+                    
+                    let badgeClass = 'badge-idle';
+                    let stateText = 'Hazır (Idle)';
+                    if (f.state === 'syncing') { badgeClass = 'badge-syncing'; stateText = 'Senkronize Ediliyor'; }
+                    else if (f.state === 'error') { badgeClass = 'badge-error'; stateText = 'Hata'; }
+                    
+                    let typeLabel = 'İki Yönlü';
+                    if (f.type === 'sendonly') typeLabel = 'Yalnızca Gönder';
+                    else if (f.type === 'receiveonly') typeLabel = 'Yalnızca Al';
+                    
+                    card.innerHTML = `
+                        <div>
+                            <div class="item-card-header">
+                                <div class="item-card-title">📁 ${f.label}</div>
+                                <span class="badge ${badgeClass}">${stateText}</span>
+                            </div>
+                            <div class="item-path">${f.path}</div>
+                            <div class="item-metrics">
+                                <div class="metric-row">Boyut: <strong>${formatBytes(f.globalBytes)}</strong></div>
+                                <div class="metric-row">Dosya Sayısı: <strong>${f.globalFiles} adet</strong></div>
+                                <div class="metric-row">Erişim Modu: <strong>${typeLabel}</strong></div>
+                                <div class="metric-row">Çöp Kutusu: <strong>${f.versioning && f.versioning.type ? 'Etkin (30 Gün)' : 'Pasif'}</strong></div>
+                            </div>
+                        </div>
+                        <div class="item-card-footer">
+                            <div class="footer-btn-group">
+                                <button class="btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openFilesModal('${f.id}', '${f.label}')" title="İçindeki Dosyaları ve Ekleyen Cihazları İncele">
+                                    📂 Dosyalar
+                                </button>
+                                <button class="btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openTrashModal('${f.id}', '${f.label}')" title="Silinen Dosyaları Gör ve Kurtar">
+                                    🗑️ Çöp Kutusu
+                                </button>
+                                <button class="btn" style="padding:4px 8px; font-size:0.75rem;" onclick="openExportModal('${f.id}', '${f.label}')" title="ZIP İndir veya Paylaş">
+                                    📦 Yedek / Paylaş
+                                </button>
+                            </div>
+                            <button class="btn" style="padding:4px 8px; font-size:0.75rem;" onclick="triggerRescan('${f.id}')" title="Diski Şimdi Tara">
+                                🔄 Tara
+                            </button>
+                        </div>
+                    `;
+                    foldersGrid.appendChild(card);
+                });
+            }
+            document.getElementById('statTotalBytes').textContent = formatBytes(totalBytes);
+
+            const devRes = await fetch('/api/devices');
+            const devData = await devRes.json();
+            const devices = devData.devices || [];
+            document.getElementById('statDeviceCount').textContent = devices.length;
+            
+            const devicesGrid = document.getElementById('devicesGrid');
+            if (devices.length === 0) {
+                devicesGrid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding:30px; color:#64748b;">Henüz eşleşen bir cihaz yok.</div>';
+            } else {
+                devicesGrid.innerHTML = '';
+                devices.forEach(d => {
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+                    
+                    let statusBadge = d.isLocal ? '<span class="badge badge-local">Bu Sunucu</span>' : 
+                        (d.connected ? '<span class="badge badge-connected">Bağlı</span>' : '<span class="badge badge-disconnected">Bağlantı Yok</span>');
+                    
+                    card.innerHTML = `
+                        <div>
+                            <div class="item-card-header">
+                                <div class="item-card-title">💻 ${d.name}</div>
+                                ${statusBadge}
+                            </div>
+                            <div class="item-path">${d.deviceID}</div>
+                            <div class="item-metrics">
+                                <div class="metric-row">Ağ Adresi: <strong>${d.address || 'Keşfedilmedi'}</strong></div>
+                                <div class="metric-row">İstemci: <strong>${d.clientVersion || '-'}</strong></div>
+                                <div class="metric-row">İndirilen Veri: <strong>${formatBytes(d.inBytesTotal)}</strong></div>
+                                <div class="metric-row">Gönderilen Veri: <strong>${formatBytes(d.outBytesTotal)}</strong></div>
+                            </div>
+                        </div>
+                    `;
+                    devicesGrid.appendChild(card);
+                });
+            }
+            
+            if (manual) {
+                console.log('TincSync verileri yenilendi.');
+            }
+        } catch (e) {
+            console.error('Veri yüklenirken hata:', e);
+        }
+    }
+
+    async function triggerRescan(folderId) {
+        try {
+            const res = await fetch('/api/folder/rescan', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({folder: folderId})
+            });
+            const data = await res.json();
+            if (data.ok) {
+                alert(data.message);
+                loadSyncData();
+            } else {
+                alert('Hata: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        } catch (e) {
+            alert('İstek başarısız: ' + e);
+        }
+    }
+
+    async function submitNewFolder() {
+        const label = document.getElementById('folderLabelInput').value.trim();
+        const id = document.getElementById('folderIdInput').value.trim();
+        const path = document.getElementById('folderPathInput').value.trim();
+        const type = document.getElementById('folderTypeInput').value;
+        const trash = document.getElementById('folderTrashCheckbox').checked;
+        
+        if (!id || !path) {
+            alert('Lütfen Klasör ID ve Dizin Yolunu girin!');
+            return;
+        }
+        
+        try {
+            const res = await fetch('/api/folder/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id, label, path, type, trash})
+            });
+            const data = await res.json();
+            if (data.ok) {
+                closeFolderModal();
+                loadSyncData();
+            } else {
+                alert('Klasör eklenemedi: ' + (data.error || 'Hata'));
+            }
+        } catch (e) {
+            alert('İstek hatası: ' + e);
+        }
+    }
+
+    async function submitNewDevice() {
+        const name = document.getElementById('deviceNameInput').value.trim();
+        const deviceID = document.getElementById('deviceIdInput').value.trim();
+        
+        if (!deviceID) {
+            alert('Lütfen Cihaz ID girin!');
+            return;
+        }
+        
+        try {
+            const res = await fetch('/api/device/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, deviceID})
+            });
+            const data = await res.json();
+            if (data.ok) {
+                closeDeviceModal();
+                loadSyncData();
+            } else {
+                alert('Cihaz eklenemedi: ' + (data.error || 'Hata'));
+            }
+        } catch (e) {
+            alert('İstek hatası: ' + e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSyncData();
+        setInterval(loadSyncData, 10000);
+    });
+    </script>
+</body>
+</html>
