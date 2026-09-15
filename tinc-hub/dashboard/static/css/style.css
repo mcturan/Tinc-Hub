@@ -212,9 +212,8 @@ code {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #10b981;
+  background: #0284c7;
   display: inline-block;
-  box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
 }
 
 .sidebar-logout {
@@ -1118,10 +1117,10 @@ footer {
   border-radius: 2px;
   transition: width 0.4s ease;
 }
-.pro-metric-fill.cpu { background: #3b82f6; }
-.pro-metric-fill.ram { background: #64748b; }
-.pro-metric-fill.disk { background: #0ea5e9; }
-.pro-metric-fill.net { background: #10b981; }
+.pro-metric-fill.cpu { background: #0284c7; }
+.pro-metric-fill.ram { background: #475569; }
+.pro-metric-fill.disk { background: #0284c7; }
+.pro-metric-fill.net { background: #475569; }
 
 .pro-metric-sub {
   font-size: 0.66rem;
@@ -1158,151 +1157,215 @@ footer {
 }
 
 /* ── Pro Compact CasaOS App Grid ───────────────────────────── */
-.casa-apps-grid {
+/* ── Compact Enterprise App Grid & Row Items ───────────────── */
+.compact-apps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 8px;
   margin-bottom: 14px;
 }
 
-.casa-app-card {
+.compact-app-item {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 6px 7px 6px;
+  border-radius: 6px;
+  padding: 8px 12px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
-  position: relative;
-  transition: all 0.15s ease;
+  justify-content: space-between;
+  gap: 10px;
+  transition: all 0.12s ease;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.02);
   user-select: none;
+  min-height: 46px;
 }
-.casa-app-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+.compact-app-item:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 
-.casa-app-top {
-  position: absolute;
-  top: 5px;
-  left: 7px;
-  right: 5px;
+.compact-app-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.compact-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.compact-status-dot.healthy {
+  background: #0284c7;
+}
+.compact-status-dot.dead {
+  background: #94a3b8;
+}
+.compact-status-dot.unknown {
+  background: #cbd5e1;
+}
+
+.compact-app-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--surface2);
+  border-radius: 6px;
+}
+
+.compact-app-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.compact-app-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.compact-app-name {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compact-app-tag {
+  font-family: 'Cascadia Code', monospace;
+  font-size: 0.67rem;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid #e2e8f0;
+}
+
+.compact-app-sub {
+  font-size: 0.69rem;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.compact-app-metric {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.compact-app-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.compact-action-btn {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 9px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #334155;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.compact-action-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+  text-decoration: none;
+}
+
+.compact-menu-btn {
+  background: transparent;
+  border: none;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.compact-menu-btn:hover {
+  background: var(--surface2);
+  color: var(--text);
+}
+
+.btn-section-add {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.btn-section-add:hover {
+  background: var(--surface2);
+  color: var(--text);
+  border-color: #cbd5e1;
+}
+
+.pro-autopilot-compact-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 14px;
+  margin-bottom: 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-
-.casa-status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  display: inline-block;
+.pro-autopilot-compact-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.casa-status-dot.healthy {
-  background: #10b981;
-  box-shadow: 0 0 4px rgba(16, 185, 129, 0.6);
-}
-.casa-status-dot.dead { background: #94a3b8; }
-.casa-status-dot.unknown { background: #cbd5e1; }
-
-.casa-pin-badge { font-size: 0.62rem; margin-left: 2px; }
-
-.casa-app-menu-btn {
-  background: transparent;
-  border: none;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--muted);
+.btn-pro-xs {
+  font-size: 0.73rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
   cursor: pointer;
-  padding: 0 3px;
-  border-radius: 3px;
-  line-height: 1;
-  opacity: 0.35;
-  transition: var(--transition);
-}
-.casa-app-card:hover .casa-app-menu-btn { opacity: 1; }
-.casa-app-menu-btn:hover {
-  background: var(--surface2);
-  color: var(--text);
-}
-
-.casa-app-icon-wrap {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  background: var(--surface2);
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  font-size: 1.35rem;
-  margin-top: 4px;
-  margin-bottom: 5px;
-  transition: transform 0.15s ease;
 }
-.casa-app-card:hover .casa-app-icon-wrap { transform: scale(1.06); }
-
-.casa-app-icon-wrap.add-icon {
-  border: 1.5px dashed var(--border);
-  background: transparent;
-  font-size: 1.15rem;
-  color: var(--muted);
-}
-.casa-add-card:hover .casa-app-icon-wrap.add-icon {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.casa-app-name {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text);
-  margin-bottom: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.casa-app-meta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-size: 0.66rem;
-  color: var(--muted);
-  width: 100%;
-}
-
-.casa-metric-compact {
-  font-size: 0.64rem;
-  font-weight: 600;
-  color: #10b981;
-}
-.casa-metric-compact .muted { color: var(--muted); }
-
-.casa-port-tag {
-  background: var(--surface2);
-  padding: 0 3px;
-  border-radius: 3px;
-  font-family: monospace;
-  font-weight: 600;
-  font-size: 0.64rem;
-  color: var(--muted);
-}
-.casa-cat-tag {
-  font-size: 0.64rem;
-  color: var(--muted);
+.btn-pro-xs:hover {
+  background: #e2e8f0;
 }
 
 /* Category Filter Bar (Compact Pills) */
 .cat-filters {
   display: flex;
   gap: 5px;
-  margin: 8px 0 14px 0;
+  margin: 6px 0 12px 0;
   overflow-x: auto;
   padding-bottom: 2px;
 }
@@ -1320,14 +1383,14 @@ footer {
   transition: var(--transition);
 }
 .cat-chip:hover {
-  border-color: var(--accent);
+  border-color: #94a3b8;
   color: var(--text);
   text-decoration: none;
 }
 .cat-chip.active {
-  background: #2563eb;
-  border-color: #2563eb;
-  color: #fff;
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
 }
 
 /* CasaOS Dropdown Menu */

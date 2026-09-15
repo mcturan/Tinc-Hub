@@ -2,78 +2,87 @@
 {% set refresh = 60 %}
 
 {% macro render_app_card(app) %}
-<div class="casa-app-card {{ app.status_class }}" onclick="handleCardClick(event, '{{ app.url or '' }}', '{{ app.id }}')">
-    <div class="casa-app-top">
-        <span class="casa-status-dot {{ app.status_class }}" title="Durum: {{ 'Çalışıyor' if app.status_class == 'healthy' else ('Durdu' if app.status_class == 'dead' else 'Bilinmiyor') }}"></span>
-        <button class="casa-app-menu-btn" onclick="toggleAppMenu(event, '{{ app.id }}')" title="Seçenekler">⋮</button>
-        
-        <!-- CasaOS 3-Dots Dropdown Menu -->
-        <div class="casa-dropdown-menu" id="menu-{{ app.id }}" style="display: none;" onclick="event.stopPropagation()">
-            <div class="casa-menu-header">
-                <strong>{{ app.name }}</strong>
-                {% if app.port %}<span class="casa-port-tag">:{{ app.port }}</span>{% endif %}
+<div class="compact-app-item {{ app.status_class }}" onclick="handleCardClick(event, '{{ app.url or '' }}', '{{ app.id }}')">
+    <div class="compact-app-left">
+        <span class="compact-status-dot {{ app.status_class }}" title="Durum: {{ 'Çalışıyor' if app.status_class == 'healthy' else ('Durdu' if app.status_class == 'dead' else 'Bilinmiyor') }}"></span>
+        <span class="compact-app-icon">{{ app.icon or '📦' }}</span>
+        <div class="compact-app-details">
+            <div class="compact-app-name-row">
+                <span class="compact-app-name" title="{{ app.name }}">{{ app.name }}</span>
+                {% if app.port %}<span class="compact-app-tag">:{{ app.port }}</span>{% endif %}
             </div>
-            {% if app.action_script %}
-            <button onclick="serviceAction('{{ app.id }}', 'toggle')" class="casa-menu-item">
-                <span>🔊</span> Ses Çıkışını Değiştir
-            </button>
-            {% else %}
-            <a {% if app.url %}href="{{ app.url }}" target="_blank"{% else %}href="#" onclick="alert('Bu uygulamanın web arayüzü (URL) yapılandırılmamış.'); return false;"{% endif %} class="casa-menu-item {% if not app.url %}disabled{% endif %}">
-                <span>↗️</span> Tarayıcıda Aç
-            </a>
-            <button onclick="editApp('{{ app.id }}')" class="casa-menu-item">
-                <span>⚙️</span> Yapılandır
-            </button>
-            <button onclick="serviceAction('{{ app.id }}', 'restart')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
-                <span>⟳</span> Yeniden Başlat
-            </button>
-            {% if app.status_class == 'healthy' %}
-            <button onclick="serviceAction('{{ app.id }}', 'stop')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
-                <span>⏹️</span> Servisi Durdur
-            </button>
-            {% else %}
-            <button onclick="serviceAction('{{ app.id }}', 'start')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
-                <span>▶️</span> Servisi Başlat
-            </button>
-            {% endif %}
-            <a {% if app.service %}href="/logs?service={{ app.service }}"{% else %}href="#" onclick="alert('Log bağlantısı yok.'); return false;"{% endif %} class="casa-menu-item {% if not app.service %}disabled{% endif %}">
-                <span>📜</span> Canlı Loglar
-            </a>
-            <button onclick="openTerminalFor('{{ app.service }}')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
-                <span>💻</span> Terminal
-            </button>
-            {% endif %}
-            <div class="casa-menu-divider"></div>
-            <button onclick="togglePin('{{ app.id }}', {{ 'true' if app.pinned else 'false' }})" class="casa-menu-item">
-                <span>📌</span> {{ 'Sabitlemeyi Kaldır' if app.pinned else 'Panoya Sabitle' }}
-            </button>
-            {% if app.id != "tinc-hub" %}
-            <button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="casa-menu-item danger">
-                <span>🗑️</span> Panodan Sil
-            </button>
-            {% endif %}
+            <div class="compact-app-sub">
+                <span>{{ app.category or 'Servis' }}</span>
+                <span class="compact-app-metric" id="res-{{ app.id }}">
+                    {% if app.running and app.ram_mb is not none %}
+                        · {{ app.ram_mb|round|int }}MB
+                    {% elif app.status_class == 'dead' %}
+                        · Kapalı
+                    {% endif %}
+                </span>
+            </div>
         </div>
     </div>
     
-    <div class="casa-app-icon-wrap">
-        {{ app.icon or '📦' }}
-    </div>
-    
-    <div class="casa-app-name" title="{{ app.name }}">{{ app.name }}</div>
-    
-    <div class="casa-app-meta">
-        {% if app.port %}
-        <span class="casa-port-tag">:{{ app.port }}</span>
-        {% else %}
-        <span class="casa-cat-tag">{{ app.category or 'Servis' }}</span>
+    <div class="compact-app-right" onclick="event.stopPropagation()">
+        {% if app.action_script %}
+        <button onclick="serviceAction('{{ app.id }}', 'toggle')" class="compact-action-btn" title="Ses Çıkışını Değiştir">
+            <span>🔊</span> Değiştir
+        </button>
+        {% elif app.url %}
+        <a href="{{ app.url }}" target="_blank" class="compact-action-btn" title="Arayüzü Aç">
+            <span>↗</span> Aç
+        </a>
         {% endif %}
-        <span class="casa-metric-compact" id="res-{{ app.id }}">
-            {% if app.running and app.ram_mb is not none %}
-                {{ app.ram_mb|round|int }}MB
-            {% elif app.status_class == 'dead' %}
-                <span class="muted">Kapalı</span>
-            {% endif %}
-        </span>
+        
+        <div style="position:relative; display:inline-block;">
+            <button class="compact-menu-btn" onclick="toggleAppMenu(event, '{{ app.id }}')" title="İşlemler">⋮</button>
+            <div class="casa-dropdown-menu" id="menu-{{ app.id }}" style="display: none;" onclick="event.stopPropagation()">
+                <div class="casa-menu-header">
+                    <strong>{{ app.name }}</strong>
+                    {% if app.port %}<span class="casa-port-tag">:{{ app.port }}</span>{% endif %}
+                </div>
+                {% if app.action_script %}
+                <button onclick="serviceAction('{{ app.id }}', 'toggle')" class="casa-menu-item">
+                    <span>🔊</span> Ses Çıkışını Değiştir
+                </button>
+                {% else %}
+                <a {% if app.url %}href="{{ app.url }}" target="_blank"{% else %}href="#" onclick="alert('Bu uygulamanın web arayüzü (URL) yapılandırılmamış.'); return false;"{% endif %} class="casa-menu-item {% if not app.url %}disabled{% endif %}">
+                    <span>↗️</span> Tarayıcıda Aç
+                </a>
+                <button onclick="editApp('{{ app.id }}')" class="casa-menu-item">
+                    <span>⚙️</span> Yapılandır
+                </button>
+                <button onclick="serviceAction('{{ app.id }}', 'restart')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                    <span>⟳</span> Yeniden Başlat
+                </button>
+                {% if app.status_class == 'healthy' %}
+                <button onclick="serviceAction('{{ app.id }}', 'stop')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                    <span>⏹️</span> Servisi Durdur
+                </button>
+                {% else %}
+                <button onclick="serviceAction('{{ app.id }}', 'start')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                    <span>▶️</span> Servisi Başlat
+                </button>
+                {% endif %}
+                <a {% if app.service %}href="/logs?service={{ app.service }}"{% else %}href="#" onclick="alert('Log bağlantısı yok.'); return false;"{% endif %} class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                    <span>📜</span> Canlı Loglar
+                </a>
+                <button onclick="openTerminalFor('{{ app.service }}')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
+                    <span>💻</span> Terminal
+                </button>
+                {% endif %}
+                <div class="casa-menu-divider"></div>
+                <button onclick="togglePin('{{ app.id }}', {{ 'true' if app.pinned else 'false' }})" class="casa-menu-item">
+                    <span>📌</span> {{ 'Sabitlemeyi Kaldır' if app.pinned else 'Panoya Sabitle' }}
+                </button>
+                {% if app.id != "tinc-hub" %}
+                <button onclick="deleteApp('{{ app.id }}', '{{ app.name }}')" class="casa-menu-item danger">
+                    <span>🗑️</span> Panodan Sil
+                </button>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
 {% endmacro %}
@@ -87,11 +96,11 @@
             <span class="pro-pill-sep">·</span>
             <span>İşlemci: <strong>{{ system.cpu_cores or 4 }} vCPU</strong></span>
             <span class="pro-pill-sep">·</span>
-            <span>Durum: <strong style="color:#10b981;">Aktif</strong></span>
+            <span>Durum: <strong>Aktif</strong></span>
         </div>
-        <a href="/rules" class="pro-host-pill" style="text-decoration:none; margin-left:8px; background:#f0fdf4; border-color:#bbf7d0;" title="Tinc Autopilot Kural Motoru">
-            <span class="status-dot-sm" style="background:#10b981; box-shadow:0 0 6px #10b981;"></span>
-            <span style="color:#15803d; font-weight:600;">Autopilot: <strong>4 Kural Aktif</strong></span>
+        <a href="/rules" class="pro-host-pill" style="text-decoration:none; margin-left:8px;" title="Tinc Autopilot Kural Motoru">
+            <span class="status-dot-sm" style="background:#475569;"></span>
+            <span>Autopilot: <strong>4 Kural Aktif</strong></span>
         </a>
     </div>
     <div class="pro-strip-right">
@@ -99,7 +108,7 @@
         <a href="/rules" class="btn-pro-subtle" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;" title="Otomasyon Kuralları">⚡ Otomasyon</a>
         <button onclick="openAIAgentModal()" class="btn-pro-subtle" title="TincOps Yapay Zeka Görev Ajanı">🤖 TincOps</button>
         <a href="/store" class="btn-pro-subtle" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;" title="Uygulama Mağazası">🛒 App Store</a>
-        <button onclick="openAddModal()" class="btn-pro-primary" title="Yeni servis ekle">➕ Servis Ekle</button>
+        <button onclick="openAddModal()" class="btn-pro-primary" title="Yeni servis ekle">＋ Servis Ekle</button>
         {% endif %}
     </div>
 </div>
@@ -151,38 +160,25 @@
     </div>
 </div>
 
-<!-- Tinc Autopilot Otonom Koruma Şeridi -->
-<div class="pro-autopilot-strip" style="background:var(--surface,#ffffff); border:1px solid var(--border,#e2e8f0); border-radius:10px; padding:12px 18px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
-    <div style="display:flex; align-items:center; gap:14px;">
-        <div style="width:36px; height:36px; border-radius:8px; background:#f8fafc; display:flex; align-items:center; justify-content:center; font-size:1.2rem; border:1px solid var(--border,#e2e8f0);">
-            🤖
-        </div>
-        <div>
-            <div style="display:flex; align-items:center; gap:8px;">
-                <strong style="color:var(--text,#0f172a); font-size:0.92rem;">Tinc Autopilot</strong>
-                <span style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px;">OTONOM · 60s</span>
-                <span style="color:var(--muted,#64748b); font-size:0.8rem;">4 Kural Devrede</span>
-            </div>
-            <div style="font-size:0.8rem; color:var(--muted,#64748b); margin-top:3px;">
-                <span>🛡️ Disk %85 Temizlik</span> &nbsp;·&nbsp;
-                <span>🔄 Nginx Canlandırma</span> &nbsp;·&nbsp;
-                <span>🧠 RAM %90 Optimizasyonu</span> &nbsp;·&nbsp;
-                <span>⏰ 07:00 Modem Reboot</span>
-            </div>
-        </div>
+<!-- Tinc Autopilot Otonom Koruma Şeridi (Kompakt) -->
+<div class="pro-autopilot-compact-bar">
+    <div class="pro-autopilot-compact-info">
+        <span class="status-dot-sm" style="background:#475569;"></span>
+        <strong style="color:var(--text); font-size:0.8rem;">Tinc Autopilot:</strong>
+        <span style="color:var(--muted); font-size:0.77rem;">4 aktif kural sistemi koruyor (Disk %85, Nginx, RAM %90, 07:00 Reboot)</span>
     </div>
-    <div style="display:flex; gap:8px; align-items:center;">
-        <button onclick="fetch('/api/rules/run-all', {method:'POST'}).then(r=>r.json()).then(d=>alert(d.message||'Tüm kurallar değerlendirildi.'))" class="btn-pro-subtle" style="font-size:0.82rem; padding:6px 12px; cursor:pointer;" title="Tüm kuralları anında işlet">⚡ Çalıştır</button>
-        <a href="/rules" class="btn-pro-subtle" style="text-decoration:none; font-size:0.82rem; padding:6px 14px; display:inline-flex; align-items:center; gap:4px;">Yönet ➜</a>
+    <div style="display:flex; gap:6px; align-items:center;">
+        <button onclick="fetch('/api/rules/run-all', {method:'POST'}).then(r=>r.json()).then(d=>alert(d.message||'Tüm kurallar değerlendirildi.'))" class="btn-pro-xs" title="Tüm kuralları anında işlet">⚡ Çalıştır</button>
+        <a href="/rules" class="btn-pro-xs" style="text-decoration:none;">Yönet ➜</a>
     </div>
 </div>
 
 <!-- Plugin Widgetleri -->
 {% if plugin_widgets %}
-<div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+<div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
 {% for widget in plugin_widgets %}
     {% if widget.position == 'sidebar' or widget.position == 'main' %}
-        <div class="plugin-widget widget-box" id="widget-{{ widget.id }}" style="flex: 1; min-width: 200px; background: var(--surface); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+        <div class="plugin-widget widget-box" id="widget-{{ widget.id }}" style="flex: 1; min-width: 200px; background: var(--surface); padding: 10px; border-radius: 6px; border: 1px solid var(--border);">
             {{ widget.html | safe }}
         </div>
     {% endif %}
@@ -200,78 +196,62 @@
 
 {% if not selected_cat %}
 <!-- 1. ÇEKİRDEK SERVİSLER -->
-<div class="section" style="margin-bottom: 22px;">
+<div class="section" style="margin-bottom: 16px;">
     <div class="pro-section-head">
         <div class="pro-section-title">Çekirdek Servisler</div>
         <span class="pro-section-count">{{ tinc_core|length }}</span>
+        <button onclick="openAddModal()" class="btn-section-add" title="Yeni Servis Ekle">＋ Ekle</button>
     </div>
-    <div class="casa-apps-grid">
+    <div class="compact-apps-grid">
         {% for app in tinc_core %}
             {{ render_app_card(app) }}
         {% endfor %}
-        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis Ekle">
-            <div class="casa-app-icon-wrap add-icon">＋</div>
-            <div class="casa-app-name" style="color:var(--accent);">Ekle</div>
-            <div class="casa-app-meta"><span class="casa-cat-tag">Yeni</span></div>
-        </div>
     </div>
 </div>
 
 <!-- 2. SİSTEM VE ALTYAPI SERVİSLERİ -->
-<div class="section" style="margin-bottom: 22px;">
+<div class="section" style="margin-bottom: 16px;">
     <div class="pro-section-head">
         <div class="pro-section-title">Sistem &amp; Altyapı Servisleri</div>
         <span class="pro-section-count">{{ system_services|length }}</span>
+        <button onclick="openAddModal()" class="btn-section-add" title="Sistem Servisi Tanımla">＋ Ekle</button>
     </div>
-    <div class="casa-apps-grid">
+    <div class="compact-apps-grid">
         {% for app in system_services %}
             {{ render_app_card(app) }}
         {% endfor %}
-        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Sistem Servisi Tanımla">
-            <div class="casa-app-icon-wrap add-icon">＋</div>
-            <div class="casa-app-name" style="color:var(--accent);">Ekle</div>
-            <div class="casa-app-meta"><span class="casa-cat-tag">Daemon</span></div>
-        </div>
     </div>
 </div>
 
 <!-- 3. HARİCİ UYGULAMALAR -->
 {% if web_external|length > 0 %}
-<div class="section" style="margin-bottom: 22px;">
+<div class="section" style="margin-bottom: 16px;">
     <div class="pro-section-head">
         <div class="pro-section-title">Harici Servisler &amp; Linkler</div>
         <span class="pro-section-count">{{ web_external|length }}</span>
+        <button onclick="openAddModal()" class="btn-section-add" title="Harici Link Ekle">＋ Ekle</button>
     </div>
-    <div class="casa-apps-grid">
+    <div class="compact-apps-grid">
         {% for app in web_external %}
             {{ render_app_card(app) }}
         {% endfor %}
-        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Harici Link Ekle">
-            <div class="casa-app-icon-wrap add-icon">＋</div>
-            <div class="casa-app-name" style="color:var(--accent);">Ekle</div>
-            <div class="casa-app-meta"><span class="casa-cat-tag">Web</span></div>
-        </div>
     </div>
 </div>
 {% endif %}
 {% else %}
 <!-- Kategori Seçildiğinde Filtrelenmiş Liste -->
-<div class="section" style="margin-bottom: 22px;">
+<div class="section" style="margin-bottom: 16px;">
     <div class="pro-section-head">
         <div class="pro-section-title">{{ selected_cat }} Servisleri</div>
         <span class="pro-section-count">{{ apps|length }}</span>
+        <button onclick="openAddModal()" class="btn-section-add" title="Yeni Servis Ekle">＋ Ekle</button>
     </div>
-    <div class="casa-apps-grid">
+    <div class="compact-apps-grid">
         {% for app in apps %}
             {{ render_app_card(app) }}
         {% else %}
-            <div class="empty-state" style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--muted); font-size: 0.85rem;">Bu kategoride servis bulunamadı.</div>
+            <div class="empty-state" style="grid-column: 1 / -1; padding: 18px; text-align: center; color: var(--muted); font-size: 0.82rem;">Bu kategoride servis bulunamadı.</div>
         {% endfor %}
-        <div class="casa-app-card casa-add-card" onclick="openAddModal()" title="Yeni Servis Ekle">
-            <div class="casa-app-icon-wrap add-icon">＋</div>
-            <div class="casa-app-name" style="color:var(--accent);">Ekle</div>
-            <div class="casa-app-meta"><span class="casa-cat-tag">Servis</span></div>
-        </div>
     </div>
 </div>
 {% endif %}
@@ -389,7 +369,7 @@
                     </div>
                     <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:0.8rem; font-weight:600; margin:0;">
                         <input type="checkbox" id="rg-router-enabled" style="cursor:pointer;" checked>
-                        <span id="rg-router-enabled-label" style="color:#10b981;">Otomasyon Açık ✓</span>
+                        <span id="rg-router-enabled-label" style="color:var(--text); font-weight:600;">Otomasyon Açık ✓</span>
                     </label>
                 </div>
 
@@ -586,17 +566,17 @@ async function updateSystemMetrics() {
         if (data.cpu_percent !== undefined) {
             document.getElementById('sys-cpu-val').innerText = data.cpu_percent + '%';
             document.getElementById('sys-cpu-bar').style.width = data.cpu_percent + '%';
-            document.getElementById('sys-cpu-bar').style.background = data.cpu_percent > 80 ? '#ef4444' : '#2563eb';
+            document.getElementById('sys-cpu-bar').style.background = data.cpu_percent > 85 ? '#ef4444' : '#0284c7';
             
             document.getElementById('sys-ram-val').innerText = data.ram_percent + '%';
             document.getElementById('sys-ram-text').innerText = data.ram_used_gb + ' / ' + data.ram_total_gb + ' GB';
             document.getElementById('sys-ram-bar').style.width = data.ram_percent + '%';
-            document.getElementById('sys-ram-bar').style.background = data.ram_percent > 85 ? '#ef4444' : '#8b5cf6';
+            document.getElementById('sys-ram-bar').style.background = data.ram_percent > 85 ? '#ef4444' : '#475569';
             
             document.getElementById('sys-disk-val').innerText = data.disk_percent + '%';
             document.getElementById('sys-disk-text').innerText = data.disk_used_gb + ' / ' + data.disk_total_gb + ' GB';
             document.getElementById('sys-disk-bar').style.width = data.disk_percent + '%';
-            document.getElementById('sys-disk-bar').style.background = data.disk_percent > 90 ? '#ef4444' : '#10b981';
+            document.getElementById('sys-disk-bar').style.background = data.disk_percent > 90 ? '#ef4444' : '#0284c7';
 
             if (data.ip) {
                 const ipEl = document.getElementById('sys-ip-val');
@@ -615,14 +595,14 @@ async function updateAppMetrics() {
             const el = document.getElementById(`res-${app.id}`);
             if (el) {
                 if (app.running && app.ram_mb !== null) {
-                    el.innerText = `${Math.round(app.ram_mb)}MB`;
-                    el.className = 'casa-metric-compact';
+                    el.innerText = `· ${Math.round(app.ram_mb)}MB`;
+                    el.className = 'compact-app-metric';
                 } else if (app.status_class === 'dead') {
-                    el.innerHTML = '<span class="muted">Kapalı</span>';
-                    el.className = 'casa-metric-compact';
+                    el.innerText = '· Kapalı';
+                    el.className = 'compact-app-metric';
                 } else {
                     el.innerText = '';
-                    el.className = 'casa-metric-compact';
+                    el.className = 'compact-app-metric';
                 }
             }
         });
@@ -729,7 +709,7 @@ async function testPortAvailability() {
             resEl.innerHTML = `<span style="color:#ef4444; font-weight:700;">❌ Port ${port} DOLU!</span> (Kullanan: ${d.process || 'Bilinmiyor'} ${d.pid ? 'PID: ' + d.pid : ''})`;
         } else {
             let note = d.is_tinc_reserved ? ` (Rezerve: ${d.reserved_name})` : '';
-            resEl.innerHTML = `<span style="color:#10b981; font-weight:700;">✅ Port ${port} BOŞ &amp; Müsait!</span>${note}`;
+            resEl.innerHTML = `<span style="color:var(--text); font-weight:700;">✅ Port ${port} BOŞ &amp; Müsait!</span>${note}`;
         }
     } catch(e) {
         resEl.innerHTML = `<span style="color:#f59e0b;">Test hatası: ${e}</span>`;

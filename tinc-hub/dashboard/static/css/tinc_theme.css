@@ -25,9 +25,9 @@
   --tinc-primary-dark: #0369a1;
   --tinc-primary-soft: #f0f9ff;
   
-  /* ── Durum Göstergeleri (Dengeli, göz almayan tonlar) ── */
-  --tinc-success:      #10b981;
-  --tinc-success-soft: #ecfdf5;
+  /* ── Durum Göstergeleri (Sakin, kurumsal tonlar) ── */
+  --tinc-success:      #0284c7;
+  --tinc-success-soft: #f0f9ff;
   --tinc-warning:      #f59e0b;
   --tinc-warning-soft: #fffbeb;
   --tinc-danger:       #ef4444;
