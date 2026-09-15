@@ -135,6 +135,22 @@ def check_app(app: dict) -> dict:
         else:
             result["detail"] = {"error": "Port tanımlı değil"}
 
+    elif health_type == "sink":
+        sink_name = app.get("sink_name", "Firinna_Amfi")
+        try:
+            r = subprocess.run(
+                ["sudo", f"XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "-u", RUN_USER, "pactl", "get-default-sink"],
+                capture_output=True, text=True, timeout=3
+            )
+            current = r.stdout.strip()
+            ok = (r.returncode == 0 and bool(current))
+            is_routed = (sink_name in current)
+            result["ok"] = ok
+            result["detail"] = {"active_sink": current, "is_routed": is_routed, "mode": "Amfi (Pi)" if is_routed else "Yerel Hoparlör"}
+        except Exception as e:
+            result["ok"] = False
+            result["detail"] = {"error": str(e)[:80]}
+
     elif health_type == "none":
         result["ok"] = True
         result["detail"] = {"note": "İzleme kapalı"}

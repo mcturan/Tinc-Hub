@@ -34,7 +34,7 @@ def index():
         pinned.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
         unpinned.sort(key=lambda a: (a.get('id') != 'tinc-hub', a.get('name', '')))
         
-    tinc_core_ids = {'tinc-hub', 'tincnet', 'terminal', 'tnote', 'tincprocess', 'aprs-beacon', 'socies'}
+    tinc_core_ids = {'tinc-hub', 'tincsync', 'tincnet', 'terminal', 'tnote', 'tincprocess', 'aprs-beacon', 'amfi-ses'}
     def is_tinc_core(a):
         if a.get('id') in tinc_core_ids or a.get('id', '').startswith('tinc'):
             return True
@@ -156,13 +156,20 @@ def multi_page():
     return render_template("multi_hub.html", now=_now(), has_auth=bool(PASSWORD))
 
 @bp.route("/apps")
+@bp.route("/packages")
 @auth_required
-def apps_redirect():
-    return redirect("/")
+def packages_page():
+    return render_template("packages.html", now=_now(), has_auth=bool(PASSWORD), role=session.get("role", "admin"))
 
-@bp.route("/events")
+@bp.route("/sync")
+@bp.route("/files")
 @auth_required
-def events_redirect():
-    return redirect("/agents")
+def sync_page():
+    return render_template("sync.html", now=_now(), has_auth=bool(PASSWORD), role=session.get("role", "admin"))
+
+@bp.route("/store")
+@auth_required
+def store_page():
+    return render_template("store.html", now=_now(), has_auth=bool(PASSWORD), role=session.get("role", "admin"))
 
 

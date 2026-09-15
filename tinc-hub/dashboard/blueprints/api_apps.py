@@ -39,16 +39,29 @@ def api_action(app_id):
     """Start / stop / restart"""
     data = request.get_json() or {}
     action = data.get("action", "")
-    if action not in ("start", "stop", "restart"):
+    if action not in ("start", "stop", "restart", "toggle", "run"):
         return jsonify({"error": "Geçersiz eylem"}), 400
 
     app_data = get_app(app_id)
     if not app_data:
         return jsonify({"error": "Uygulama bulunamadı"}), 404
 
+    # Script/Otomasyon tabanlı uygulamalar
+    if app_data.get("action_script"):
+        script = app_data["action_script"]
+        try:
+            cmd = ["sudo", f"XDG_RUNTIME_DIR=/run/user/{RUN_UID}", "-u", RUN_USER, script]
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            ok = r.returncode == 0
+            lines = [l for l in (r.stdout + "\n" + r.stderr).splitlines() if l.strip()]
+            msg = lines[-1] if lines else ("İşlem başarıyla çalıştırıldı" if ok else "Komut hata verdi")
+            return jsonify({"ok": ok, "message": msg})
+        except Exception as e:
+            return jsonify({"ok": False, "message": str(e)}), 500
+
     service = app_data.get("service")
     if not service:
-        return jsonify({"error": "Bu uygulama için servis tanımlı değil"}), 400
+        return jsonify({"error": "Bu uygulama için servis veya script tanımlı değil"}), 400
 
     unit = service if service.endswith(".service") else f"{service}.service"
     try:

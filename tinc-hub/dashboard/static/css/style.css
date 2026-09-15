@@ -58,19 +58,19 @@ code {
   background: var(--bg);
 }
 
-/* Sidebar */
+/* Sidebar — Açık Kurumsal Slate Standart */
 .sidebar {
   width: 220px;
   min-width: 220px;
-  background: #0f172a;
-  color: #94a3b8;
+  background: var(--surface, #ffffff);
+  color: #475569;
   display: flex;
   flex-direction: column;
   position: sticky;
   top: 0;
   height: 100vh;
   z-index: 300;
-  border-right: 1px solid #1e293b;
+  border-right: 1px solid var(--border, #e2e8f0);
   user-select: none;
   transition: transform 0.25s ease;
 }
@@ -81,7 +81,8 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  background: #ffffff;
 }
 
 .sidebar-logo {
@@ -89,17 +90,17 @@ code {
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  color: #f8fafc;
+  color: #0f172a;
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.sidebar-logo:hover { text-decoration: none; color: #fff; }
-.sidebar-logo strong { color: #38bdf8; }
+.sidebar-logo:hover { text-decoration: none; color: #0284c7; }
+.sidebar-logo strong { color: #0284c7; }
 
 .sidebar-logo-icon {
   font-size: 1.25rem;
-  color: #38bdf8;
+  color: #0284c7;
   display: inline-flex;
   align-items: center;
 }
@@ -107,9 +108,9 @@ code {
 .sidebar-badge {
   font-size: 0.62rem;
   font-weight: 700;
-  background: rgba(56, 189, 248, 0.15);
-  color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: #f0f9ff;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
   padding: 1px 5px;
   border-radius: 4px;
 }
@@ -118,7 +119,7 @@ code {
   display: none;
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 1.3rem;
   cursor: pointer;
   padding: 0 4px;
@@ -138,17 +139,17 @@ code {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #64748b;
-  padding: 12px 10px 4px 10px;
+  color: #94a3b8;
+  padding: 14px 10px 4px 10px;
 }
 
 .sidebar-link {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px;
+  padding: 8px 10px;
   border-radius: 6px;
-  color: #94a3b8;
+  color: #475569;
   font-size: 0.82rem;
   font-weight: 500;
   text-decoration: none;
@@ -162,39 +163,40 @@ code {
 }
 
 .sidebar-link:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #f8fafc;
+  background: #f1f5f9;
+  color: #0f172a;
   text-decoration: none;
 }
 
 .sidebar-link.active {
-  background: #1e293b;
-  color: #38bdf8;
+  background: #f0f9ff;
+  color: #0284c7;
   font-weight: 600;
-  box-shadow: inset 3px 0 0 #38bdf8;
+  box-shadow: inset 3px 0 0 #0284c7;
 }
 
 .sidebar-link.tincops-link {
-  background: rgba(99, 102, 241, 0.12);
-  color: #c7d2fe;
-  border: 1px solid rgba(99, 102, 241, 0.25);
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
   margin-top: 4px;
 }
 .sidebar-link.tincops-link:hover {
-  background: rgba(99, 102, 241, 0.22);
-  color: #ffffff;
+  background: #f1f5f9;
+  color: #0284c7;
+  border-color: #cbd5e1;
 }
 
 .sidebar-footer {
-  height: 44px;
+  height: 46px;
   padding: 0 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--border, #e2e8f0);
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 0.75rem;
   color: #64748b;
-  background: #090e1a;
+  background: #ffffff;
 }
 
 .sidebar-host-status {
@@ -202,7 +204,7 @@ code {
   align-items: center;
   gap: 6px;
   font-family: monospace;
-  color: #94a3b8;
+  color: #475569;
   font-size: 0.75rem;
 }
 
@@ -212,19 +214,19 @@ code {
   border-radius: 50%;
   background: #10b981;
   display: inline-block;
-  box-shadow: 0 0 5px rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
 }
 
 .sidebar-logout {
-  color: #94a3b8;
+  color: #64748b;
   text-decoration: none;
   font-size: 0.85rem;
   padding: 2px 6px;
   border-radius: 4px;
 }
 .sidebar-logout:hover {
-  background: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
+  background: #fee2e2;
+  color: #dc2626;
 }
 
 /* Main Content Area */
@@ -1116,10 +1118,10 @@ footer {
   border-radius: 2px;
   transition: width 0.4s ease;
 }
-.pro-metric-fill.cpu { background: #2563eb; }
-.pro-metric-fill.ram { background: #8b5cf6; }
-.pro-metric-fill.disk { background: #10b981; }
-.pro-metric-fill.net { background: #0284c7; }
+.pro-metric-fill.cpu { background: #3b82f6; }
+.pro-metric-fill.ram { background: #64748b; }
+.pro-metric-fill.disk { background: #0ea5e9; }
+.pro-metric-fill.net { background: #10b981; }
 
 .pro-metric-sub {
   font-size: 0.66rem;

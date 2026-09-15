@@ -13,6 +13,11 @@
                 <strong>{{ app.name }}</strong>
                 {% if app.port %}<span class="casa-port-tag">:{{ app.port }}</span>{% endif %}
             </div>
+            {% if app.action_script %}
+            <button onclick="serviceAction('{{ app.id }}', 'toggle')" class="casa-menu-item">
+                <span>🔊</span> Ses Çıkışını Değiştir
+            </button>
+            {% else %}
             <a {% if app.url %}href="{{ app.url }}" target="_blank"{% else %}href="#" onclick="alert('Bu uygulamanın web arayüzü (URL) yapılandırılmamış.'); return false;"{% endif %} class="casa-menu-item {% if not app.url %}disabled{% endif %}">
                 <span>↗️</span> Tarayıcıda Aç
             </a>
@@ -37,6 +42,7 @@
             <button onclick="openTerminalFor('{{ app.service }}')" class="casa-menu-item {% if not app.service %}disabled{% endif %}">
                 <span>💻</span> Terminal
             </button>
+            {% endif %}
             <div class="casa-menu-divider"></div>
             <button onclick="togglePin('{{ app.id }}', {{ 'true' if app.pinned else 'false' }})" class="casa-menu-item">
                 <span>📌</span> {{ 'Sabitlemeyi Kaldır' if app.pinned else 'Panoya Sabitle' }}
@@ -83,11 +89,16 @@
             <span class="pro-pill-sep">·</span>
             <span>Durum: <strong style="color:#10b981;">Aktif</strong></span>
         </div>
+        <a href="/rules" class="pro-host-pill" style="text-decoration:none; margin-left:8px; background:#f0fdf4; border-color:#bbf7d0;" title="Tinc Autopilot Kural Motoru">
+            <span class="status-dot-sm" style="background:#10b981; box-shadow:0 0 6px #10b981;"></span>
+            <span style="color:#15803d; font-weight:600;">Autopilot: <strong>4 Kural Aktif</strong></span>
+        </a>
     </div>
     <div class="pro-strip-right">
         {% if role == "admin" %}
+        <a href="/rules" class="btn-pro-subtle" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;" title="Otomasyon Kuralları">⚡ Otomasyon</a>
         <button onclick="openAIAgentModal()" class="btn-pro-subtle" title="TincOps Yapay Zeka Görev Ajanı">🤖 TincOps</button>
-        <button onclick="openStoreModal()" class="btn-pro-subtle" title="Uygulama Mağazası">🛒 App Store</button>
+        <a href="/store" class="btn-pro-subtle" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;" title="Uygulama Mağazası">🛒 App Store</a>
         <button onclick="openAddModal()" class="btn-pro-primary" title="Yeni servis ekle">➕ Servis Ekle</button>
         {% endif %}
     </div>
@@ -137,6 +148,32 @@
             <div class="pro-metric-fill net" style="width:100%;"></div>
         </div>
         <div class="pro-metric-sub">Port 9010 · 9011 · 9013 · 9014</div>
+    </div>
+</div>
+
+<!-- Tinc Autopilot Otonom Koruma Şeridi -->
+<div class="pro-autopilot-strip" style="background:var(--surface,#ffffff); border:1px solid var(--border,#e2e8f0); border-radius:10px; padding:12px 18px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+    <div style="display:flex; align-items:center; gap:14px;">
+        <div style="width:36px; height:36px; border-radius:8px; background:#f8fafc; display:flex; align-items:center; justify-content:center; font-size:1.2rem; border:1px solid var(--border,#e2e8f0);">
+            🤖
+        </div>
+        <div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <strong style="color:var(--text,#0f172a); font-size:0.92rem;">Tinc Autopilot</strong>
+                <span style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:6px;">OTONOM · 60s</span>
+                <span style="color:var(--muted,#64748b); font-size:0.8rem;">4 Kural Devrede</span>
+            </div>
+            <div style="font-size:0.8rem; color:var(--muted,#64748b); margin-top:3px;">
+                <span>🛡️ Disk %85 Temizlik</span> &nbsp;·&nbsp;
+                <span>🔄 Nginx Canlandırma</span> &nbsp;·&nbsp;
+                <span>🧠 RAM %90 Optimizasyonu</span> &nbsp;·&nbsp;
+                <span>⏰ 07:00 Modem Reboot</span>
+            </div>
+        </div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+        <button onclick="fetch('/api/rules/run-all', {method:'POST'}).then(r=>r.json()).then(d=>alert(d.message||'Tüm kurallar değerlendirildi.'))" class="btn-pro-subtle" style="font-size:0.82rem; padding:6px 12px; cursor:pointer;" title="Tüm kuralları anında işlet">⚡ Çalıştır</button>
+        <a href="/rules" class="btn-pro-subtle" style="text-decoration:none; font-size:0.82rem; padding:6px 14px; display:inline-flex; align-items:center; gap:4px;">Yönet ➜</a>
     </div>
 </div>
 
@@ -984,7 +1021,7 @@ async function togglePin(appId, currentPinned) {
 }
 
 async function serviceAction(appId, action) {
-    event.stopPropagation();
+    if (window.event) window.event.stopPropagation();
     try {
         const r = await fetch(`/api/app/${appId}/action`, {
             method: 'POST',
@@ -993,7 +1030,7 @@ async function serviceAction(appId, action) {
         });
         const d = await r.json();
         if(d.ok) {
-            alert(`${action} başarılı`);
+            alert(d.message || `${action} başarılı`);
             location.reload();
         } else {
             alert(`Hata: ${d.message}`);
@@ -1022,6 +1059,10 @@ async function runSystemAudit() {
 // ── CasaOS Kart & Menü Yönetimi ──
 function handleCardClick(e, url, appId) {
     if (e.target.closest('.casa-app-top') || e.target.closest('.casa-dropdown-menu')) return;
+    if (appId === 'amfi-ses') {
+        serviceAction(appId, 'toggle');
+        return;
+    }
     if (url && url.trim() !== '') {
         window.open(url, '_blank');
     } else {
