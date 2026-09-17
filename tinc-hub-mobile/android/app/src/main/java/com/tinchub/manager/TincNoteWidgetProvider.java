@@ -27,6 +27,7 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
     public static final String PREFS_NAME = "TincNoteWidgetPrefs";
     public static final String KEY_TASKS_JSON = "tasks_json";
     public static final String KEY_SERVER_URL = "server_url";
+    public static final String KEY_AUTH_TOKEN = "auth_token";
     public static final String KEY_PENDING_TOGGLES = "pending_toggles";
     public static final String DEFAULT_SERVER_URL = "http://192.168.1.10:9013";
 
@@ -35,6 +36,9 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
         for (int appWidgetId : appWidgetIds) {
             updateWidget(context, appWidgetManager, appWidgetId);
         }
+        if (appWidgetIds != null && appWidgetIds.length > 0) {
+            appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetIds, R.id.widget_tasks_list);
+        }
         // Sunucudan canlı verileri arka planda çek
         fetchTasksFromServer(context);
     }
@@ -42,6 +46,7 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
     @Override
     public void onEnabled(Context context) {
         super.onEnabled(context);
+        updateAllWidgets(context);
         fetchTasksFromServer(context);
     }
 
@@ -125,6 +130,7 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
                 try {
                     SharedPreferences p = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
                     String sUrl = p.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL);
+                    String token = p.getString(KEY_AUTH_TOKEN, "");
                     if (!sUrl.startsWith("http://") && !sUrl.startsWith("https://")) sUrl = "http://" + sUrl;
                     if (sUrl.endsWith("/")) sUrl = sUrl.substring(0, sUrl.length() - 1);
 
@@ -132,6 +138,10 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
                     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                     conn.setRequestMethod("POST");
                     conn.setRequestProperty("Content-Type", "application/json");
+                    if (token != null && !token.isEmpty()) {
+                        conn.setRequestProperty("Authorization", "Bearer " + token);
+                        conn.setRequestProperty("X-Auth-Token", token);
+                    }
                     conn.setConnectTimeout(3000);
                     conn.setReadTimeout(3000);
                     conn.setDoOutput(true);
@@ -156,6 +166,7 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
         try {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String sUrl = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL);
+            String token = prefs.getString(KEY_AUTH_TOKEN, "");
             if (sUrl == null || sUrl.trim().isEmpty()) sUrl = DEFAULT_SERVER_URL;
             if (!sUrl.startsWith("http://") && !sUrl.startsWith("https://")) sUrl = "http://" + sUrl;
             if (sUrl.endsWith("/")) sUrl = sUrl.substring(0, sUrl.length() - 1);
@@ -164,6 +175,10 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("Accept", "application/json");
+            if (token != null && !token.isEmpty()) {
+                conn.setRequestProperty("Authorization", "Bearer " + token);
+                conn.setRequestProperty("X-Auth-Token", token);
+            }
             conn.setConnectTimeout(2500);
             conn.setReadTimeout(2500);
 
@@ -212,10 +227,10 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         ComponentName component = new ComponentName(context, TincNoteWidgetProvider.class);
         int[] ids = manager.getAppWidgetIds(component);
-        for (int id : ids) {
-            updateWidget(context, manager, id);
-        }
         if (ids != null && ids.length > 0) {
+            for (int id : ids) {
+                updateWidget(context, manager, id);
+            }
             manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_tasks_list);
         }
     }
@@ -242,7 +257,6 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
         openQuickIntent.putExtra("action", "open_quick");
         openQuickIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent openQuickPending = PendingIntent.getActivity(context, 1000, openQuickIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        // NOT: widget_root üzerine pending intent atanmamalıdır, aksi takdirde ListView kaydırma ve öğe tıklamalarını gasp eder!
         views.setOnClickPendingIntent(R.id.widget_empty_view, openQuickPending);
         views.setOnClickPendingIntent(R.id.widget_footer, openQuickPending);
         views.setOnClickPendingIntent(R.id.widget_header_title_box, openQuickPending);
@@ -274,11 +288,12 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
         }
 
         if (totalCount > 0) {
-            views.setTextViewText(R.id.widget_subtitle, totalCount + " bekleyen görev");
+            views.setTextViewText(R.id.widget_subtitle, totalCount + " bekleyen madde / not");
         } else {
             views.setTextViewText(R.id.widget_subtitle, "Tüm görevler bitti ✨");
         }
 
         appWidgetManager.updateAppWidget(appWidgetId, views);
+        appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.widget_tasks_list);
     }
 }

@@ -2456,6 +2456,15 @@ def get_unified_tasks(notebook_id: int = None):
             WHERE c.notebook_id = ? AND fe.entry_type = 'expense' AND fe.is_paid = 0 AND p.is_archived = 0
         """, (notebook_id,))
         finances = cur.fetchall()
+
+        # 3. Hızlı notlar
+        cur.execute("""
+            SELECT id, notebook_id, content, color, created_at
+            FROM quick_notes
+            WHERE notebook_id = ?
+            ORDER BY id DESC
+        """, (notebook_id,))
+        quick_notes = cur.fetchall()
         conn.close()
 
     tasks = []
@@ -2548,6 +2557,28 @@ def get_unified_tasks(notebook_id: int = None):
             "due_urgency": due_urgency,
             "sort_key": f"{due_urgency}_9999-99-99_{it['id']}"
         })
+
+    # 3. Hızlı notları ekle
+    for qn in quick_notes:
+        content = (qn["content"] or "").strip()
+        first_line = content.split('\n')[0] if content else ""
+        if first_line:
+            tasks.append({
+                "id": f"qn_{qn['id']}",
+                "raw_id": qn["id"],
+                "type": "quick_note",
+                "title": first_line,
+                "price": None,
+                "quantity": None,
+                "page_id": 0,
+                "page_title": "Hızlı Not",
+                "category_name": "Notlar",
+                "is_done": False,
+                "due_date": None,
+                "due_badge": "Not",
+                "due_urgency": 3.5,
+                "sort_key": f"3.5_9999-99-99_{qn['id']}"
+            })
 
     tasks.sort(key=lambda x: x["sort_key"])
     return tasks

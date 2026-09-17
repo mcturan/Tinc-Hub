@@ -1428,24 +1428,24 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.5.4",
-        "versionCode": 109,
+        "version": "1.5.5",
+        "versionCode": 110,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.5.4:\n- Mobil uygulama sunucu bağlantısı ve CORS yetkilendirme sorunları çözüldü\n- Kesintisiz çevrimdışı çalışma, anında otomatik kaydetme optimize edildi\n- Genel Bakış görev etkileşimi, checkbox ile anında tamamlama ve UI düzeltmeleri"
+        "notes": "v1.5.5:\n- Android Widget: RemoteViews hatası (<View> etiketi) düzeltildi, launcher çökmesi ve simgeye dönüşme engellendi\n- Widget Grid: 4x3 boyutlandırma ve yeniden boyutlandırma parametreleri eklendi (Google Keep / Todo stili)\n- Hem yapılacaklar listesi hem hızlı notlar doğrudan widget üzerinde gösteriliyor\n- Widget içinden doğrudan tek tıkla görev tamamlama ve not açma desteği"
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
-        "/home/turan/Masaüstü/TincNote-v1.5.4.apk",
+        "/home/turan/Masaüstü/TincNote-v1.5.5.apk",
         "/opt/tinc-hub/TNOTE/static/tincnote.apk",
         "/home/turan/101/tinc-hub/TNOTE/static/tincnote.apk",
         "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/debug/app-debug.apk",
-        "/home/turan/Masaüstü/TincNote-v1.5.3.apk",
+        "/home/turan/Masaüstü/TincNote-v1.5.4.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.5.4.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.5.5.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────

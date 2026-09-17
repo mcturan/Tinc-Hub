@@ -4,7 +4,7 @@
  * yeni sürüm çıktığında kullanıcıya APK indirme ve güncelleme imkanı sunar.
  */
 
-const APP_VERSION = "1.5.4";
+const APP_VERSION = "1.5.5";
 const DEFAULT_GITHUB_REPO = "mcturan/tinc-hub"; // Ayarlardan değiştirilebilir
 
 class TincNoteUpdater {

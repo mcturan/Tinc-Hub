@@ -46,6 +46,20 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public void setAuthToken(String token) {
+            try {
+                SharedPreferences prefs = mContext.getSharedPreferences(TincNoteWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE);
+                if (token != null && !token.trim().isEmpty()) {
+                    prefs.edit().putString(TincNoteWidgetProvider.KEY_AUTH_TOKEN, token.trim()).apply();
+                } else {
+                    prefs.edit().remove(TincNoteWidgetProvider.KEY_AUTH_TOKEN).apply();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        @JavascriptInterface
         public String getPendingWidgetToggles() {
             try {
                 SharedPreferences prefs = mContext.getSharedPreferences(TincNoteWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE);
@@ -116,6 +130,12 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleWidgetIntent(intent);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        TincNoteWidgetProvider.updateAllWidgets(this);
     }
 
     private void handleWidgetIntent(Intent intent) {

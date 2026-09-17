@@ -3,7 +3,6 @@ package com.tinchub.manager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.graphics.Paint;
 import android.view.View;
 import android.widget.RemoteViews;
 import android.widget.RemoteViewsService;
@@ -99,12 +98,25 @@ class TincNoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
 
         RemoteViews views = new RemoteViews(mContext.getPackageName(), R.layout.widget_task_item);
 
-        // Başlık ve Çizili Durum (Microsoft To-Do / Google Görevler stili)
-        if (item.isDone) {
+        boolean isQuickNote = "quick_note".equals(item.type);
+        boolean isFinance = "finance".equals(item.type);
+
+        // İkon, Renk ve Başlık
+        if (isQuickNote) {
+            views.setTextViewText(R.id.widget_item_check_text, "📝");
+            views.setTextColor(R.id.widget_item_check_text, 0xFF6366F1); // İndigo
+            views.setTextViewText(R.id.widget_item_title, item.title);
+            views.setTextColor(R.id.widget_item_title, 0xFF0F172A);      // Koyu
+        } else if (item.isDone) {
             views.setTextViewText(R.id.widget_item_check_text, "✓");
             views.setTextColor(R.id.widget_item_check_text, 0xFF10B981); // Yeşil
             views.setTextViewText(R.id.widget_item_title, android.text.Html.fromHtml("<s>" + item.title + "</s>"));
             views.setTextColor(R.id.widget_item_title, 0xFF94A3B8);      // Muted
+        } else if (isFinance) {
+            views.setTextViewText(R.id.widget_item_check_text, "💳");
+            views.setTextColor(R.id.widget_item_check_text, 0xFFD97706); // Amber
+            views.setTextViewText(R.id.widget_item_title, item.title);
+            views.setTextColor(R.id.widget_item_title, 0xFF0F172A);      // Koyu
         } else {
             views.setTextViewText(R.id.widget_item_check_text, "○");
             views.setTextColor(R.id.widget_item_check_text, 0xFF3B82F6); // Mavi
@@ -135,22 +147,30 @@ class TincNoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
             views.setViewVisibility(R.id.widget_item_page_badge, View.GONE);
         }
 
-        // 1. Tik Butonu Tıklaması: Doğrudan Widget İçinde Görevi Tamamla / Geri Al
-        Intent toggleFillIn = new Intent();
-        toggleFillIn.setAction(TincNoteWidgetProvider.ACTION_TOGGLE_TASK);
-        toggleFillIn.putExtra("task_id", item.id);
-        toggleFillIn.putExtra("raw_id", item.rawId);
-        toggleFillIn.putExtra("task_type", item.type);
-        views.setOnClickFillInIntent(R.id.widget_item_check_box, toggleFillIn);
-        views.setOnClickFillInIntent(R.id.widget_item_check_text, toggleFillIn);
+        // 1. Sol İkon / Tik Butonu Tıklaması
+        if (!isQuickNote) {
+            Intent toggleFillIn = new Intent();
+            toggleFillIn.setAction(TincNoteWidgetProvider.ACTION_TOGGLE_TASK);
+            toggleFillIn.putExtra("task_id", item.id);
+            toggleFillIn.putExtra("raw_id", item.rawId);
+            toggleFillIn.putExtra("task_type", item.type);
+            views.setOnClickFillInIntent(R.id.widget_item_check_box, toggleFillIn);
+            views.setOnClickFillInIntent(R.id.widget_item_check_text, toggleFillIn);
+        } else {
+            // Hızlı not ise tıklanınca doğrudan Hızlı Notlar ekranını aç
+            Intent openQuickFillIn = new Intent();
+            openQuickFillIn.setAction(TincNoteWidgetProvider.ACTION_OPEN_PAGE);
+            openQuickFillIn.putExtra("open_page_id", 0L);
+            views.setOnClickFillInIntent(R.id.widget_item_check_box, openQuickFillIn);
+            views.setOnClickFillInIntent(R.id.widget_item_check_text, openQuickFillIn);
+        }
 
-        // 2. Satır Gövdesi Tıklaması: İlgili Sayfayı Aç
+        // 2. Satır Gövdesi (Metin) Tıklaması: İlgili Sayfayı Aç
         Intent openPageFillIn = new Intent();
         openPageFillIn.setAction(TincNoteWidgetProvider.ACTION_OPEN_PAGE);
         openPageFillIn.putExtra("open_page_id", item.pageId);
         openPageFillIn.putExtra("task_id", item.id);
         views.setOnClickFillInIntent(R.id.widget_item_body, openPageFillIn);
-        views.setOnClickFillInIntent(R.id.widget_item_root, openPageFillIn);
 
         return views;
     }

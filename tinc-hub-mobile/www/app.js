@@ -198,6 +198,11 @@ async function syncWidgetData() {
             }
         }
 
+        if (window.AndroidWidgetBridge.setAuthToken && window.appStorage) {
+            const token = await window.appStorage.getSetting('auth_token', '');
+            window.AndroidWidgetBridge.setAuthToken(token || '');
+        }
+
         const tasks = await window.appStorage.getUnifiedTasks();
         const activeTasks = tasks.filter(t => !t.is_done);
 

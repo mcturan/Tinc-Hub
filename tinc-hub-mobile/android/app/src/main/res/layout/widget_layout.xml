@@ -70,7 +70,7 @@
             android:textStyle="bold" />
     </LinearLayout>
 
-    <View
+    <ImageView
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#E2E8F0"
@@ -130,7 +130,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <View
+    <ImageView
         android:layout_width="match_parent"
         android:layout_height="1dp"
         android:background="#E2E8F0"

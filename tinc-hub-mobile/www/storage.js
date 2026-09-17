@@ -676,6 +676,31 @@ class TincNoteStorage {
             });
         }
 
+        // 3. Hızlı Notlar (Quick Notes)
+        const quickNotes = await this.getAll('quick_notes');
+        const activeQn = quickNotes.filter(n => !n._deleted && n.content);
+        for (const qn of activeQn) {
+            const firstLine = (qn.content || '').trim().split('\n')[0];
+            if (firstLine) {
+                tasks.push({
+                    id: `qn_${qn.id}`,
+                    raw_id: qn.id,
+                    type: 'quick_note',
+                    title: firstLine,
+                    price: null,
+                    quantity: null,
+                    page_id: 0,
+                    page_title: 'Hızlı Not',
+                    category_name: 'Notlar',
+                    is_done: false,
+                    due_date: null,
+                    due_badge: '📝 Not',
+                    due_urgency: 3.5,
+                    sort_key: `3.5_9999-99-99_${qn.id}`
+                });
+            }
+        }
+
         tasks.sort((a, b) => a.sort_key.localeCompare(b.sort_key));
         return tasks;
     }
