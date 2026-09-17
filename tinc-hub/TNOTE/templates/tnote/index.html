@@ -344,10 +344,10 @@
                             </button>
                         </div>
                         <div style="padding:4px 0 0 0;">
-                            <div style="display:flex; gap:6px; margin-bottom:8px;">
-                                <input type="text" id="ov-quick-note-input" class="form-control" placeholder="Aklına geleni hemen buraya yaz..." onkeydown="if(event.key==='Enter') submitOverviewQuickNote()">
-                                <button class="btn btn-sm btn-primary" onclick="submitOverviewQuickNote()" style="white-space:nowrap; padding:4px 10px;">
-                                    <svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg>
+                            <div style="display:flex; gap:6px; margin-bottom:8px; width:100%;">
+                                <input type="text" id="ov-quick-note-input" class="form-control" style="flex:1;" placeholder="Aklına geleni hemen buraya yaz..." onkeydown="if(event.key==='Enter') submitOverviewQuickNote()">
+                                <button class="btn btn-sm btn-primary" onclick="submitOverviewQuickNote()" style="white-space:nowrap; padding:4px 12px; display:inline-flex; align-items:center; gap:4px;">
+                                    <svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg><span>Not Ekle</span>
                                 </button>
                             </div>
                             <div id="ov-quick-notes-list" style="display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto;">
