@@ -1455,7 +1455,20 @@ function renderPageHeader() {
     const badgeEl = document.getElementById('current-page-badge');
 
     if (titleEl) titleEl.textContent = currentPageData.title;
-    if (iconEl) iconEl.textContent = currentPageData.icon || '📝';
+    if (iconEl) {
+        const typeIcons = {
+            'checklist': '#i-check-square',
+            'notes': '#i-file-text',
+            'finance': '#i-credit-card',
+            'project': '#i-layers'
+        };
+        if (currentPageData.icon && currentPageData.icon !== '📝' && currentPageData.icon !== '📄' && currentPageData.icon !== '📋') {
+            iconEl.innerHTML = `<span style="font-size:1.15rem;">${escapeHtml(currentPageData.icon)}</span>`;
+        } else {
+            const svgHref = typeIcons[currentPageData.type] || '#i-file-text';
+            iconEl.innerHTML = `<svg class="svg-icon svg-icon-md"><use href="${svgHref}"/></svg>`;
+        }
+    }
 
     const checklistArea = document.getElementById('checklist-view');
     const noteArea = document.getElementById('note-view');
@@ -2713,6 +2726,12 @@ async function loadProjectData(pageId) {
         renderBOM();
         renderLogs();
         loadProjectNotes();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const ptab = urlParams.get('ptab');
+        if (ptab) {
+            switchProjectTab(ptab);
+        }
     } catch (e) {
         console.error("Proje verisi yükleme hatası:", e);
     }
@@ -2789,7 +2808,7 @@ function renderTimeline() {
         if (m.id === selectedMilestoneId) node.classList.add('active');
 
         const statusIcon = m.status === 'completed' ? '✓' : (m.status === 'in_progress' ? '⚙' : (idx + 1));
-        const dateHtml = m.target_date ? `<div class="timeline-node-date">📅 ${escapeHtml(m.target_date)}</div>` : '';
+        const dateHtml = m.target_date ? `<div class="timeline-node-date">${escapeHtml(m.target_date)}</div>` : '';
 
         node.innerHTML = `
             <div class="timeline-node-circle">${statusIcon}</div>

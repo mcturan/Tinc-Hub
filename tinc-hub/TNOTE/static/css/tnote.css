@@ -21,7 +21,7 @@
     --purple-light: #f1f5f9;
 }
 
-body, .tnote-container {
+body, .tnote-container, input, textarea, select, button {
     font-family: var(--font-sans);
 }
 
@@ -1207,15 +1207,19 @@ body, .tnote-container {
 }
 
 .form-control {
+    font-family: var(--font-sans);
     padding: 8px 12px;
-    border: 1px solid var(--border, #dee2e6);
+    border: 1px solid var(--border, #cbd5e1);
     border-radius: 6px;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
+    line-height: 1.5;
     outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .form-control:focus {
-    border-color: var(--accent, #0d6efd);
+    border-color: var(--primary, #0284c7);
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.12);
 }
 
 /* ── Finans & Düzenli Ödeme Stilleri ── */
@@ -1613,6 +1617,26 @@ body, .tnote-container {
     border-radius: var(--radius, 10px);
     padding: 16px 20px;
     box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05));
+}
+
+.project-subcard textarea.form-control {
+    font-family: var(--font-sans);
+    font-size: 0.90rem;
+    line-height: 1.6;
+    min-height: 150px;
+    resize: vertical;
+    border: 1px solid var(--border, #cbd5e1);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text, #1e293b);
+    background: var(--surface, #ffffff);
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.project-subcard textarea.form-control:focus {
+    border-color: var(--primary, #0284c7);
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.12);
 }
 
 /* Gallery */

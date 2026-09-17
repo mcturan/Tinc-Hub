@@ -3,8 +3,8 @@
 {% block title %}TincNote — Notlar & Listeler{% endblock %}
 
 {% block head %}
-<link rel="stylesheet" href="{{ url_for('tnote.static', filename='css/tinc_theme.css') }}">
-<link rel="stylesheet" href="{{ url_for('tnote.static', filename='css/tnote.css') }}">
+<link rel="stylesheet" href="{{ url_for('tnote.static', filename='css/tinc_theme.css') }}?v=20260917_2">
+<link rel="stylesheet" href="{{ url_for('tnote.static', filename='css/tnote.css') }}?v=20260917_2">
 {% endblock %}
 
 {% block content %}
@@ -188,7 +188,7 @@
 
             <div class="header-actions" id="page-header-actions">
                 <button class="btn btn-sm btn-outline header-ai-btn" id="btn-header-ai" onclick="openAiAssistModal()" title="TincAI Asistanı">
-                    <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-zap"/></svg><span>✨ AI</span>
+                    <svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-zap"/></svg><span>TincAI</span>
                 </button>
                 <button class="btn btn-sm btn-primary header-add-btn" id="btn-header-add" onclick="focusQuickAdd()" title="Ekle">
                     <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-plus"/></svg><span>Ekle</span>
@@ -551,12 +551,11 @@
             <div class="project-header-card">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="font-size:1.15rem;" id="proj-status-icon">🔬</span>
-                        <select id="proj-status-select" class="form-control" style="font-weight:600; font-size:0.82rem; width:auto; padding:3px 8px;" onchange="updateProjectStatus()">
-                            <option value="planning">💡 Planlama</option>
-                            <option value="in_progress">🛠️ Yapım Aşamasında</option>
-                            <option value="testing">🧪 Test & Kalibrasyon</option>
-                            <option value="completed">✅ Tamamlandı</option>
+                        <select id="proj-status-select" class="form-control" style="font-weight:600; font-size:0.82rem; width:auto; padding:4px 10px;" onchange="updateProjectStatus()">
+                            <option value="planning">Planlama</option>
+                            <option value="in_progress">Yapım Aşamasında</option>
+                            <option value="testing">Test &amp; Kalibrasyon</option>
+                            <option value="completed">Tamamlandı</option>
                         </select>
                     </div>
                     <!-- Proje KPI Mini İstatistikleri -->
@@ -589,8 +588,13 @@
             <!-- 2. Kaydırılabilir İnteraktif Zaman Çizelgesi (Timeline & Yol Haritası) -->
             <div class="timeline-section-card">
                 <div class="timeline-section-header">
-                    <span style="font-weight:700; font-size:0.85rem;">⏳ Zaman Çizelgesi</span>
-                    <button class="btn btn-sm btn-primary" onclick="openAddMilestoneModal()">➕ Aşama Ekle</button>
+                    <span style="font-weight:700; font-size:0.85rem; display:inline-flex; align-items:center; gap:6px;">
+                        <svg class="svg-icon svg-icon-sm"><use href="#i-calendar"/></svg>
+                        <span>Zaman Çizelgesi &amp; Aşamalar</span>
+                    </span>
+                    <button class="btn btn-sm btn-primary" onclick="openAddMilestoneModal()">
+                        <svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-plus"/></svg>Aşama Ekle
+                    </button>
                 </div>
 
                 <!-- Kaydırılabilir Zaman Çizgisi -->
@@ -617,7 +621,7 @@
                     </div>
                     <div id="detail-milestone-desc" style="font-size:0.88rem; margin-top:8px; color:var(--text); white-space:pre-wrap;"></div>
                     <div id="detail-milestone-reqs-container" style="margin-top:10px;">
-                        <div style="font-weight:600; font-size:0.82rem; color:var(--muted); margin-bottom:4px;">📋 Gereksinimler & Yapılacak Adımlar:</div>
+                        <div style="font-weight:600; font-size:0.82rem; color:var(--muted); margin-bottom:4px;">Gereksinimler &amp; Yapılacak Adımlar:</div>
                         <div id="detail-milestone-reqs" style="font-size:0.85rem;"></div>
                     </div>
                 </div>
@@ -641,7 +645,7 @@
                                 <strong style="font-size:0.85rem;">Amaç &amp; Kapsam</strong>
                                 <span id="proj-concept-save-status" style="font-size:0.72rem; color:var(--muted);"></span>
                             </div>
-                            <textarea id="proj-concept-input" class="form-control" rows="6" placeholder="Proje amacı, notlar..." oninput="handleProjectConceptInput()"></textarea>
+                            <textarea id="proj-concept-input" class="form-control" rows="6" placeholder="Proje amacı, hedefler, notlar..." oninput="handleProjectConceptInput()"></textarea>
                         </div>
                         <!-- Teknik Detaylar & Şartname -->
                         <div class="project-subcard">
@@ -656,11 +660,18 @@
                     <!-- Çizimler & Görseller Galerisi -->
                     <div class="project-subcard" style="margin-top:12px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                            <strong style="font-size:0.88rem;">📐 Çizimler & Şemalar</strong>
+                            <strong style="font-size:0.88rem; display:inline-flex; align-items:center; gap:6px;">
+                                <svg class="svg-icon svg-icon-sm"><use href="#i-file-text"/></svg>
+                                <span>Çizimler &amp; Şemalar</span>
+                            </strong>
                             <div style="display:flex; gap:6px;">
                                 <input type="file" id="proj-file-input" style="display:none;" onchange="handleProjectFileUpload(event)">
-                                <button class="btn btn-sm btn-primary" onclick="document.getElementById('proj-file-input').click()">📤 Yükle</button>
-                                <button class="btn btn-sm btn-outline" onclick="openAddDrawingModal()">🔗 Link Ekle</button>
+                                <button class="btn btn-sm btn-primary" onclick="document.getElementById('proj-file-input').click()">
+                                    <svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-plus"/></svg>Yükle
+                                </button>
+                                <button class="btn btn-sm btn-outline" onclick="openAddDrawingModal()">
+                                    <svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-folder"/></svg>Bağlantı Ekle
+                                </button>
                             </div>
                         </div>
 
@@ -675,10 +686,12 @@
                     <div class="project-subcard">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                             <div>
-                                <strong style="font-size:0.95rem;">🧰 Malzeme & Bileşen Tablosu (Bill of Materials)</strong>
+                                <strong style="font-size:0.95rem;">Malzeme &amp; Bileşen Tablosu (BOM)</strong>
                                 <span style="font-size:0.78rem; color:var(--muted); margin-left:8px;">Duruma tıklayarak [Aranıyor] ➔ [Sipariş Verildi] ➔ [Elde Var] arasında geçin</span>
                             </div>
-                            <button class="btn btn-sm btn-primary" onclick="openAddMaterialModal()">➕ Malzeme Ekle</button>
+                            <button class="btn btn-sm btn-primary" onclick="openAddMaterialModal()">
+                                <svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-plus"/></svg>Malzeme Ekle
+                            </button>
                         </div>
 
                         <div class="finance-table-container">
@@ -713,31 +726,40 @@
                     <div class="project-subcard">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
                             <div>
-                                <strong style="font-size:0.95rem;">🛠️ Yapım & Gelişim Günlüğü (Atölye / Lab Defteri)</strong>
+                                <strong style="font-size:0.95rem;">Yapım &amp; Gelişim Günlüğü</strong>
                                 <span style="font-size:0.78rem; color:var(--muted); margin-left:8px;">Kronolojik ilerleme, karşılaşılan problemler ve çözümler</span>
                             </div>
-                            <button class="btn btn-sm btn-primary" onclick="openAddLogModal()">➕ Günlük Girişi Ekle</button>
+                            <button class="btn btn-sm btn-primary" onclick="openAddLogModal()">
+                                <svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-plus"/></svg>Günlük Girişi Ekle
+                            </button>
                         </div>
 
                         <div class="log-timeline-container" id="project-logs-container">
                             <!-- JS ile günlük kartları doldurulur -->
                         </div>
+                    </div>
+                </div>
+
                 <!-- Tab 4: Görev & Not Maddeleri -->
                 <div id="ptab-notes" class="project-tab-pane" style="display:none;">
                     <div class="project-subcard">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                             <div>
-                                <strong style="font-size:0.95rem;">📋 Proje Görev ve Not Maddeleri</strong>
+                                <strong style="font-size:0.95rem;">Proje Görev ve Not Maddeleri</strong>
                                 <span style="font-size:0.78rem; color:var(--muted); margin-left:8px;">Proje adımlarını, yapılacakları ve hızlı maddeleri takip edin</span>
                             </div>
                             <div style="display:flex; gap:6px;">
-                                <button class="btn btn-sm btn-outline" onclick="openModal('modal-bulk-add')">📋 Toplu Ekle</button>
+                                <button class="btn btn-sm btn-outline" onclick="openModal('modal-bulk-add')">
+                                    <svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-layers"/></svg>Toplu Ekle
+                                </button>
                             </div>
                         </div>
 
                         <form id="project-add-item-form" class="item-input-bar" onsubmit="event.preventDefault(); addProjectItem();" style="margin-bottom:12px; display:flex; gap:8px;">
                             <input type="text" id="project-item-title-input" class="form-control" placeholder="Yeni proje görevi veya not maddesi yazın (Enter)..." style="flex:1;">
-                            <button type="submit" class="btn btn-sm btn-primary">➕ Ekle</button>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-plus"/></svg>Ekle
+                            </button>
                         </form>
 
                         <div class="item-list" id="project-items-list" style="display:flex; flex-direction:column; gap:4px; min-height:80px;">
@@ -1924,5 +1946,5 @@
 <script>
     window.CURRENT_NOTEBOOK_ID = {{ current_notebook.id if current_notebook else 1 }};
 </script>
-<script src="{{ url_for('tnote.static', filename='js/tnote.js') }}"></script>
+<script src="{{ url_for('tnote.static', filename='js/tnote.js') }}?v=20260917_2"></script>
 {% endblock %}
