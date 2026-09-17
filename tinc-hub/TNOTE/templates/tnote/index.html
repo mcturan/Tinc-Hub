@@ -10,6 +10,8 @@
 {% block content %}
 {% include "tnote/_icons.html" %}
 <div class="tnote-container">
+    <!-- Mobil Kenar Çubuğu Karartma Perdesi -->
+    <div class="tnote-sidebar-backdrop" id="tnote-sidebar-backdrop" onclick="closeMobileSidebar()"></div>
     <!-- Sol Sidebar (Kategoriler & Sayfalar) -->
     <aside class="tnote-sidebar" id="tnote-sidebar">
         <div class="sidebar-header sidebar-notebook-header">
@@ -202,13 +204,13 @@
                         <div class="dropdown-item" onclick="copyListToClipboard(); closeMoreActionsDropdown();">
                             <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-file-text"/></svg></span> Kopyala
                         </div>
-                        <div class="dropdown-item" onclick="resetCurrentList(); closeMoreActionsDropdown();">
+                        <div class="dropdown-item" id="btn-reset-list" onclick="resetCurrentList(); closeMoreActionsDropdown();">
                             <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-undo"/></svg></span> Tikleri Sıfırla
                         </div>
-                        <div class="dropdown-item" onclick="openModal('modal-bulk-add'); closeMoreActionsDropdown();">
+                        <div class="dropdown-item" id="btn-bulk-add" onclick="openModal('modal-bulk-add'); closeMoreActionsDropdown();">
                             <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-plus"/></svg></span> Toplu Ekle
                         </div>
-                        <div class="dropdown-item" onclick="clearCompleted(); closeMoreActionsDropdown();">
+                        <div class="dropdown-item" id="btn-clear-done" onclick="clearCompleted(); closeMoreActionsDropdown();">
                             <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-trash"/></svg></span> Tamamlananları Sil
                         </div>
                         <div class="dropdown-divider"></div>

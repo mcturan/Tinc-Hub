@@ -2015,6 +2015,12 @@ function openAddPageModal() {
     openModal('modal-add-page');
 }
 
+function openAddProjectModal() {
+    const typeSel = document.getElementById('new-page-type');
+    if (typeSel) typeSel.value = 'project';
+    openAddPageModal();
+}
+
 async function submitAddPage() {
     const catId = document.getElementById('new-page-cat').value;
     const title = document.getElementById('new-page-title').value.trim();
