@@ -23,6 +23,16 @@ tnote_bp = Blueprint(
     static_url_path='/static'
 )
 
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+
+@tnote_bp.route('/sw.js')
+def service_worker():
+    return send_file(os.path.join(STATIC_DIR, 'sw.js'), mimetype='application/javascript')
+
+@tnote_bp.route('/manifest.json')
+def manifest_json():
+    return send_file(os.path.join(STATIC_DIR, 'manifest.json'), mimetype='application/json')
+
 def auth_check(f):
     @wraps(f)
     def decorated(*args, **kwargs):

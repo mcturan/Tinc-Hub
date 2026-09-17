@@ -2466,7 +2466,7 @@ def get_unified_tasks(notebook_id: int = None):
     for f in finances:
         amt_val = f["amount"]
         amt_str = f"{amt_val:,.0f} TL".replace(",", ".") if amt_val else ""
-        display_title = f"💳 {f['title']}"
+        display_title = f"{f['title']}"
         if amt_str:
             display_title += f" ({amt_str})"
 
@@ -2493,16 +2493,16 @@ def get_unified_tasks(notebook_id: int = None):
             diff = (task_date - today).days
             if diff < 0:
                 due_urgency = 1
-                due_badge = f"🔴 Gecikmiş ({task_date.strftime('%d.%m')})"
+                due_badge = f"Gecikmiş ({task_date.strftime('%d.%m')})"
             elif diff == 0:
                 due_urgency = 2
-                due_badge = "🟡 Bugün"
+                due_badge = "Bugün"
             elif diff == 1:
                 due_urgency = 3
-                due_badge = "🟠 Yarın"
+                due_badge = "Yarın"
             elif diff <= 7:
                 due_urgency = 4
-                due_badge = f"🟢 {task_date.strftime('%d.%m')}"
+                due_badge = task_date.strftime("%d.%m")
             else:
                 due_urgency = 5
                 due_badge = task_date.strftime("%d.%m")
@@ -2530,7 +2530,7 @@ def get_unified_tasks(notebook_id: int = None):
         page_title = (it["page_title"] or "").lower()
         is_quick = ("hızlı" in cat_name or "hizli" in cat_name or "hızlı" in page_title or "hizli" in page_title)
         due_urgency = 2.5 if is_quick else 6
-        due_badge = "⚡ Hızlı Görev" if is_quick else (it["page_title"] or "Liste")
+        due_badge = "Hızlı" if is_quick else None
 
         tasks.append({
             "id": f"item_{it['id']}",

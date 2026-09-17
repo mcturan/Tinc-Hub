@@ -1,0 +1,22 @@
+{
+  "name": "TincNote — Notlar & Listeler",
+  "short_name": "TincNote",
+  "description": "Tinc Ekosistemi Çevrimdışı ve Canlı Senkronize Not, Liste ve Proje Yönetimi",
+  "start_url": "/notes/",
+  "scope": "/notes/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0284c7",
+  "icons": [
+    {
+      "src": "/notes/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/notes/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

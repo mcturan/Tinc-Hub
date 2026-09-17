@@ -74,12 +74,9 @@
         <div class="sidebar-categories" id="sidebar-categories">
             {% for cat in categories %}
             <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}">
-                <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" title="{{ cat.name }}" onclick="toggleCategoryGroup({{ cat.id }})" style="border-left: 3px solid {{ cat.color or '#0284c7' }};">
+                <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" title="{{ cat.name }}" onclick="toggleCategoryGroup({{ cat.id }})">
                     <div class="category-title-area">
-                        <span class="drag-handle cat-drag-handle" title="Kategoriyi taşımak için sürükleyin" onclick="event.stopPropagation()">⋮</span>
                         <span class="cat-chevron" id="cat-chevron-{{ cat.id }}">▾</span>
-                        <span class="cat-color-dot" style="background-color: {{ cat.color or '#0284c7' }};"></span>
-                        <span class="cat-icon-span" style="font-size:0.9rem;" title="{{ cat.name }}">{{ cat.icon }}</span>
                         <span class="category-title-text" title="{{ cat.name }}">{{ cat.name }}</span>
                     </div>
                     <div class="category-actions" onclick="event.stopPropagation()">
@@ -94,8 +91,6 @@
                         {% if p.category_id == cat.id %}
                         <li class="page-item" id="page-item-{{ p.id }}" data-page-id="{{ p.id }}" data-category-id="{{ cat.id }}" draggable="true" onclick="loadPage({{ p.id }})">
                             <div class="page-item-info">
-                                <span class="drag-handle page-drag-handle" title="Listeyi taşımak veya başka kategoriye aktarmak için sürükleyin" onclick="event.stopPropagation()">⋮</span>
-                                <span>{{ p.icon }}</span>
                                 <span class="page-title-text" title="{{ p.title }}">{{ p.title }}</span>
                             </div>
                             <div class="page-item-actions">
@@ -418,13 +413,16 @@
                 <div class="overview-col">
                     <div class="overview-section-box">
                         <div class="section-box-header">
-                            <span class="section-box-title">📝 Hızlı Notlar</span>
+                            <span class="section-box-title">
+                                <svg class="svg-icon svg-icon-sm"><use href="#i-file-text"/></svg>
+                                <span>Hızlı Notlar</span>
+                            </span>
                             <span class="badge-count" id="web-quick-notes-count">0</span>
                         </div>
                         <div style="padding:10px;">
                             <div style="display:flex; gap:6px; margin-bottom:8px;">
                                 <input type="text" id="web-quick-note-input" class="form-control" placeholder="Hızlı not..." onkeydown="if(event.key==='Enter') addWebQuickNote()">
-                                <button class="btn btn-sm btn-primary" onclick="addWebQuickNote()">➕ Ekle</button>
+                                <button class="btn btn-sm btn-primary" onclick="addWebQuickNote()">Ekle</button>
                             </div>
                             <div id="web-quick-notes-list" class="overview-items-list" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
                                 <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Not yok</div>
@@ -437,13 +435,16 @@
                 <div class="overview-col">
                     <div class="overview-section-box">
                         <div class="section-box-header">
-                            <span class="section-box-title">⚡ Hızlı Görevler</span>
+                            <span class="section-box-title">
+                                <svg class="svg-icon svg-icon-sm"><use href="#i-zap"/></svg>
+                                <span>Hızlı Görevler</span>
+                            </span>
                             <span class="badge-count" id="web-quick-direct-count">0</span>
                         </div>
                         <div style="padding:10px;">
                             <div style="display:flex; gap:6px; margin-bottom:8px;">
                                 <input type="text" id="web-quick-task-input" class="form-control" placeholder="Hızlı görev..." onkeydown="if(event.key==='Enter') addWebQuickTask()">
-                                <button class="btn btn-sm btn-primary" onclick="addWebQuickTask()">➕ Ekle</button>
+                                <button class="btn btn-sm btn-primary" onclick="addWebQuickTask()">Ekle</button>
                             </div>
                             <div id="web-quick-direct-list" class="overview-items-list" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
                                 <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Görev yok</div>
@@ -453,10 +454,13 @@
                 </div>
             </div>
 
-            <!-- 2. Kategori ve Sayfalardan Gelen Görevler (Tarih Sıralı) -->
+            <!-- 2. Kategori ve Sayfalardan Gelen Görevler -->
             <div class="overview-section-box">
                 <div class="section-box-header">
-                    <span class="section-box-title">📅 Planlanan Görev &amp; Ödemeler</span>
+                    <span class="section-box-title">
+                        <svg class="svg-icon svg-icon-sm"><use href="#i-check-square"/></svg>
+                        <span>Görevler</span>
+                    </span>
                     <span class="badge-count" id="web-unified-tasks-count">0</span>
                 </div>
                 <div class="overview-items-list" id="web-unified-tasks-container">
@@ -612,8 +616,8 @@
                         </div>
                         <div style="display:flex; gap:6px;">
                             <button class="btn btn-sm btn-outline" id="btn-toggle-milestone-status" onclick="toggleSelectedMilestoneStatus()">Durumu Değiştir</button>
-                            <button class="btn btn-sm btn-outline" onclick="openEditSelectedMilestone()">✏️ Düzenle</button>
-                            <button class="btn btn-sm btn-danger-hover" onclick="deleteSelectedMilestone()">🗑️ Sil</button>
+                            <button class="btn btn-sm btn-outline" onclick="openEditSelectedMilestone()"><svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-edit"/></svg>Düzenle</button>
+                            <button class="btn btn-sm btn-danger-hover" onclick="deleteSelectedMilestone()"><svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-trash"/></svg>Sil</button>
                             <button class="btn-icon" onclick="closeMilestoneDetail()">✕</button>
                         </div>
                     </div>
@@ -628,10 +632,10 @@
             <!-- 3. Proje Sekmeleri -->
             <div class="project-tabs-container">
                 <div class="project-tab-nav">
-                    <button class="project-tab-btn active" id="tab-btn-concept" onclick="switchProjectTab('concept')">💡 Fikir & Çizimler</button>
-                    <button class="project-tab-btn" id="tab-btn-bom" onclick="switchProjectTab('bom')">🧰 Malzemeler (BOM)</button>
-                    <button class="project-tab-btn" id="tab-btn-logs" onclick="switchProjectTab('logs')">🛠️ Günlük</button>
-                    <button class="project-tab-btn" id="tab-btn-notes" onclick="switchProjectTab('notes')">📋 Görev &amp; Not Maddeleri</button>
+                    <button class="project-tab-btn active" id="tab-btn-concept" onclick="switchProjectTab('concept')"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg> Fikir &amp; Çizimler</button>
+                    <button class="project-tab-btn" id="tab-btn-bom" onclick="switchProjectTab('bom')"><svg class="svg-icon svg-icon-xs"><use href="#i-layers"/></svg> Malzemeler (BOM)</button>
+                    <button class="project-tab-btn" id="tab-btn-logs" onclick="switchProjectTab('logs')"><svg class="svg-icon svg-icon-xs"><use href="#i-clock"/></svg> Günlük</button>
+                    <button class="project-tab-btn" id="tab-btn-notes" onclick="switchProjectTab('notes')"><svg class="svg-icon svg-icon-xs"><use href="#i-check-square"/></svg> Görev &amp; Notlar</button>
                 </div>
 
                 <!-- Tab 1: Fikir & Çizimler -->
@@ -640,18 +644,18 @@
                         <!-- Fikir & Amaç -->
                         <div class="project-subcard">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <strong style="font-size:0.85rem;">💡 Amaç & Kapsam</strong>
-                                <button class="btn btn-sm btn-outline" onclick="saveProjectConcept()">💾 Kaydet</button>
+                                <strong style="font-size:0.85rem;">Amaç &amp; Kapsam</strong>
+                                <span id="proj-concept-save-status" style="font-size:0.72rem; color:var(--muted);"></span>
                             </div>
-                            <textarea id="proj-concept-input" class="form-control" rows="6" placeholder="Proje amacı, notlar..."></textarea>
+                            <textarea id="proj-concept-input" class="form-control" rows="6" placeholder="Proje amacı, notlar..." oninput="handleProjectConceptInput()"></textarea>
                         </div>
                         <!-- Teknik Detaylar & Şartname -->
                         <div class="project-subcard">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                <strong style="font-size:0.85rem;">📐 Teknik Detaylar</strong>
-                                <button class="btn btn-sm btn-outline" onclick="saveProjectConcept()">💾 Kaydet</button>
+                                <strong style="font-size:0.85rem;">Teknik Detaylar</strong>
+                                <span id="proj-specs-save-status" style="font-size:0.72rem; color:var(--muted);"></span>
                             </div>
-                            <textarea id="proj-specs-input" class="form-control" rows="6" placeholder="Ölçüler, voltaj, şema, teknik notlar..."></textarea>
+                            <textarea id="proj-specs-input" class="form-control" rows="6" placeholder="Ölçüler, voltaj, şema, teknik notlar..." oninput="handleProjectConceptInput()"></textarea>
                         </div>
                     </div>
 
@@ -766,11 +770,10 @@
                 </div>
                 <div class="note-toolbar-group">
                     <div class="btn-group-segmented">
-                        <button type="button" id="btn-note-mode-edit" class="btn-seg active" onclick="toggleNoteEditorMode('edit')">✏️ Düzenle</button>
-                        <button type="button" id="btn-note-mode-preview" class="btn-seg" onclick="toggleNoteEditorMode('preview')">👁️ Önizle</button>
+                        <button type="button" id="btn-note-mode-edit" class="btn-seg active" onclick="toggleNoteEditorMode('edit')">Düzenle</button>
+                        <button type="button" id="btn-note-mode-preview" class="btn-seg" onclick="toggleNoteEditorMode('preview')">Önizle</button>
                     </div>
-                    <span id="note-save-status" class="note-save-status">Kaydedildi</span>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="saveNoteContent()">Kaydet</button>
+                    <span id="note-save-status" class="note-save-status" style="font-size:0.75rem; color:var(--muted); font-weight:500;">Kaydedildi ✓</span>
                 </div>
             </div>
             <textarea id="note-content-textarea" class="note-textarea" oninput="handleNoteInput()" placeholder="Not..."></textarea>
@@ -785,11 +788,11 @@
             <!-- Kasa Klasörleri Şeridi -->
             <div class="vault-folders-container">
                 <div class="vault-folders-header">
-                    <span style="font-weight:700; font-size:0.83rem; color:var(--text); display:flex; align-items:center; gap:6px;">
-                        <span>📁</span> <span>Klasörler</span>
+                    <span style="font-weight:600; font-size:0.83rem; color:var(--text); display:flex; align-items:center; gap:6px;">
+                        <svg class="svg-icon svg-icon-xs"><use href="#i-folder"/></svg> <span>Klasörler</span>
                     </span>
                     <button class="btn btn-xs btn-outline" onclick="openNewVaultFolderModal()" title="Yeni Klasör Ekle" style="font-size:0.75rem; padding:2px 8px; border-radius:12px;">
-                        ➕ Ekle
+                        <svg class="svg-icon svg-icon-xs" style="margin-right:2px;"><use href="#i-plus"/></svg>Ekle
                     </button>
                 </div>
                 <div class="vault-folders-strip" id="vault-folders-strip">
@@ -808,9 +811,9 @@
                 <!-- Kapsam Sekmeleri (Scope) -->
                 <div class="vault-scope-tabs" id="vault-scope-tabs">
                     <button class="vault-tab-btn active" data-scope="all" onclick="setVaultScope('all')">Tümü</button>
-                    <button class="vault-tab-btn" data-scope="personal" onclick="setVaultScope('personal')">👤 Kişisel</button>
-                    <button class="vault-tab-btn" data-scope="family" onclick="setVaultScope('family')">👨‍👩‍👧 Aile</button>
-                    <button class="vault-tab-btn" data-scope="work" onclick="setVaultScope('work')">💼 İş</button>
+                    <button class="vault-tab-btn" data-scope="personal" onclick="setVaultScope('personal')">Kişisel</button>
+                    <button class="vault-tab-btn" data-scope="family" onclick="setVaultScope('family')">Aile</button>
+                    <button class="vault-tab-btn" data-scope="work" onclick="setVaultScope('work')">İş</button>
                 </div>
 
                 <!-- Profil & Klasör & Kategori & Arama Araçları -->
@@ -818,11 +821,11 @@
                     <input type="text" id="vault-search-input" class="form-control" placeholder="Ara..." style="font-size:0.8rem; padding:5px 8px; width:160px;" oninput="debounceVaultSearch()">
 
                     <select id="vault-folder-filter" class="form-control" style="font-size:0.8rem; padding:5px 8px; width:135px;" onchange="setVaultFolder(this.value)">
-                        <option value="all">📁 Tüm Klasörler</option>
+                        <option value="all">Tüm Klasörler</option>
                     </select>
                     
                     <select id="vault-profile-filter" class="form-control" style="font-size:0.8rem; padding:5px 8px; width:125px;" onchange="setVaultProfile(this.value)">
-                        <option value="all">👥 Tüm Kişiler</option>
+                        <option value="all">Tüm Kişiler</option>
                     </select>
 
                     <select id="vault-category-filter" class="form-control" style="font-size:0.8rem; padding:5px 8px; width:135px;" onchange="setVaultCategory(this.value)">
@@ -857,7 +860,7 @@
 <div class="tnote-modal-backdrop" id="modal-transfer-quick-note">
     <div class="tnote-modal" style="max-width:480px;">
         <div class="modal-header">
-            <span>📁 Hızlı Notu Sayfaya / Klasöre Aktar</span>
+            <span><svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-folder"/></svg>Hızlı Notu Sayfaya Aktar</span>
             <button class="btn-icon" onclick="closeModal('modal-transfer-quick-note')">✕</button>
         </div>
         <div class="modal-body">
@@ -1305,7 +1308,7 @@
 <div class="tnote-modal-backdrop" id="modal-edit-finance">
     <div class="tnote-modal">
         <div class="modal-header">
-            <span>✏️ Kalemi Düzenle</span>
+            <span>Kalemi Düzenle</span>
             <button class="btn-icon" onclick="closeModal('modal-edit-finance')">✕</button>
         </div>
         <div class="modal-body">
@@ -1862,11 +1865,11 @@
             <textarea id="qn-detail-content" class="form-control" rows="5" style="font-size:0.9rem; line-height:1.5;"></textarea>
         </div>
         <div class="modal-footer" style="display:flex; justify-content:space-between;">
-            <button class="btn btn-danger btn-sm" onclick="deleteCurrentDetailQuickNote()">🗑️ Sil</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteCurrentDetailQuickNote()">Sil</button>
             <div style="display:flex; gap:6px;">
-                <button class="btn btn-sm btn-outline" onclick="copyDetailQuickNote()">📋 Kopyala</button>
-                <button class="btn btn-sm btn-outline" onclick="transferDetailQuickNote()">📁 Sayfaya Aktar</button>
-                <button class="btn btn-sm btn-primary" onclick="saveDetailQuickNote()">💾 Kaydet</button>
+                <button class="btn btn-sm btn-outline" onclick="copyDetailQuickNote()">Kopyala</button>
+                <button class="btn btn-sm btn-outline" onclick="transferDetailQuickNote()">Sayfaya Aktar</button>
+                <button class="btn btn-sm btn-primary" onclick="saveDetailQuickNote()">Kaydet</button>
             </div>
         </div>
     </div>

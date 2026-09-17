@@ -11,7 +11,77 @@ let draggedPage = null;
 let draggedCat = null;
 let sourceCatId = null;
 
+// PWA & Çevrimdışı (Offline) Kuyruk ve Eşitleme
+function enqueueOfflineAction(action) {
+    try {
+        const q = JSON.parse(localStorage.getItem('tnote_offline_queue') || '[]');
+        const existingIdx = q.findIndex(item => item.type === action.type && item.pageId === action.pageId);
+        if (existingIdx >= 0) {
+            q[existingIdx] = action;
+        } else {
+            q.push(action);
+        }
+        localStorage.setItem('tnote_offline_queue', JSON.stringify(q));
+    } catch(e) {
+        console.warn("enqueueOfflineAction error:", e);
+    }
+}
+
+async function syncOfflineQueue() {
+    try {
+        const raw = localStorage.getItem('tnote_offline_queue');
+        if (!raw) return;
+        const q = JSON.parse(raw);
+        if (!Array.isArray(q) || q.length === 0) return;
+
+        const remaining = [];
+        for (const item of q) {
+            try {
+                if (item.type === 'save_note') {
+                    const res = await fetch(`/notes/api/pages/${item.pageId}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({content: item.content})
+                    });
+                    if (!res.ok) remaining.push(item);
+                } else if (item.type === 'save_project') {
+                    const res = await fetch(`/notes/api/pages/${item.pageId}/project`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({concept: item.concept, specs: item.specs})
+                    });
+                    if (!res.ok) remaining.push(item);
+                }
+            } catch(err) {
+                remaining.push(item);
+            }
+        }
+        localStorage.setItem('tnote_offline_queue', JSON.stringify(remaining));
+        if (remaining.length === 0) {
+            showToast("Tüm çevrimdışı değişiklikler eşitlendi ✓");
+        }
+    } catch(e) {
+        console.warn("syncOfflineQueue error:", e);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+    // PWA Service Worker Kaydı
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/notes/sw.js', { scope: '/notes/' })
+            .then(reg => console.log('TincNote SW registered:', reg.scope))
+            .catch(err => console.warn('TincNote SW registration failed:', err));
+    }
+
+    // Çevrimdışı / Çevrimiçi Dinleyicileri
+    window.addEventListener('online', () => {
+        showToast("İnternet bağlantısı sağlandı. Eşitleniyor...", "info");
+        syncOfflineQueue();
+    });
+    window.addEventListener('offline', () => {
+        showToast("Çevrimdışı moddasınız. Değişiklikler cihazda saklanıyor.", "warning");
+    });
+
     // Sol Kenar Çubuğu Manuel Daraltma (« / ») durumunu yükle
     initSidebarToggleState();
 
@@ -26,6 +96,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const initialPageId = urlParams.get('page_id') || urlParams.get('page');
     if (initialPageId) {
         loadPage(initialPageId);
+    } else if (urlParams.get('tab') === 'quick' || urlParams.get('view') === 'quick') {
+        loadQuickTasksPage();
     } else {
         loadOverviewPage();
     }
@@ -55,6 +127,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 50);
         });
+    }
+});
+
+// Sayfadan ayrılırken anında kaydetme garantisi (OneNote davranışı)
+window.addEventListener('beforeunload', () => {
+    if (currentPageData && currentPageData.page && currentPageData.page.type === 'note') {
+        const ta = document.getElementById('note-content-textarea');
+        if (ta && currentPageId) {
+            try {
+                localStorage.setItem(`tnote_draft_${currentPageId}`, ta.value);
+            } catch(e) {}
+            const blob = new Blob([JSON.stringify({content: ta.value})], {type: 'application/json'});
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(`/notes/api/pages/${currentPageId}`, blob);
+            }
+        }
     }
 });
 
@@ -506,16 +594,16 @@ async function renderWebQuickTasks() {
                     notesListEl.innerHTML = notes.map(n => {
                         const dateStr = n.created_at ? n.created_at.slice(5, 16) : '';
                         return `
-                            <div class="ov-item-row" style="background:var(--surface, #fff); border:1px solid var(--border); border-radius:6px; padding:6px 10px; display:flex; flex-direction:column; gap:4px;">
+                            <div class="ov-item-row" style="background:var(--surface, #fff); border:1px solid var(--border); border-radius:6px; padding:6px 10px; display:flex; flex-direction:column; gap:4px; margin-bottom:4px;">
                                 <div style="font-size:0.83rem; color:var(--text); white-space:pre-wrap; word-break:break-word; line-height:1.35; cursor:pointer;" onclick="openQuickNoteDetail(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')}, '${dateStr}')">${escapeHtml(n.content)}</div>
                                 <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:2px;">
-                                    <span style="font-size:0.68rem; color:var(--muted); opacity:0.85;">🕒 ${escapeHtml(dateStr)}</span>
+                                    <span style="font-size:0.68rem; color:var(--muted); opacity:0.85;">${escapeHtml(dateStr)}</span>
                                     <div style="display:flex; gap:4px;">
-                                        <button class="btn-icon-subtle" onclick="openTransferQuickNoteModal(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')})" title="Sayfaya Aktar" style="font-size:0.85rem; padding:2px 4px;">
-                                            📁
+                                        <button class="btn-icon-subtle" onclick="openTransferQuickNoteModal(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')})" title="Sayfaya Aktar" style="padding:2px 4px;">
+                                            <svg class="svg-icon svg-icon-xs"><use href="#i-folder"/></svg>
                                         </button>
-                                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteWebQuickNote(${n.id})" title="Sil" style="font-size:0.85rem; padding:2px 4px; color:var(--danger, #ef4444);">
-                                            🗑️
+                                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteWebQuickNote(${n.id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);">
+                                            <svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg>
                                         </button>
                                     </div>
                                 </div>
@@ -543,8 +631,8 @@ async function renderWebQuickTasks() {
         const directCountEl = document.getElementById('web-quick-direct-count');
 
         // Hızlı doğrudan görevler ile genel görevleri ayır
-        const directTasks = tasks.filter(t => t.due_urgency === 2.5 || (t.due_badge && t.due_badge.includes('Hızlı Görev')));
-        const generalTasks = tasks.filter(t => t.due_urgency !== 2.5 && (!t.due_badge || !t.due_badge.includes('Hızlı Görev')));
+        const directTasks = tasks.filter(t => t.due_urgency === 2.5 || (t.due_badge && t.due_badge.includes('Hızlı')));
+        const generalTasks = tasks.filter(t => t.due_urgency !== 2.5 && (!t.due_badge || !t.due_badge.includes('Hızlı')));
 
         if (directCountEl) directCountEl.textContent = directTasks.length;
         if (badge) badge.textContent = generalTasks.length;
@@ -556,14 +644,15 @@ async function renderWebQuickTasks() {
                 directListEl.innerHTML = `<div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Görev yok</div>`;
             } else {
                 directListEl.innerHTML = directTasks.map(t => `
-                    <div class="ov-item-row" id="web-unified-task-${t.id}">
-                        <div class="ov-item-left">
-                            <input type="checkbox" ${t.is_done ? 'checked' : ''} onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:16px; height:16px;">
-                            <span class="ov-item-text" style="font-weight:600; ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
+                    <div class="ov-item-row" id="web-unified-task-${t.id}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;">
+                        <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+                            <input type="checkbox" ${t.is_done ? 'checked' : ''} onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;">
+                            <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
                         </div>
-                        <div class="ov-item-meta">
-                            <span style="background:#e0f2fe; color:#0284c7; font-size:0.72rem; font-weight:700; padding:2px 6px; border-radius:4px;">⚡ Hızlı</span>
-                            <button class="btn-icon-subtle" onclick="deleteWebQuickTask(${t.raw_id})" title="Görevi Sil" style="color:var(--danger, #ef4444); font-size:0.8rem;">✕</button>
+                        <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                            <span style="background:#e0f2fe; color:#0284c7; font-size:0.70rem; font-weight:600; padding:2px 6px; border-radius:4px;">Hızlı</span>
+                            <button class="btn-icon-subtle" onclick="editUnifiedTask('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                            <button class="btn-icon-subtle btn-danger-hover" onclick="deleteUnifiedTask('${t.type}', ${t.raw_id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                         </div>
                     </div>
                 `).join('');
@@ -587,14 +676,16 @@ async function renderWebQuickTasks() {
                     }
 
                     return `
-                        <div class="ov-item-row" id="web-unified-task-${t.id}">
-                            <div class="ov-item-left">
-                                <input type="checkbox" ${t.is_done ? 'checked' : ''} onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:16px; height:16px;">
-                                <span class="ov-item-text" style="font-weight:600; ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
+                        <div class="ov-item-row" id="web-unified-task-${t.id}" onclick="loadPage(${t.page_id})" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" title="${escapeHtml(t.page_title)} sayfasına git">
+                            <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+                                <input type="checkbox" ${t.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;">
+                                <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
                             </div>
-                            <div class="ov-item-meta">
-                                ${t.due_badge ? `<span style="background:${badgeBg}; color:${badgeColor}; font-size:0.72rem; font-weight:700; padding:2px 6px; border-radius:4px;">${escapeHtml(t.due_badge)}</span>` : ''}
-                                <span class="ov-page-tag" onclick="loadPage(${t.page_id})" title="${escapeHtml(t.page_title)} sayfasına git">📁 ${escapeHtml(t.page_title)}</span>
+                            <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                                ${t.due_badge ? `<span style="background:${badgeBg}; color:${badgeColor}; font-size:0.70rem; font-weight:600; padding:2px 6px; border-radius:4px;">${escapeHtml(t.due_badge)}</span>` : ''}
+                                <span class="ov-page-tag" onclick="event.stopPropagation(); loadPage(${t.page_id})" title="${escapeHtml(t.page_title)} sayfasına git">${escapeHtml(t.page_title)}</span>
+                                <button class="btn-icon-subtle" onclick="event.stopPropagation(); editUnifiedTask('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                                <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteUnifiedTask('${t.type}', ${t.raw_id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                             </div>
                         </div>
                     `;
@@ -765,14 +856,46 @@ async function addWebQuickTask() {
     }
 }
 
-async function deleteWebQuickTask(rawId) {
-    if (!confirm('Bu hızlı görevi silmek istediğinize emin misiniz?')) return;
+async function editUnifiedTask(taskType, rawId, currentTitle) {
+    const newTitle = prompt('Görevi düzenle:', currentTitle);
+    if (!newTitle || newTitle.trim() === '' || newTitle.trim() === currentTitle) return;
+
     try {
-        await fetch(`/notes/api/items/${rawId}`, { method: 'DELETE' });
+        if (taskType === 'finance') {
+            await fetch(`/notes/api/finance/${rawId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle.trim() })
+            });
+        } else {
+            await fetch(`/notes/api/items/${rawId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle.trim() })
+            });
+        }
         await renderWebQuickTasks();
     } catch (e) {
-        console.error("deleteWebQuickTask error:", e);
+        console.error("editUnifiedTask error:", e);
     }
+}
+
+async function deleteUnifiedTask(taskType, rawId) {
+    if (!confirm('Bu görevi silmek istediğinize emin misiniz?')) return;
+    try {
+        if (taskType === 'finance') {
+            await fetch(`/notes/api/finance/${rawId}`, { method: 'DELETE' });
+        } else {
+            await fetch(`/notes/api/items/${rawId}`, { method: 'DELETE' });
+        }
+        await renderWebQuickTasks();
+    } catch (e) {
+        console.error("deleteUnifiedTask error:", e);
+    }
+}
+
+async function deleteWebQuickTask(rawId) {
+    await deleteUnifiedTask('checklist', rawId);
 }
 
 async function toggleWebUnifiedTask(taskType, rawId, checkboxEl) {
@@ -1504,7 +1627,7 @@ function handleNoteInput() {
     clearTimeout(noteAutoSaveTimer);
     noteAutoSaveTimer = setTimeout(() => {
         saveNoteContent(true);
-    }, 1000);
+    }, 400);
 }
 
 function insertMarkdownSyntax(before, after = '') {
@@ -1575,11 +1698,17 @@ function focusQuickAdd() {
 function renderNoteEditor() {
     const textarea = document.getElementById('note-content-textarea');
     if (textarea && currentPageData) {
-        textarea.value = currentPageData.content || '';
+        const draft = localStorage.getItem(`tnote_draft_${currentPageId}`);
+        textarea.value = (draft !== null && draft !== undefined) ? draft : (currentPageData.content || '');
         updateNoteStats();
         toggleNoteEditorMode('edit');
         const statusEl = document.getElementById('note-save-status');
-        if (statusEl) statusEl.textContent = "Tüm değişiklikler kaydedildi";
+        if (statusEl) statusEl.textContent = "Kaydedildi ✓";
+
+        textarea.onblur = () => {
+            clearTimeout(noteAutoSaveTimer);
+            saveNoteContent(true);
+        };
     }
 }
 
@@ -1588,22 +1717,44 @@ async function saveNoteContent(isAutoSave = false) {
     const statusEl = document.getElementById('note-save-status');
     if (!textarea || !currentPageId) return;
 
+    const content = textarea.value;
+    try {
+        localStorage.setItem(`tnote_draft_${currentPageId}`, content);
+    } catch(e) {}
+
+    if (!navigator.onLine) {
+        enqueueOfflineAction({
+            type: 'save_note',
+            pageId: currentPageId,
+            content: content,
+            timestamp: Date.now()
+        });
+        if (statusEl) statusEl.textContent = "Kaydedildi (çevrimdışı) ✓";
+        return;
+    }
+
     try {
         const res = await fetch(`/notes/api/pages/${currentPageId}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({content: textarea.value})
+            body: JSON.stringify({content: content})
         });
         const data = await res.json();
         if (data.ok) {
-            if (statusEl) statusEl.textContent = "Tüm değişiklikler kaydedildi ✓";
+            if (statusEl) statusEl.textContent = "Kaydedildi ✓";
             if (!isAutoSave) {
                 showToast("Not başarıyla kaydedildi!");
             }
         }
     } catch (e) {
         console.error("Not kaydetme hatası:", e);
-        if (statusEl) statusEl.textContent = "Kaydetme başarısız!";
+        enqueueOfflineAction({
+            type: 'save_note',
+            pageId: currentPageId,
+            content: content,
+            timestamp: Date.now()
+        });
+        if (statusEl) statusEl.textContent = "Kaydedildi (yerel) ✓";
     }
 }
 
@@ -2761,10 +2912,29 @@ function renderConcept() {
     const drawings = currentProjectData.drawings || [];
 
     const cInput = document.getElementById('proj-concept-input');
-    if (cInput) cInput.value = details.concept || '';
+    if (cInput) {
+        const cDraft = localStorage.getItem(`tnote_proj_concept_${currentPageId}`);
+        cInput.value = (cDraft !== null && cDraft !== undefined) ? cDraft : (details.concept || '');
+        cInput.onblur = () => {
+            clearTimeout(projectConceptAutoSaveTimer);
+            saveProjectConceptInstant();
+        };
+    }
 
     const sInput = document.getElementById('proj-specs-input');
-    if (sInput) sInput.value = details.specs || '';
+    if (sInput) {
+        const sDraft = localStorage.getItem(`tnote_proj_specs_${currentPageId}`);
+        sInput.value = (sDraft !== null && sDraft !== undefined) ? sDraft : (details.specs || '');
+        sInput.onblur = () => {
+            clearTimeout(projectConceptAutoSaveTimer);
+            saveProjectConceptInstant();
+        };
+    }
+
+    const status1 = document.getElementById('proj-concept-save-status');
+    const status2 = document.getElementById('proj-specs-save-status');
+    if (status1) status1.textContent = "Kaydedildi ✓";
+    if (status2) status2.textContent = "Kaydedildi ✓";
 
     const grid = document.getElementById('project-gallery-grid');
     if (!grid) return;
@@ -2785,7 +2955,7 @@ function renderConcept() {
                 ${d.desc ? `<div class="gallery-desc">${escapeHtml(d.desc)}</div>` : ''}
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
                     <span style="font-size:0.68rem; color:var(--muted);">${d.created_at || ''}</span>
-                    <button class="btn-icon-subtle btn-danger-hover" onclick="deleteDrawing(${d.id}); event.stopPropagation();" title="Sil">🗑️</button>
+                    <button class="btn-icon-subtle btn-danger-hover" onclick="deleteDrawing(${d.id}); event.stopPropagation();" title="Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                 </div>
             </div>
         `;
@@ -2794,19 +2964,70 @@ function renderConcept() {
     });
 }
 
-async function saveProjectConcept() {
-    const concept = document.getElementById('proj-concept-input').value.trim();
-    const specs = document.getElementById('proj-specs-input').value.trim();
+let projectConceptAutoSaveTimer = null;
+function handleProjectConceptInput() {
+    clearTimeout(projectConceptAutoSaveTimer);
+    const status1 = document.getElementById('proj-concept-save-status');
+    const status2 = document.getElementById('proj-specs-save-status');
+    if (status1) status1.textContent = "Kaydediliyor...";
+    if (status2) status2.textContent = "Kaydediliyor...";
+    projectConceptAutoSaveTimer = setTimeout(() => {
+        saveProjectConceptInstant();
+    }, 400);
+}
+
+async function saveProjectConceptInstant() {
+    if (!currentPageId) return;
+    const cEl = document.getElementById('proj-concept-input');
+    const sEl = document.getElementById('proj-specs-input');
+    const concept = cEl ? cEl.value : '';
+    const specs = sEl ? sEl.value : '';
+    const status1 = document.getElementById('proj-concept-save-status');
+    const status2 = document.getElementById('proj-specs-save-status');
+
+    try {
+        localStorage.setItem(`tnote_proj_concept_${currentPageId}`, concept);
+        localStorage.setItem(`tnote_proj_specs_${currentPageId}`, specs);
+    } catch(e) {}
+
+    if (!navigator.onLine) {
+        enqueueOfflineAction({
+            type: 'save_project',
+            pageId: currentPageId,
+            concept: concept,
+            specs: specs,
+            timestamp: Date.now()
+        });
+        if (status1) status1.textContent = "Kaydedildi (çevrimdışı) ✓";
+        if (status2) status2.textContent = "Kaydedildi (çevrimdışı) ✓";
+        return;
+    }
+
     try {
         await fetch(`/notes/api/pages/${currentPageId}/project`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ concept, specs })
         });
-        showToast("Fikir ve teknik şartname kaydedildi!");
+        if (status1) status1.textContent = "Kaydedildi ✓";
+        if (status2) status2.textContent = "Kaydedildi ✓";
     } catch (e) {
         console.error(e);
+        enqueueOfflineAction({
+            type: 'save_project',
+            pageId: currentPageId,
+            concept: concept,
+            specs: specs,
+            timestamp: Date.now()
+        });
+        if (status1) status1.textContent = "Kaydedildi (yerel) ✓";
+        if (status2) status2.textContent = "Kaydedildi (yerel) ✓";
     }
+}
+
+async function saveProjectConcept() {
+    await saveProjectConceptInstant();
+    showToast("Fikir ve teknik şartname kaydedildi!");
 }
 
 function openAddDrawingModal() {
