@@ -442,8 +442,11 @@ async function loadQuickTasksPage() {
     const iconEl = document.getElementById('current-page-icon');
     const badgeEl = document.getElementById('current-page-badge');
     if (titleEl) titleEl.textContent = 'Hızlı Görevler';
-    if (iconEl) iconEl.textContent = '⚡';
-    if (badgeEl) badgeEl.textContent = '';
+    if (iconEl) iconEl.innerHTML = '<svg class="svg-icon svg-icon-md"><use href="#i-zap"/></svg>';
+    if (badgeEl) {
+        badgeEl.textContent = '';
+        badgeEl.style.display = 'none';
+    }
 
     // Header aksiyonları
     const pageActions = document.getElementById('page-header-actions');
@@ -814,8 +817,11 @@ async function loadOverviewPage() {
     const iconEl = document.getElementById('current-page-icon');
     const badgeEl = document.getElementById('current-page-badge');
     if (titleEl) titleEl.textContent = 'Genel Bakış';
-    if (iconEl) iconEl.textContent = '🏠';
-    if (badgeEl) badgeEl.textContent = '';
+    if (iconEl) iconEl.innerHTML = '<svg class="svg-icon svg-icon-md"><use href="#i-home"/></svg>';
+    if (badgeEl) {
+        badgeEl.textContent = '';
+        badgeEl.style.display = 'none';
+    }
 
     // Header aksiyonları
     const pageActions = document.getElementById('page-header-actions');
@@ -863,8 +869,65 @@ async function loadOverviewPage() {
 
         currentOverviewData = data.overview;
         renderOverview(data.overview);
+        loadOverviewQuickNotes();
     } catch (e) {
         console.error("Genel bakış yükleme hatası:", e);
+    }
+}
+
+async function loadOverviewQuickNotes() {
+    const listEl = document.getElementById('ov-quick-notes-list');
+    if (!listEl) return;
+    try {
+        const res = await fetch('/notes/api/quick-notes');
+        const data = await res.json();
+        if (!data.ok || !data.notes || data.notes.length === 0) {
+            listEl.innerHTML = `<div style="padding:10px; text-align:center; color:var(--muted); font-size:0.78rem;">Kayıtlı hızlı not yok</div>`;
+            return;
+        }
+        listEl.innerHTML = data.notes.slice(0, 5).map(n => `
+            <div class="ov-quicknote-row">
+                <span class="ov-quicknote-text" title="${escapeHtml(n.content)}">${escapeHtml(n.content)}</span>
+                <button class="ov-quicknote-del" onclick="deleteOverviewQuickNote(${n.id})" title="Sil">✕</button>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.warn("loadOverviewQuickNotes error:", e);
+    }
+}
+
+async function submitOverviewQuickNote() {
+    const input = document.getElementById('ov-quick-note-input');
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) return;
+    try {
+        const res = await fetch('/notes/api/quick-notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            input.value = '';
+            loadOverviewQuickNotes();
+            if (typeof showToast === 'function') showToast("Hızlı not kaydedildi");
+        }
+    } catch (e) {
+        console.error("submitOverviewQuickNote error:", e);
+    }
+}
+
+async function deleteOverviewQuickNote(id) {
+    try {
+        const res = await fetch(`/notes/api/quick-notes/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+            loadOverviewQuickNotes();
+            if (typeof showToast === 'function') showToast("Not silindi");
+        }
+    } catch (e) {
+        console.error("deleteOverviewQuickNote error:", e);
     }
 }
 
@@ -883,7 +946,14 @@ function renderOverview(ov) {
 
     if (tasksTotalEl) tasksTotalEl.textContent = totalItems;
     if (tasksSubEl) tasksSubEl.textContent = `${pendingItems} bekleyen`;
-    if (tasksBadgeEl) tasksBadgeEl.textContent = `%${taskPct}`;
+    if (tasksBadgeEl) {
+        if (totalItems > 0) {
+            tasksBadgeEl.textContent = `%${taskPct}`;
+            tasksBadgeEl.style.display = 'inline-block';
+        } else {
+            tasksBadgeEl.style.display = 'none';
+        }
+    }
     if (tasksBarEl) tasksBarEl.style.width = `${taskPct}%`;
 
     // Finans
@@ -937,17 +1007,16 @@ function renderOverview(ov) {
     const billsTagEl = document.getElementById('ov-bills-count-tag');
 
     if (billsTotalEl) billsTotalEl.textContent = unpaid.toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' TL';
-    if (billsSubEl) billsSubEl.textContent = unpaidCount > 0 ? `${unpaidCount} bekleyen` : 'Bekleyen yok';
+    if (billsSubEl) billsSubEl.textContent = unpaidCount > 0 ? `${unpaidCount} bekleyen` : 'Bekleyen fatura yok';
     if (billsTagEl) {
-        billsTagEl.textContent = unpaidCount;
         if (unpaidCount > 0) {
+            billsTagEl.textContent = unpaidCount;
+            billsTagEl.style.display = 'inline-block';
             billsTagEl.className = 'kpi-tag kpi-badge-amber';
             billsTagEl.style.background = '#fef3c7';
             billsTagEl.style.color = '#d97706';
         } else {
-            billsTagEl.className = 'kpi-tag kpi-badge-neutral';
-            billsTagEl.style.background = 'var(--surface2, #f1f5f9)';
-            billsTagEl.style.color = 'var(--muted, #64748b)';
+            billsTagEl.style.display = 'none';
         }
     }
 
@@ -958,17 +1027,16 @@ function renderOverview(ov) {
     const projTagEl = document.getElementById('ov-proj-count-tag');
 
     if (projTotalEl) projTotalEl.textContent = projects.length;
-    if (projSubEl) projSubEl.textContent = projects.length > 0 ? `${projects.length} aktif` : 'Aktif yok';
+    if (projSubEl) projSubEl.textContent = projects.length > 0 ? `${projects.length} aktif` : 'Aktif proje yok';
     if (projTagEl) {
-        projTagEl.textContent = projects.length;
         if (projects.length > 0) {
+            projTagEl.textContent = projects.length;
+            projTagEl.style.display = 'inline-block';
             projTagEl.className = 'kpi-tag kpi-badge-purple';
             projTagEl.style.background = '#f3e8ff';
             projTagEl.style.color = '#9333ea';
         } else {
-            projTagEl.className = 'kpi-tag kpi-badge-neutral';
-            projTagEl.style.background = 'var(--surface2, #f1f5f9)';
-            projTagEl.style.color = 'var(--muted, #64748b)';
+            projTagEl.style.display = 'none';
         }
     }
 
@@ -979,7 +1047,14 @@ function renderOverview(ov) {
 
     if (pendingContainer) {
         if (!ov.pending_tasks || ov.pending_tasks.length === 0) {
-            pendingContainer.innerHTML = `<div class="empty-state-slim"><svg class="svg-icon svg-icon-sm" style="color:var(--text-secondary, #64748b); vertical-align:text-bottom; margin-right:4px;"><use href="#i-check"/></svg> Bekleyen görev bulunmuyor</div>`;
+            pendingContainer.innerHTML = `
+                <div class="empty-state-modern">
+                    <svg class="svg-icon empty-state-icon"><use href="#i-check-square"/></svg>
+                    <span class="empty-state-text">Bekleyen görev bulunmuyor</span>
+                    <button class="empty-state-action" onclick="openAddPageModal()">
+                        <svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg> Yeni Liste Başlat
+                    </button>
+                </div>`;
         } else {
             pendingContainer.innerHTML = ov.pending_tasks.map(it => `
                 <div class="ov-item-row" id="ov-task-${it.id}">
@@ -1001,11 +1076,18 @@ function renderOverview(ov) {
         }
     }
 
-    // 3. Vadesi Yaklaşan Faturalar & Ödemeler (Slim Empty Notice)
+    // 3. Vadesi Yaklaşan Faturalar & Ödemeler (Modern Empty Notice)
     const billsContainer = document.getElementById('ov-upcoming-bills-container');
     if (billsContainer) {
         if (!ov.upcoming_bills || ov.upcoming_bills.length === 0) {
-            billsContainer.innerHTML = `<div class="empty-state-slim"><svg class="svg-icon svg-icon-sm" style="color:var(--text-secondary, #64748b); vertical-align:text-bottom; margin-right:4px;"><use href="#i-check"/></svg> Bu ay bekleyen ödeme bulunmuyor</div>`;
+            billsContainer.innerHTML = `
+                <div class="empty-state-modern">
+                    <svg class="svg-icon empty-state-icon"><use href="#i-calendar"/></svg>
+                    <span class="empty-state-text">Bu ay bekleyen ödeme veya fatura yok</span>
+                    <button class="empty-state-action" onclick="jumpToFinancePage()">
+                        <svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg> Finans Takibine Git
+                    </button>
+                </div>`;
         } else {
             billsContainer.innerHTML = ov.upcoming_bills.map(b => `
                 <div class="ov-bill-row" onclick="loadPage(${b.page_id})" title="Finans sayfasına git">
@@ -1027,10 +1109,11 @@ function renderOverview(ov) {
     if (projContainer) {
         if (projects.length === 0) {
             projContainer.innerHTML = `
-                <div class="empty-state-slim" style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>Aktif proje bulunmuyor</span>
-                    <button class="btn btn-sm btn-outline" style="padding:2px 8px; font-size:0.75rem;" onclick="openAddProjectModal()">
-                        <svg class="svg-icon svg-icon-xs" style="margin-right:3px;"><use href="#i-plus"/></svg>Yeni Proje
+                <div class="empty-state-modern">
+                    <svg class="svg-icon empty-state-icon"><use href="#i-layers"/></svg>
+                    <span class="empty-state-text">Henüz aktif bir proje bulunmuyor</span>
+                    <button class="empty-state-action" onclick="openAddProjectModal()">
+                        <svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg> Yeni Proje Başlat
                     </button>
                 </div>`;
         } else {
@@ -3422,8 +3505,11 @@ async function loadTrashPage() {
     const iconEl = document.getElementById('current-page-icon');
     const badgeEl = document.getElementById('current-page-badge');
     if (titleEl) titleEl.textContent = 'Çöp Kutusu';
-    if (iconEl) iconEl.textContent = '🗑️';
-    if (badgeEl) badgeEl.textContent = '';
+    if (iconEl) iconEl.innerHTML = '<svg class="svg-icon svg-icon-md"><use href="#i-trash"/></svg>';
+    if (badgeEl) {
+        badgeEl.textContent = '';
+        badgeEl.style.display = 'none';
+    }
 
     const pageActions = document.getElementById('page-header-actions');
     const ovActions = document.getElementById('overview-header-actions');
@@ -3608,8 +3694,11 @@ async function loadVaultPage() {
     const iconEl = document.getElementById('current-page-icon');
     const badgeEl = document.getElementById('current-page-badge');
     if (titleEl) titleEl.textContent = 'Şifre Kasası';
-    if (iconEl) iconEl.textContent = '🔐';
-    if (badgeEl) badgeEl.textContent = '';
+    if (iconEl) iconEl.innerHTML = '<svg class="svg-icon svg-icon-md"><use href="#i-shield"/></svg>';
+    if (badgeEl) {
+        badgeEl.textContent = '';
+        badgeEl.style.display = 'none';
+    }
 
     const pageActions = document.getElementById('page-header-actions');
     const ovActions = document.getElementById('overview-header-actions');

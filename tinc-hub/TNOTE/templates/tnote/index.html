@@ -49,7 +49,7 @@
                 </div>
             </div>
             <div class="sidebar-header-actions">
-                <button class="btn-icon" onclick="openModal('modal-add-category')" title="Bu Deftere Yeni Kategori Ekle">➕</button>
+                <button class="btn-icon" onclick="openModal('modal-add-category')" title="Bu Deftere Yeni Kategori Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
                 <button class="btn-icon sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarManual()" title="Menüyü Daralt ( « )">«</button>
             </div>
         </div>
@@ -58,17 +58,16 @@
         <div class="sidebar-nav-block" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">
             <div class="sidebar-overview-row active" id="sidebar-overview-btn" onclick="loadOverviewPage()" title="TincNote Genel Bakış & Özet">
                 <div class="overview-row-left">
-                    <span class="ov-row-icon">🏠</span>
+                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-home"/></svg></span>
                     <span class="overview-btn-text">Genel Bakış</span>
                 </div>
-                <span class="badge-count ov-badge-pill">Özet</span>
             </div>
             <div class="sidebar-overview-row" id="sidebar-quick-btn" onclick="loadQuickTasksPage()" title="Hızlı Notlar & Görevler">
                 <div class="overview-row-left">
-                    <span class="ov-row-icon">⚡</span>
+                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-zap"/></svg></span>
                     <span class="overview-btn-text">Hızlı Notlar & Görevler</span>
                 </div>
-                <span class="badge-count ov-badge-pill" id="quick-tasks-badge-count" style="background:#fef3c7; color:#d97706;">⚡</span>
+                <span class="badge-count ov-badge-pill" id="quick-tasks-badge-count" style="background:#fef3c7; color:#d97706; display:none;"></span>
             </div>
         </div>
 
@@ -84,9 +83,9 @@
                     </div>
                     <div class="category-actions" onclick="event.stopPropagation()">
                         <span class="badge-count" id="cat-badge-{{ cat.id }}">{{ cat.page_count }}</span>
-                        <button class="btn-icon-subtle" onclick="openAddPageForCat({{ cat.id }}, '{{ cat.name|escape }}')" title="Bu Kategoriye Liste Ekle">➕</button>
-                        <button class="btn-icon-subtle" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|escape }}', '{{ cat.icon|escape }}', '{{ cat.color|escape }}')" title="Kategoriyi Düzenle">✏️</button>
-                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteCategory({{ cat.id }}, '{{ cat.name|escape }}')" title="Kategoriyi Sil">🗑️</button>
+                        <button class="btn-icon-subtle" onclick="openAddPageForCat({{ cat.id }}, '{{ cat.name|escape }}')" title="Bu Kategoriye Liste Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
+                        <button class="btn-icon-subtle" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|escape }}', '{{ cat.icon|escape }}', '{{ cat.color|escape }}')" title="Kategoriyi Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteCategory({{ cat.id }}, '{{ cat.name|escape }}')" title="Kategoriyi Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                     </div>
                 </div>
                 <ul class="page-list" id="cat-pages-{{ cat.id }}" data-category-id="{{ cat.id }}">
@@ -100,14 +99,12 @@
                             </div>
                             <div class="page-item-actions">
                                 <span class="badge-count" id="page-badge-{{ p.id }}">
-                                    {% if p.type == 'checklist' %}
+                                    {% if p.type == 'checklist' and (p.total_items - p.completed_items) > 0 %}
                                         {{ p.total_items - p.completed_items }}
-                                    {% else %}
-                                        📝
                                     {% endif %}
                                 </span>
-                                <button class="btn-icon-subtle" onclick="event.stopPropagation(); openEditPageModal({{ p.id }}, '{{ p.title|escape }}', {{ p.category_id }}, '{{ p.icon|escape }}', '{{ p.type|escape }}')" title="Sayfayı Düzenle">✏️</button>
-                                <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deletePage({{ p.id }}, '{{ p.title|escape }}')" title="Sayfayı Sil">🗑️</button>
+                                <button class="btn-icon-subtle" onclick="event.stopPropagation(); openEditPageModal({{ p.id }}, '{{ p.title|escape }}', {{ p.category_id }}, '{{ p.icon|escape }}', '{{ p.type|escape }}')" title="Sayfayı Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                                <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deletePage({{ p.id }}, '{{ p.title|escape }}')" title="Sayfayı Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                             </div>
                         </li>
                         {% endif %}
@@ -117,43 +114,50 @@
             {% endfor %}
         </div>
 
-        <div class="sidebar-footer" style="margin-top:auto; padding-top:6px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:5px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:4px;">
-                <button class="btn btn-sm" id="sidebar-vault-btn" onclick="loadVaultPage()" style="flex:1; font-size:0.75rem; padding:4px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Şifre Kasası">
-                    <span>🔐</span> <span class="sidebar-footer-text">Kasa</span>
+        <!-- Sidebar Alt Dock (Kompakt ve Kurumsal Araç Çubuğu) -->
+        <div class="sidebar-footer">
+            <div class="sidebar-footer-tools">
+                <button class="footer-tool-btn" id="sidebar-vault-btn" onclick="loadVaultPage()" title="Şifre Kasası">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-shield"/></svg>
+                    <span class="tool-label">Kasa</span>
                 </button>
-                <button class="btn btn-sm" id="sidebar-trash-btn" onclick="loadTrashPage()" style="flex:1; font-size:0.75rem; padding:4px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Çöp Kutusu & Geri Dönüşüm">
-                    <span>🗑️</span> <span class="sidebar-footer-text">Çöp Kutusu</span>
-                    <span class="badge-count ov-badge-pill" id="sidebar-trash-badge" style="display:none; padding:1px 4px; font-size:0.65rem;">0</span>
+                <button class="footer-tool-btn" id="sidebar-trash-btn" onclick="loadTrashPage()" title="Çöp Kutusu & Geri Dönüşüm">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-trash"/></svg>
+                    <span class="tool-label">Çöp</span>
+                    <span class="badge-count ov-badge-pill" id="sidebar-trash-badge" style="display:none;">0</span>
                 </button>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:4px;">
-                <button class="btn btn-sm" onclick="openHistoryModal()" style="flex:1; font-size:0.75rem; padding:3px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Son 100 İşlem Geçmişi (Geri Al)">
-                    <span>📜</span> <span class="sidebar-footer-text">Geçmiş (100)</span>
+                <button class="footer-tool-btn" onclick="openHistoryModal()" title="İşlem Geçmişi (Son 100)">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-clock"/></svg>
+                    <span class="tool-label">Geçmiş</span>
                 </button>
-                <button class="btn btn-sm" onclick="triggerUndo()" style="flex:1; font-size:0.75rem; padding:3px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Son İşlemi Geri Al (Ctrl+Z)">
-                    <span>↩️</span> <span class="sidebar-footer-text">Geri Al</span>
+                <button class="footer-tool-btn" onclick="triggerUndo()" title="Son İşlemi Geri Al (Ctrl+Z)">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-undo"/></svg>
+                    <span class="tool-label">Geri Al</span>
                 </button>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                <a href="/notes/settings" class="btn btn-sm" style="display:flex; align-items:center; gap:6px; font-size:0.78rem; padding:3px 8px;" title="Ayarlar & Not Defterleri">
-                    <span>⚙️</span> <span class="sidebar-footer-text">Ayarlar</span>
+                <a href="/notes/settings" class="footer-tool-btn" title="Ayarlar & Not Defterleri">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-settings"/></svg>
+                    <span class="tool-label">Ayarlar</span>
                 </a>
-                <span class="sidebar-footer-text" style="font-size:0.72rem; color: {{ '#0284c7' if bot_status else '#94a3b8' }}; font-weight:600;" title="Telegram Bot Durumu">
-                    ● {{ 'Bot Açık' if bot_status else 'Bot Kapalı' }}
-                </span>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding: 4px 6px; background: var(--border, rgba(255,255,255,0.05)); border-radius: 6px;">
-                <div style="display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="openUserModal()" title="Kullanıcı / Oturum">
-                    <span style="font-size:0.85rem;">👤</span>
-                    <span class="sidebar-footer-text" style="font-weight:600; font-size:0.75rem;">
-                        {{ user.display_name if user else 'Oturum Aç' }}
-                    </span>
+            <div class="sidebar-footer-profile">
+                <div class="profile-left" onclick="openUserModal()" title="Kullanıcı / Oturum">
+                    <div class="profile-avatar">
+                        <svg class="svg-icon svg-icon-sm"><use href="#i-user"/></svg>
+                    </div>
+                    <div class="profile-info">
+                        <span class="profile-name">{{ user.display_name if user else 'Misafir' }}</span>
+                        <span class="profile-bot-tag" title="Telegram Bot Durumu">
+                            <span class="status-dot {{ 'online' if bot_status else 'offline' }}"></span>
+                            <span>{{ 'Bot Aktif' if bot_status else 'Bot Kapalı' }}</span>
+                        </span>
+                    </div>
                 </div>
                 {% if user %}
-                <button class="btn btn-sm btn-icon" onclick="logoutUser()" title="Çıkış Yap" style="font-size:0.75rem; padding:2px 5px;">🚪</button>
+                <button class="profile-action-btn" onclick="logoutUser()" title="Çıkış Yap">
+                    <svg class="svg-icon svg-icon-xs"><use href="#i-log-out"/></svg>
+                </button>
                 {% else %}
-                <button class="btn btn-sm btn-primary" onclick="openUserModal()" style="font-size:0.7rem; padding:2px 6px;">Giriş</button>
+                <button class="btn btn-xs btn-primary" onclick="openUserModal()" style="font-size:0.7rem; padding:2px 7px;">Giriş</button>
                 {% endif %}
             </div>
         </div>
@@ -168,16 +172,19 @@
                     <span class="mobile-toggle-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-folder"/></svg></span>
                     <span class="mobile-toggle-text">Listeler</span>
                 </button>
-                <span id="current-page-icon" style="font-size:1.15rem;">📝</span>
+                <span id="current-page-icon" class="current-page-icon-box">
+                    <svg class="svg-icon svg-icon-md"><use href="#i-home"/></svg>
+                </span>
                 <div class="content-title-wrapper">
-                    <h2 class="content-title" id="current-page-title">Yükleniyor...</h2>
-                    <span class="badge-count" id="current-page-badge" style="display:inline-block;"></span>
+                    <h2 class="content-title" id="current-page-title">Genel Bakış</h2>
+                    <span class="badge-count" id="current-page-badge"></span>
                 </div>
             </div>
 
             <!-- Global Arama Çubuğu (Spotlight Search) -->
             <div class="global-search-trigger" onclick="openGlobalSearchModal()" title="Arama (Ctrl+K)">
                 <span class="search-trigger-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-search"/></svg></span>
+                <span class="search-trigger-text">Arama...</span>
                 <kbd class="search-trigger-kbd">Ctrl K</kbd>
             </div>
 
@@ -257,16 +264,16 @@
         </div>
 
         <!-- GENEL BAKIŞ SAYFASI -->
-        <div id="overview-view" style="display:flex; flex-direction:column; gap:8px;">
+        <div id="overview-view" style="display:flex; flex-direction:column; gap:12px;">
             <span id="overview-date-str" style="display:none;"></span>
 
-            <!-- Üst 4'lü KPI Kartları (Sade & Kompakt) -->
+            <!-- Üst 4'lü KPI Kartları (Sade, Ferah & Kompakt) -->
             <div class="overview-kpi-grid">
                 <!-- Görevler -->
                 <div class="overview-kpi-card" onclick="jumpToFirstChecklist()">
                     <div class="kpi-top">
                         <span class="kpi-icon-badge"><svg class="svg-icon"><use href="#i-check-square"/></svg></span>
-                        <span class="kpi-tag" id="ov-tasks-badge">%0</span>
+                        <span class="kpi-tag" id="ov-tasks-badge" style="display:none;"></span>
                     </div>
                     <div class="kpi-num" id="ov-tasks-total">0</div>
                     <div class="kpi-title">Görevler</div>
@@ -290,54 +297,79 @@
                 <div class="overview-kpi-card" onclick="jumpToFinancePage()">
                     <div class="kpi-top">
                         <span class="kpi-icon-badge"><svg class="svg-icon"><use href="#i-clock"/></svg></span>
-                        <span class="kpi-tag" id="ov-bills-count-tag">0</span>
+                        <span class="kpi-tag" id="ov-bills-count-tag" style="display:none;"></span>
                     </div>
                     <div class="kpi-num" id="ov-bills-total">0,00 TL</div>
                     <div class="kpi-title">Faturalar</div>
-                    <div class="kpi-sub" id="ov-bills-sub">Bekleyen</div>
+                    <div class="kpi-sub" id="ov-bills-sub">Bekleyen fatura yok</div>
                 </div>
 
                 <!-- Aktif Projeler -->
                 <div class="overview-kpi-card" onclick="jumpToFirstProject()">
                     <div class="kpi-top">
                         <span class="kpi-icon-badge"><svg class="svg-icon"><use href="#i-layers"/></svg></span>
-                        <span class="kpi-tag" id="ov-proj-count-tag">0</span>
+                        <span class="kpi-tag" id="ov-proj-count-tag" style="display:none;"></span>
                     </div>
                     <div class="kpi-num" id="ov-projects-total">0</div>
                     <div class="kpi-title">Projeler</div>
-                    <div class="kpi-sub" id="ov-projects-sub">Aktif</div>
+                    <div class="kpi-sub" id="ov-projects-sub">Aktif proje yok</div>
                 </div>
             </div>
 
-            <!-- İki Sütunlu Detay Tabloları (Sol: Görevler, Sağ: Yaklaşan Ödemeler + Projeler) -->
+            <!-- İki Sütunlu Detay Tabloları (Sol: Görevler & Hızlı Not, Sağ: Yaklaşan Ödemeler + Projeler) -->
             <div class="overview-grid-2col">
-                <!-- Sol Sütun: Bekleyen Görevler -->
-                <div class="overview-col">
-                    <div class="overview-section-box" style="height:100%; display:flex; flex-direction:column;">
+                <!-- Sol Sütun: Bekleyen Görevler + Hızlı Not Karalama -->
+                <div class="overview-col" style="display:flex; flex-direction:column; gap:12px;">
+                    <div class="overview-section-box">
                         <div class="section-box-header">
                             <span class="section-box-title">
-                                <svg class="svg-icon svg-icon-sm" style="margin-right:6px; color:var(--text-secondary);"><use href="#i-check-square"/></svg>Bekleyen Görevler
+                                <svg class="svg-icon svg-icon-sm" style="color:var(--accent);"><use href="#i-check-square"/></svg>
+                                <span>Bekleyen Görevler</span>
                             </span>
                             <span class="badge-count" id="ov-pending-count-badge">0</span>
                         </div>
-                        <div class="overview-items-list" id="ov-pending-items-container" style="flex:1;">
+                        <div class="overview-items-list" id="ov-pending-items-container">
                             <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Yükleniyor...</div>
+                        </div>
+                    </div>
+
+                    <div class="overview-section-box">
+                        <div class="section-box-header">
+                            <span class="section-box-title">
+                                <svg class="svg-icon svg-icon-sm" style="color:var(--accent);"><use href="#i-edit"/></svg>
+                                <span>Hızlı Karalama &amp; Not</span>
+                            </span>
+                            <button class="btn-icon-subtle" onclick="loadQuickTasksPage()" title="Tüm Hızlı Notları Gör">
+                                <svg class="svg-icon svg-icon-xs"><use href="#i-zap"/></svg>
+                            </button>
+                        </div>
+                        <div style="padding:4px 0 0 0;">
+                            <div style="display:flex; gap:6px; margin-bottom:8px;">
+                                <input type="text" id="ov-quick-note-input" class="form-control" placeholder="Aklına geleni hemen buraya yaz..." onkeydown="if(event.key==='Enter') submitOverviewQuickNote()">
+                                <button class="btn btn-sm btn-primary" onclick="submitOverviewQuickNote()" style="white-space:nowrap; padding:4px 10px;">
+                                    <svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg>
+                                </button>
+                            </div>
+                            <div id="ov-quick-notes-list" style="display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto;">
+                                <!-- JS ile doldurulur -->
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Sağ Sütun: Yaklaşan Ödemeler ve Projeler -->
-                <div class="overview-col" style="display:flex; flex-direction:column; gap:8px;">
+                <div class="overview-col" style="display:flex; flex-direction:column; gap:12px;">
                     <!-- Vadesi Yaklaşan Ödemeler -->
                     <div class="overview-section-box">
                         <div class="section-box-header">
                             <span class="section-box-title">
-                                <svg class="svg-icon svg-icon-sm" style="margin-right:6px; color:var(--text-secondary);"><use href="#i-calendar"/></svg>Yaklaşan Ödemeler
+                                <svg class="svg-icon svg-icon-sm" style="color:var(--accent);"><use href="#i-calendar"/></svg>
+                                <span>Yaklaşan Ödemeler</span>
                             </span>
                             <span class="badge-count" id="ov-upcoming-bills-badge">Bu Ay</span>
                         </div>
                         <div class="overview-bills-list" id="ov-upcoming-bills-container">
-                            <div style="padding:8px; text-align:center; color:var(--muted); font-size:0.78rem;">Yükleniyor...</div>
+                            <div style="padding:12px; text-align:center; color:var(--muted); font-size:0.78rem;">Yükleniyor...</div>
                         </div>
                     </div>
 
@@ -345,14 +377,15 @@
                     <div class="overview-section-box">
                         <div class="section-box-header">
                             <span class="section-box-title">
-                                <svg class="svg-icon svg-icon-sm" style="margin-right:6px; color:var(--text-secondary);"><use href="#i-layers"/></svg>Projeler
+                                <svg class="svg-icon svg-icon-sm" style="color:var(--accent);"><use href="#i-layers"/></svg>
+                                <span>Projeler &amp; Atölye</span>
                             </span>
                             <button class="btn-icon-subtle" onclick="openAddProjectModal()" title="Yeni Proje Ekle">
                                 <svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg>
                             </button>
                         </div>
                         <div class="overview-projects-list" id="ov-projects-container">
-                            <div style="padding:8px; text-align:center; color:var(--muted); font-size:0.78rem;">Yükleniyor...</div>
+                            <div style="padding:12px; text-align:center; color:var(--muted); font-size:0.78rem;">Yükleniyor...</div>
                         </div>
                     </div>
                 </div>

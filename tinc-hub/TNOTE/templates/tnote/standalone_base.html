@@ -122,7 +122,7 @@
                 <svg class="svg-icon"><use href="#i-settings"/></svg>
                 <span>Ayarlar</span>
             </a>
-            <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9010';" class="header-nav-link" title="TincHub Ana Panosu">
+            <a href="javascript:void(0)" onclick="window.location.href = window.TINCHUB_URL || ('http://' + window.location.hostname + ':9010');" class="header-nav-link" title="TincHub Ana Panosu">
                 <svg class="svg-icon"><use href="#i-home"/></svg>
                 <span>TincHub</span>
             </a>

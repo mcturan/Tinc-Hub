@@ -415,15 +415,19 @@ body, .tnote-container {
     padding: 6px 0 4px 0;
 }
 
-.tnote-container.sidebar-collapsed .sidebar-footer > div {
+.tnote-container.sidebar-collapsed .sidebar-footer-tools {
     flex-direction: column !important;
     gap: 4px !important;
     width: 100% !important;
     align-items: center !important;
 }
 
-.tnote-container.sidebar-collapsed .sidebar-footer .btn {
-    width: 36px !important;
+.tnote-container.sidebar-collapsed .footer-tool-btn .tool-label {
+    display: none !important;
+}
+
+.tnote-container.sidebar-collapsed .footer-tool-btn {
+    width: 32px !important;
     height: 30px !important;
     padding: 0 !important;
     margin: 0 auto !important;
@@ -431,6 +435,17 @@ body, .tnote-container {
     align-items: center !important;
     justify-content: center !important;
     flex: none !important;
+}
+
+.tnote-container.sidebar-collapsed .sidebar-footer-profile {
+    padding: 4px !important;
+    justify-content: center !important;
+}
+
+.tnote-container.sidebar-collapsed .profile-info,
+.tnote-container.sidebar-collapsed .profile-action-btn,
+.tnote-container.sidebar-collapsed .profile-login-btn {
+    display: none !important;
 }
 
 .tnote-container.sidebar-collapsed .sidebar-categories {
@@ -690,7 +705,8 @@ body, .tnote-container {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.80rem;
+    font-size: 0.82rem;
+    font-weight: 500;
     min-width: 0;
     flex: 1;
 }
@@ -700,15 +716,15 @@ body, .tnote-container {
     align-items: center;
     gap: 2px;
     flex-shrink: 0;
-    margin-left: 4px;
+    margin-left: 2px;
 }
 
-/* Butonlar sabit genişlikle akıcı bir şekilde belirir (layout jump engellendi) */
+/* Butonlar hover edilmediğinde yer kaplamaz, böylece başlıklar gereksiz yere üç nokta ile kesilmez */
 .category-actions .btn-icon-subtle,
 .page-item-actions .btn-icon-subtle {
     opacity: 0;
     visibility: hidden;
-    width: 20px;
+    width: 0;
     height: 20px;
     padding: 0;
     margin: 0;
@@ -716,13 +732,14 @@ body, .tnote-container {
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    transition: opacity 0.15s ease, background 0.15s ease, transform 0.1s;
+    transition: opacity 0.15s ease, width 0.15s ease;
 }
 
 .category-header:hover .category-actions .btn-icon-subtle,
 .page-item:hover .page-item-actions .btn-icon-subtle {
     opacity: 1;
     visibility: visible;
+    width: 20px;
 }
 
 .btn-icon-subtle {
@@ -832,6 +849,16 @@ body, .tnote-container {
     border-radius: 10px;
     font-weight: 600;
     flex-shrink: 0;
+}
+.badge-count:empty {
+    display: none !important;
+}
+
+.current-page-icon-box {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent, #0284c7);
 }
 
 /* ── Ana İçerik Alanı ── */
@@ -2979,6 +3006,224 @@ body, .tnote-container {
         padding: 2px 6px;
         font-size: 0.72rem;
     }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Modern Sidebar Footer Dock (Kurumsal Alt Panel)
+   ───────────────────────────────────────────────────────────── */
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid var(--border, #e2e8f0);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sidebar-footer-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 3px;
+    width: 100%;
+}
+
+.footer-tool-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 2px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-secondary, #475569);
+    cursor: pointer;
+    font-size: 0.67rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    text-decoration: none;
+    position: relative;
+}
+
+.footer-tool-btn:hover {
+    background: var(--surface2, #f1f5f9);
+    color: var(--accent, #0284c7);
+    border-color: var(--border, #e2e8f0);
+}
+
+.footer-tool-btn.active {
+    background: #e0f2fe;
+    color: var(--accent, #0284c7);
+    font-weight: 600;
+}
+
+.footer-tool-btn .svg-icon {
+    width: 15px;
+    height: 15px;
+}
+
+.sidebar-footer-profile {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    background: var(--surface2, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: var(--radius-sm, 6px);
+    gap: 6px;
+}
+
+.profile-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+    min-width: 0;
+    flex: 1;
+}
+
+.profile-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #e0f2fe;
+    color: var(--accent, #0284c7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    line-height: 1.2;
+}
+
+.profile-name {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--text, #0f172a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.profile-bot-tag {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.63rem;
+    color: var(--muted, #64748b);
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.online {
+    background: #0284c7;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.status-dot.offline {
+    background: #94a3b8;
+}
+
+.profile-action-btn {
+    padding: 3px 5px;
+    color: var(--muted, #64748b);
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+.profile-action-btn:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* Modern Empty State (Onay tikli gri kutular yerine şık ve davetkar durumlar) */
+.empty-state-modern {
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: var(--muted, #64748b);
+    text-align: center;
+}
+
+.empty-state-icon {
+    width: 22px;
+    height: 22px;
+    color: #94a3b8;
+}
+
+.empty-state-text {
+    font-size: 0.80rem;
+    color: var(--muted, #64748b);
+}
+
+.empty-state-action {
+    margin-top: 4px;
+    font-size: 0.74rem;
+    padding: 3px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 6px;
+    border: 1px solid var(--border, #cbd5e1);
+    background: #ffffff;
+    color: var(--text, #0f172a);
+    cursor: pointer;
+    font-weight: 500;
+}
+.empty-state-action:hover {
+    border-color: var(--accent, #0284c7);
+    color: var(--accent, #0284c7);
+    background: #f0f9ff;
+}
+
+/* Quick Notes Scratchpad on Overview */
+.ov-quicknote-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--surface2, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 6px;
+    font-size: 0.78rem;
+    color: var(--text, #0f172a);
+}
+.ov-quicknote-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ov-quicknote-del {
+    color: var(--muted, #94a3b8);
+    cursor: pointer;
+    padding: 1px 4px;
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+}
+.ov-quicknote-del:hover {
+    color: #dc2626;
+    background: #fee2e2;
 }
 
 
