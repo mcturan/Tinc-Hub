@@ -100,16 +100,26 @@ def handle_options_preflight():
     if request.method == "OPTIONS":
         res = jsonify({"ok": True})
         res.headers["Access-Control-Allow-Origin"] = "*"
-        res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, X-API-Key"
+        res.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        res.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, X-API-Key, X-Auth-Token, Origin, Accept, Range"
         return res, 200
 
 @tnote_bp.after_request
 def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, X-API-Key"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, X-API-Key, X-Auth-Token, Origin, Accept, Range"
     return response
+
+@tnote_bp.route('/api/ping', methods=['GET'])
+def api_ping():
+    return jsonify({
+        "ok": True,
+        "app": "TincNote",
+        "status": "online",
+        "timestamp": datetime.now().isoformat()
+    })
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Web Sayfaları
@@ -1418,25 +1428,24 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.5.3",
-        "versionCode": 108,
+        "version": "1.5.4",
+        "versionCode": 109,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.5.3:\n- Hızlı Notlar ve Görevler: Ayrı ayrı not ekleme, listeleme ve sayfalara/kategorilere aktarma (taşıma) özelliği\n- Android Widget: Bağımsız kaydırılabilir görev listesi düzeltildi, kök tıklama engeli kaldırıldı, doğrudan widget içi görev tamamlama\n- Hızlı Görev ve Hızlı Notlar Web ve Mobil tam senkronize edildi"
+        "notes": "v1.5.4:\n- Mobil uygulama sunucu bağlantısı ve CORS yetkilendirme sorunları çözüldü\n- Kesintisiz çevrimdışı çalışma, anında otomatik kaydetme optimize edildi\n- Genel Bakış görev etkileşimi, checkbox ile anında tamamlama ve UI düzeltmeleri"
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
-        "/home/turan/Masaüstü/TincNote-v1.5.3.apk",
-        "/home/turan/Masaüstü/TincNote-v1.5.2.apk",
-        os.path.join(os.path.dirname(__file__), 'static', 'tincnote.apk'),
+        "/home/turan/Masaüstü/TincNote-v1.5.4.apk",
         "/opt/tinc-hub/TNOTE/static/tincnote.apk",
-        "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/debug/app-debug.apk",
         "/home/turan/101/tinc-hub/TNOTE/static/tincnote.apk",
+        "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/debug/app-debug.apk",
+        "/home/turan/Masaüstü/TincNote-v1.5.3.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.5.3.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.5.4.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────

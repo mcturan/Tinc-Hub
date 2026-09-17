@@ -27,7 +27,13 @@ class TincNoteSync {
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 url = 'http://' + url;
             }
-            if (url.endsWith('/')) {
+            while (url.endsWith('/')) {
+                url = url.slice(0, -1);
+            }
+            if (url.endsWith('/notes')) {
+                url = url.slice(0, -6);
+            }
+            while (url.endsWith('/')) {
                 url = url.slice(0, -1);
             }
         }
@@ -106,21 +112,40 @@ class TincNoteSync {
             if (!serverUrl) return false;
 
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 3500);
+            const timeout = setTimeout(() => controller.abort(), 4000);
 
-            const res = await fetch(`${serverUrl}/notes/api/categories`, {
-                method: 'GET',
-                signal: controller.signal
-            });
-            clearTimeout(timeout);
-            return res.ok;
+            try {
+                const res = await this.apiFetch('/notes/api/ping', {
+                    method: 'GET',
+                    signal: controller.signal
+                });
+                clearTimeout(timeout);
+                if (res && res.ok) return true;
+            } catch (e) {
+                clearTimeout(timeout);
+            }
+
+            // Yedek kontrol (categories endpoint'i)
+            const controller2 = new AbortController();
+            const timeout2 = setTimeout(() => controller2.abort(), 4000);
+            try {
+                const res2 = await this.apiFetch('/notes/api/categories', {
+                    method: 'GET',
+                    signal: controller2.signal
+                });
+                clearTimeout(timeout2);
+                return !!(res2 && res2.ok);
+            } catch (e2) {
+                clearTimeout(timeout2);
+                return false;
+            }
         } catch (e) {
             return false;
         }
     }
 
     async syncNow() {
-        if (this.isSyncing) return;
+        if (this.isSyncing) return false;
         this.isSyncing = true;
         this.setStatus('syncing', 'Eşitleniyor...');
 
@@ -141,7 +166,7 @@ class TincNoteSync {
 
             // 0. Genel Bakış (Overview) Verilerini Çek
             try {
-                const ovRes = await fetch(`${serverUrl}/notes/api/overview`);
+                const ovRes = await this.apiFetch('/notes/api/overview');
                 if (ovRes.ok) {
                     const ovData = await ovRes.json();
                     if (ovData.overview) {
@@ -154,7 +179,7 @@ class TincNoteSync {
 
             // 0.5 Not Defterlerini Çek & Birleştir
             try {
-                const nbRes = await fetch(`${serverUrl}/notes/api/notebooks`);
+                const nbRes = await this.apiFetch('/notes/api/notebooks');
                 if (nbRes.ok) {
                     const nbData = await nbRes.json();
                     if (nbData.notebooks) {
@@ -177,89 +202,97 @@ class TincNoteSync {
             }
 
             // 1. Kategorileri Çek & Birleştir
-            const catRes = await fetch(`${serverUrl}/notes/api/categories`);
-            if (catRes.ok) {
-                const catData = await catRes.json();
-                if (catData.categories) {
-                    for (const c of catData.categories) {
-                        const local = await this.storage.get('categories', c.id);
-                        if (!local || !local._dirty) {
-                            await this.storage.put('categories', { ...c, _dirty: false, _deleted: false });
+            try {
+                const catRes = await this.apiFetch('/notes/api/categories');
+                if (catRes.ok) {
+                    const catData = await catRes.json();
+                    if (catData.categories) {
+                        for (const c of catData.categories) {
+                            const local = await this.storage.get('categories', c.id);
+                            if (!local || !local._dirty) {
+                                await this.storage.put('categories', { ...c, _dirty: false, _deleted: false });
+                            }
                         }
                     }
                 }
+            } catch (catErr) {
+                console.warn("Kategoriler alınamadı:", catErr);
             }
 
             // 2. Sayfaları Çek & Birleştir
-            const pageRes = await fetch(`${serverUrl}/notes/api/pages`);
-            if (pageRes.ok) {
-                const pageData = await pageRes.json();
-                if (pageData.pages) {
-                    for (const p of pageData.pages) {
-                        const local = await this.storage.get('pages', p.id);
-                        if (!local || !local._dirty) {
-                            await this.storage.put('pages', { ...p, _dirty: false, _deleted: false });
+            try {
+                const pageRes = await this.apiFetch('/notes/api/pages');
+                if (pageRes.ok) {
+                    const pageData = await pageRes.json();
+                    if (pageData.pages) {
+                        for (const p of pageData.pages) {
+                            const local = await this.storage.get('pages', p.id);
+                            if (!local || !local._dirty) {
+                                await this.storage.put('pages', { ...p, _dirty: false, _deleted: false });
 
-                            // Sayfa türüne göre alt maddeleri veya finans kayıtlarını çek
-                            if (p.type === 'checklist' || p.type === 'note' || p.type === 'notes') {
-                                try {
-                                    const itemRes = await fetch(`${serverUrl}/notes/api/pages/${p.id}/items`);
-                                    if (itemRes.ok) {
-                                        const itemData = await itemRes.json();
-                                        if (itemData.items) {
-                                            for (const it of itemData.items) {
-                                                const localIt = await this.storage.get('items', it.id);
-                                                if (!localIt || !localIt._dirty) {
-                                                    await this.storage.put('items', { ...it, _dirty: false, _deleted: false });
+                                // Sayfa türüne göre alt maddeleri veya finans kayıtlarını çek
+                                if (p.type === 'checklist' || p.type === 'note' || p.type === 'notes') {
+                                    try {
+                                        const itemRes = await this.apiFetch(`/notes/api/pages/${p.id}/items`);
+                                        if (itemRes.ok) {
+                                            const itemData = await itemRes.json();
+                                            if (itemData.items) {
+                                                for (const it of itemData.items) {
+                                                    const localIt = await this.storage.get('items', it.id);
+                                                    if (!localIt || !localIt._dirty) {
+                                                        await this.storage.put('items', { ...it, _dirty: false, _deleted: false });
+                                                    }
                                                 }
                                             }
                                         }
+                                    } catch (itemErr) {
+                                        console.warn(`Maddeler alınamadı (sayfa ${p.id}):`, itemErr);
                                     }
-                                } catch (itemErr) {
-                                    console.warn(`Maddeler alınamadı (sayfa ${p.id}):`, itemErr);
-                                }
-                            } else if (p.type === 'finance') {
-                                try {
-                                    const finRes = await fetch(`${serverUrl}/notes/api/pages/${p.id}/finance`);
-                                    if (finRes.ok) {
-                                        const finData = await finRes.json();
-                                        if (finData.entries) {
-                                            for (const fe of finData.entries) {
-                                                const localFe = await this.storage.get('finances', fe.id);
-                                                if (!localFe || !localFe._dirty) {
-                                                    await this.storage.put('finances', { ...fe, _dirty: false, _deleted: false });
+                                } else if (p.type === 'finance') {
+                                    try {
+                                        const finRes = await this.apiFetch(`/notes/api/pages/${p.id}/finance`);
+                                        if (finRes.ok) {
+                                            const finData = await finRes.json();
+                                            if (finData.entries) {
+                                                for (const fe of finData.entries) {
+                                                    const localFe = await this.storage.get('finances', fe.id);
+                                                    if (!localFe || !localFe._dirty) {
+                                                        await this.storage.put('finances', { ...fe, _dirty: false, _deleted: false });
+                                                    }
                                                 }
                                             }
                                         }
+                                    } catch (finErr) {
+                                        console.warn(`Finans kayıtları alınamadı (sayfa ${p.id}):`, finErr);
                                     }
-                                } catch (finErr) {
-                                    console.warn(`Finans kayıtları alınamadı (sayfa ${p.id}):`, finErr);
-                                }
-                            } else if (p.type === 'project') {
-                                try {
-                                    const projRes = await fetch(`${serverUrl}/notes/api/pages/${p.id}/project`);
-                                    if (projRes.ok) {
-                                        const projData = await projRes.json();
-                                        if (projData.ok && projData.project) {
-                                            await this.storage.saveProject({
-                                                id: p.id,
-                                                page_id: p.id,
-                                                data: projData.project
-                                            });
+                                } else if (p.type === 'project') {
+                                    try {
+                                        const projRes = await this.apiFetch(`/notes/api/pages/${p.id}/project`);
+                                        if (projRes.ok) {
+                                            const projData = await projRes.json();
+                                            if (projData.ok && projData.project) {
+                                                await this.storage.saveProject({
+                                                    id: p.id,
+                                                    page_id: p.id,
+                                                    data: projData.project
+                                                });
+                                            }
                                         }
+                                    } catch (projErr) {
+                                        console.warn(`Proje verisi alınamadı (sayfa ${p.id}):`, projErr);
                                     }
-                                } catch (projErr) {
-                                    console.warn(`Proje verisi alınamadı (sayfa ${p.id}):`, projErr);
                                 }
                             }
                         }
                     }
                 }
+            } catch (pageErr) {
+                console.warn("Sayfalar alınamadı:", pageErr);
             }
 
             // 3. Şifre Kasası Kayıtlarını Çek & Birleştir
             try {
-                const vaultRes = await fetch(`${serverUrl}/notes/api/vault`);
+                const vaultRes = await this.apiFetch('/notes/api/vault');
                 if (vaultRes.ok) {
                     const vaultData = await vaultRes.json();
                     if (vaultData.entries) {
@@ -276,9 +309,13 @@ class TincNoteSync {
                         }
                     }
                 }
+            } catch (vaultErr) {
+                console.warn("Kasa verisi alınamadı:", vaultErr);
+            }
+
             // 3.5 Hızlı Notları Çek & Birleştir
             try {
-                const qnRes = await fetch(`${serverUrl}/notes/api/quick-notes`);
+                const qnRes = await this.apiFetch('/notes/api/quick-notes');
                 if (qnRes.ok) {
                     const qnData = await qnRes.json();
                     if (qnData.notes) {
@@ -295,7 +332,7 @@ class TincNoteSync {
             }
 
             // 4. Yerelde Değişen (Dirty) Verileri Sunucuya Gönder
-            await this.pushDirtyDataToServer(serverUrl);
+            await this.pushDirtyDataToServer();
 
             const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
             await this.storage.setSetting('last_sync_time', nowStr);
@@ -314,19 +351,19 @@ class TincNoteSync {
         }
     }
 
-    async pushDirtyDataToServer(serverUrl) {
+    async pushDirtyDataToServer() {
         // Yerelde değişen / eklenen kategoriler
         const allCats = await this.storage.getAll('categories');
         for (const cat of allCats) {
             if (cat._deleted && typeof cat.id === 'number' && cat.id < 1000000000) {
                 try {
-                    await fetch(`${serverUrl}/notes/api/categories/${cat.id}`, { method: 'DELETE' });
+                    await this.apiFetch(`/notes/api/categories/${cat.id}`, { method: 'DELETE' });
                     await this.storage.delete('categories', cat.id);
                 } catch (e) {}
             } else if (cat._dirty && !cat._deleted) {
                 try {
                     if (typeof cat.id === 'number' && cat.id >= 1000000000) {
-                        const res = await fetch(`${serverUrl}/notes/api/categories`, {
+                        const res = await this.apiFetch('/notes/api/categories', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -354,7 +391,7 @@ class TincNoteSync {
                             }
                         }
                     } else {
-                        await fetch(`${serverUrl}/notes/api/categories/${cat.id}`, {
+                        await this.apiFetch(`/notes/api/categories/${cat.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -377,14 +414,14 @@ class TincNoteSync {
         for (const p of allPages) {
             if (p._deleted && typeof p.id === 'number' && p.id < 1000000000) {
                 try {
-                    await fetch(`${serverUrl}/notes/api/pages/${p.id}`, { method: 'DELETE' });
+                    await this.apiFetch(`/notes/api/pages/${p.id}`, { method: 'DELETE' });
                     await this.storage.delete('pages', p.id);
                 } catch (e) {}
             } else if (p._dirty && !p._deleted) {
                 try {
                     if (typeof p.id === 'number' && p.id >= 1000000000) {
                         // Yeni sayfa ekleme
-                        const res = await fetch(`${serverUrl}/notes/api/pages`, {
+                        const res = await this.apiFetch('/notes/api/pages', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -404,7 +441,7 @@ class TincNoteSync {
                         }
                     } else {
                         // Var olan sayfayı güncelleme
-                        await fetch(`${serverUrl}/notes/api/pages/${p.id}`, {
+                        await this.apiFetch(`/notes/api/pages/${p.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -427,13 +464,13 @@ class TincNoteSync {
         for (const it of allItems) {
             if (it._deleted && typeof it.id === 'number' && it.id < 1000000000) {
                 try {
-                    await fetch(`${serverUrl}/notes/api/items/${it.id}`, { method: 'DELETE' });
+                    await this.apiFetch(`/notes/api/items/${it.id}`, { method: 'DELETE' });
                     await this.storage.delete('items', it.id);
                 } catch (e) {}
             } else if (it._dirty && !it._deleted) {
                 try {
                     if (typeof it.id === 'number' && it.id >= 1000000000) {
-                        const res = await fetch(`${serverUrl}/notes/api/pages/${it.page_id}/items`, {
+                        const res = await this.apiFetch(`/notes/api/pages/${it.page_id}/items`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -450,7 +487,7 @@ class TincNoteSync {
                             await this.storage.put('items', it);
                         }
                     } else {
-                        await fetch(`${serverUrl}/notes/api/items/${it.id}`, {
+                        await this.apiFetch(`/notes/api/items/${it.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -473,7 +510,7 @@ class TincNoteSync {
         for (const v of allVault) {
             if (v._deleted && typeof v.id === 'number' && v.id < 1000000000) {
                 try {
-                    await fetch(`${serverUrl}/notes/api/vault/${v.id}`, { method: 'DELETE' });
+                    await this.apiFetch(`/notes/api/vault/${v.id}`, { method: 'DELETE' });
                     await this.storage.delete('vault', v.id);
                 } catch (e) {}
             } else if (v._dirty && !v._deleted) {
@@ -492,7 +529,7 @@ class TincNoteSync {
                     };
 
                     if (typeof v.id === 'number' && v.id >= 1000000000) {
-                        const res = await fetch(`${serverUrl}/notes/api/vault`, {
+                        const res = await this.apiFetch('/notes/api/vault', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -505,7 +542,7 @@ class TincNoteSync {
                             await this.storage.put('vault', v);
                         }
                     } else {
-                        await fetch(`${serverUrl}/notes/api/vault/${v.id}`, {
+                        await this.apiFetch(`/notes/api/vault/${v.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -525,10 +562,13 @@ class TincNoteSync {
             if (qn._dirty) {
                 try {
                     if (qn._deleted) {
-                        await fetch(`${serverUrl}/notes/api/quick-notes/${qn.id}`, { method: 'DELETE' });
+                        if (typeof qn.id === 'number' && qn.id < 1000000000) {
+                            await this.apiFetch(`/notes/api/quick-notes/${qn.id}`, { method: 'DELETE' });
+                        }
                         await this.storage.delete('quick_notes', qn.id);
-                    } else {
-                        const res = await fetch(`${serverUrl}/notes/api/quick-notes`, {
+                    } else if (typeof qn.id === 'number' && qn.id >= 1000000000) {
+                        // Yeni hızlı not
+                        const res = await this.apiFetch('/notes/api/quick-notes', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ content: qn.content, notebook_id: qn.notebook_id, color: qn.color })
@@ -539,6 +579,17 @@ class TincNoteSync {
                             if (d.id) {
                                 await this.storage.put('quick_notes', { ...qn, id: d.id, _dirty: false });
                             }
+                        }
+                    } else {
+                        // Var olan hızlı notu güncelle
+                        const res = await this.apiFetch(`/notes/api/quick-notes/${qn.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content: qn.content, color: qn.color })
+                        });
+                        if (res.ok) {
+                            qn._dirty = false;
+                            await this.storage.put('quick_notes', qn);
                         }
                     }
                 } catch (e) {

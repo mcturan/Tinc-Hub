@@ -662,13 +662,14 @@ async function selectNotebook(nbId) {
     closeNotebookDropdown();
 
     // Sunucuya da bildir
-    const serverUrl = await window.appSync.getServerUrl();
-    if (serverUrl) {
-        fetch(`${serverUrl}/notes/api/notebooks/switch`, {
+    try {
+        await window.appSync.apiFetch('/notes/api/notebooks/switch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ notebook_id: nbId })
-        }).catch(e => console.warn('Notebook switch bildirilemedi:', e));
+        });
+    } catch (e) {
+        console.warn('Notebook switch bildirilemedi:', e);
     }
 
     await reloadDrawerNavigation();
@@ -1067,17 +1068,22 @@ async function updateCurrentPageTitle(newTitle) {
     }
 }
 
-function autoSaveCurrentNote(content) {
+async function autoSaveCurrentNote(content, immediate = false) {
     if (!activePageId) return;
     clearTimeout(noteSaveTimeout);
-    noteSaveTimeout = setTimeout(async () => {
+    const doSave = async () => {
         const page = await window.appStorage.getPage(activePageId);
         if (page) {
             page.content = content;
             await window.appStorage.savePage(page);
             window.appSync.syncNow();
         }
-    }, 600);
+    };
+    if (immediate) {
+        await doSave();
+    } else {
+        noteSaveTimeout = setTimeout(doSave, 350);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1087,8 +1093,7 @@ async function fetchChecklistItemsFromServer(pageId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (!isAlive) return;
-        const serverUrl = await window.appSync.getServerUrl();
-        const res = await fetch(`${serverUrl}/notes/api/pages/${pageId}/items`);
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${pageId}/items`);
         if (res.ok) {
             const data = await res.json();
             if (data.items) {
@@ -1109,8 +1114,7 @@ async function fetchPageDetailsFromServer(pageId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (!isAlive) return;
-        const serverUrl = await window.appSync.getServerUrl();
-        const res = await fetch(`${serverUrl}/notes/api/pages/${pageId}`);
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${pageId}`);
         if (res.ok) {
             const data = await res.json();
             if (data.page) {
@@ -1150,8 +1154,7 @@ async function renderFinancePage(pageId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            const res = await fetch(`${serverUrl}/notes/api/pages/${pageId}/finance?period=${currentFinancePeriod}`);
+            const res = await window.appSync.apiFetch(`/notes/api/pages/${pageId}/finance?period=${currentFinancePeriod}`);
             if (res.ok) {
                 const data = await res.json();
                 if (data.entries) {
@@ -1353,8 +1356,7 @@ async function submitAddFinanceEntry() {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            const res = await fetch(`${serverUrl}/notes/api/pages/${activePageId}/finance`, {
+            const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/finance`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -1390,8 +1392,7 @@ async function toggleFinancePaid(entryId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            await fetch(`${serverUrl}/notes/api/finance/${entryId}/toggle`, { method: 'POST' });
+            await window.appSync.apiFetch(`/notes/api/finance/${entryId}/toggle`, { method: 'POST' });
         }
     } catch (e) {
         console.warn("toggleFinancePaid server error:", e);
@@ -1412,8 +1413,7 @@ async function deleteFinanceEntry(entryId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            await fetch(`${serverUrl}/notes/api/finance/${entryId}`, { method: 'DELETE' });
+            await window.appSync.apiFetch(`/notes/api/finance/${entryId}`, { method: 'DELETE' });
         }
     } catch (e) {
         console.warn("deleteFinanceEntry server error:", e);
@@ -1442,8 +1442,7 @@ async function copyRecurringFinanceFromPrev() {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            const res = await fetch(`${serverUrl}/notes/api/pages/${activePageId}/finance/copy_recurring`, {
+            const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/finance/copy_recurring`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ source_period: prevPeriod, target_period: currentFinancePeriod })
@@ -1471,8 +1470,7 @@ async function renderProjectPage(pageId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            const res = await fetch(`${serverUrl}/notes/api/pages/${pageId}/project`);
+            const res = await window.appSync.apiFetch(`/notes/api/pages/${pageId}/project`);
             if (res.ok) {
                 const data = await res.json();
                 if (data.ok && data.project) {
@@ -1650,8 +1648,7 @@ async function updateProjectStatusFromUI(newStatus) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            await fetch(`${serverUrl}/notes/api/pages/${activePageId}/project`, {
+            await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/project`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
@@ -1669,8 +1666,7 @@ function autoSaveProjectConcept(content) {
         try {
             const isAlive = await window.appSync.checkConnection();
             if (isAlive) {
-                const serverUrl = await window.appSync.getServerUrl();
-                await fetch(`${serverUrl}/notes/api/pages/${activePageId}/project`, {
+                await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/project`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ concept: content })
@@ -1706,8 +1702,7 @@ async function submitAddMilestoneEntry() {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            const res = await fetch(`${serverUrl}/notes/api/pages/${activePageId}/project/milestones`, {
+            const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/project/milestones`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1733,8 +1728,7 @@ async function toggleMilestoneStatus(milestoneId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            await fetch(`${serverUrl}/notes/api/milestones/${milestoneId}/toggle`, { method: 'POST' });
+            await window.appSync.apiFetch(`/notes/api/milestones/${milestoneId}/toggle`, { method: 'POST' });
             await renderProjectPage(activePageId);
         }
     } catch (e) {
@@ -1747,8 +1741,7 @@ async function deleteMilestone(milestoneId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            await fetch(`${serverUrl}/notes/api/milestones/${milestoneId}`, { method: 'DELETE' });
+            await window.appSync.apiFetch(`/notes/api/milestones/${milestoneId}`, { method: 'DELETE' });
             await renderProjectPage(activePageId);
         }
     } catch (e) {
@@ -1782,8 +1775,7 @@ async function submitAddMaterialEntry() {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            const res = await fetch(`${serverUrl}/notes/api/pages/${activePageId}/project/materials`, {
+            const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/project/materials`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1810,8 +1802,7 @@ async function toggleMaterialStatus(materialId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            await fetch(`${serverUrl}/notes/api/materials/${materialId}/toggle`, { method: 'POST' });
+            await window.appSync.apiFetch(`/notes/api/materials/${materialId}/toggle`, { method: 'POST' });
             await renderProjectPage(activePageId);
         }
     } catch (e) {
@@ -1824,8 +1815,7 @@ async function deleteMaterial(materialId) {
     try {
         const isAlive = await window.appSync.checkConnection();
         if (isAlive) {
-            const serverUrl = await window.appSync.getServerUrl();
-            await fetch(`${serverUrl}/notes/api/materials/${materialId}`, { method: 'DELETE' });
+            await window.appSync.apiFetch(`/notes/api/materials/${materialId}`, { method: 'DELETE' });
             await renderProjectPage(activePageId);
         }
     } catch (e) {
@@ -1859,13 +1849,17 @@ async function renderOverview() {
         if (pendingItems.length === 0) {
             taskListEl.innerHTML = `<div class="empty-hint">Bekleyen yapılacak görev yok ✨</div>`;
         } else {
-            taskListEl.innerHTML = pendingItems.slice(0, 6).map(it => `
-                <div class="overview-item" onclick="openPage(${it.page_id})">
-                    <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
-                        <span>☑️</span>
-                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;">${escapeHtml(it.title)}</span>
+            taskListEl.innerHTML = pendingItems.slice(0, 8).map(it => `
+                <div class="overview-item" style="cursor:pointer;" onclick="openPage(${it.page_id})">
+                    <div style="display:flex; align-items:center; gap:10px; overflow:hidden; flex:1;">
+                        <div class="checkbox-custom ${it.is_done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleOverviewItemDone(${it.id})">
+                            ${it.is_done ? '✓' : ''}
+                        </div>
+                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; font-size:0.9rem; ${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
+                            ${escapeHtml(it.title)}
+                        </span>
                     </div>
-                    ${it.price ? `<span style="font-weight:700; color:var(--danger); font-size:0.8rem;">${escapeHtml(it.price)}</span>` : '<span style="color:var(--muted); font-size:0.75rem;">➔</span>'}
+                    <span style="color:var(--muted); font-size:0.75rem;">➔</span>
                 </div>
             `).join('');
         }
@@ -1890,6 +1884,17 @@ async function renderOverview() {
     }
 
     syncWidgetData();
+}
+
+async function toggleOverviewItemDone(itemId) {
+    const it = await window.appStorage.get('items', itemId);
+    if (it) {
+        it.is_done = it.is_done ? 0 : 1;
+        it._dirty = true;
+        await window.appStorage.put('items', it);
+        await renderOverview();
+        window.appSync.syncNow();
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2083,15 +2088,25 @@ function quickFillHostIP() {
     if (input) input.value = 'http://192.168.1.10:9013';
 }
 
-async function saveSettingsFromUI() {
+async function saveSettingsFromUI(showAlert = true) {
     const input = document.getElementById('cfg-server-url');
     if (input) {
         let val = input.value.trim();
-        if (val && !val.startsWith('http://') && !val.startsWith('https://')) {
-            val = 'http://' + val;
+        if (val) {
+            if (!val.startsWith('http://') && !val.startsWith('https://')) {
+                val = 'http://' + val;
+            }
+            while (val.endsWith('/')) val = val.slice(0, -1);
+            if (val.endsWith('/notes')) val = val.slice(0, -6);
+            while (val.endsWith('/')) val = val.slice(0, -1);
+        } else {
+            val = 'http://192.168.1.10:9013';
         }
+        input.value = val;
         await window.appStorage.setSetting('server_url', val);
-        alert('Ayarlar kaydedildi! ✅');
+        if (showAlert) {
+            alert('Ayarlar kaydedildi! ✅');
+        }
         window.appSync.syncNow();
     }
 }
@@ -2101,17 +2116,18 @@ async function testConnectionFromUI() {
     const diag = document.getElementById('connection-diag-box');
     if (btn) btn.innerText = 'Test ediliyor...';
 
-    await saveSettingsFromUI();
+    await saveSettingsFromUI(false);
+    const targetUrl = await window.appSync.getServerUrl();
     const ok = await window.appSync.checkConnection();
 
     if (btn) btn.innerText = '🔌 Test Et';
     if (diag) {
         diag.style.display = 'block';
         if (ok) {
-            diag.innerHTML = `🟢 <strong>Bağlantı Başarılı!</strong><br>TincHub sunucusuna erişildi.`;
+            diag.innerHTML = `🟢 <strong>Bağlantı Başarılı!</strong><br><span style="font-size:0.75rem; color:var(--text); opacity:0.85;">${escapeHtml(targetUrl)} adresine erişildi. Senkronizasyon devrede.</span>`;
             diag.style.color = 'var(--success)';
         } else {
-            diag.innerHTML = `🔴 <strong>Bağlantı Kurulamadı!</strong><br>Telefonunuzun aynı Wi-Fi ağında olduğundan emin olun.`;
+            diag.innerHTML = `🔴 <strong>Bağlantı Kurulamadı!</strong><br><span style="font-size:0.75rem; color:var(--text); opacity:0.85;">Hedef: ${escapeHtml(targetUrl)}<br>Telefonunuzun aynı Wi-Fi ağında veya VPN'de olduğunu kontrol edin.</span>`;
             diag.style.color = 'var(--danger)';
         }
     }
