@@ -263,18 +263,10 @@
         <!-- Hızlı Madde Ekleme (Checklist için) -->
         <div class="quick-add-box" id="quick-add-container">
             <div class="quick-add-main">
-                <input type="text" id="quick-item-title" class="quick-input" placeholder="Yeni madde...">
-                <button type="button" class="btn-icon" onclick="toggleQuickDetails()" title="Detaylar">
-                    <svg class="svg-icon svg-icon-sm"><use href="#i-settings"/></svg>
-                </button>
+                <input type="text" id="quick-item-title" class="quick-input" placeholder="Yeni görev / madde ekle...">
                 <button type="button" class="btn-icon btn-primary-icon" onclick="submitQuickItem()" title="Ekle">
                     <svg class="svg-icon svg-icon-sm"><use href="#i-plus"/></svg>
                 </button>
-            </div>
-            <div class="quick-details" id="quick-details-box">
-                <input type="text" id="quick-item-qty" class="form-control" placeholder="Miktar">
-                <input type="text" id="quick-item-price" class="form-control" placeholder="Fiyat">
-                <input type="text" id="quick-item-url" class="form-control" placeholder="Link">
             </div>
         </div>
 
@@ -1858,7 +1850,7 @@
 <div class="tnote-modal-backdrop" id="modal-quicknote-detail">
     <div class="tnote-modal" style="max-width:480px;">
         <div class="modal-header">
-            <span>📝 Hızlı Not</span>
+            <span>Hızlı Not</span>
             <button class="btn-icon" onclick="closeModal('modal-quicknote-detail')">✕</button>
         </div>
         <div class="modal-body">

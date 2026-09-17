@@ -1354,6 +1354,17 @@ def api_add_quick_note():
     notes = db.get_quick_notes(notebook_id=nb_id)
     return jsonify({"ok": True, "id": note_id, "notes": notes})
 
+@tnote_bp.route('/api/quick-notes/<int:note_id>', methods=['PUT'])
+@auth_check
+def api_update_quick_note(note_id):
+    data = request.get_json() or {}
+    content = data.get('content', '').strip()
+    if not content:
+        return jsonify({"ok": False, "error": "Not içeriği boş olamaz"}), 400
+    db.update_quick_note(note_id, content)
+    nb_id = db.get_active_notebook_id()
+    return jsonify({"ok": True, "notes": db.get_quick_notes(notebook_id=nb_id)})
+
 @tnote_bp.route('/api/quick-notes/<int:note_id>', methods=['DELETE'])
 @auth_check
 def api_delete_quick_note(note_id):

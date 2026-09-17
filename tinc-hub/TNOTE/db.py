@@ -2616,6 +2616,19 @@ def delete_quick_note(note_id: int):
         conn.close()
         return True
 
+def update_quick_note(note_id: int, content: str):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE quick_notes
+            SET content = ?, updated_at = datetime('now', 'localtime')
+            WHERE id = ?
+        """, (content.strip(), int(note_id)))
+        conn.commit()
+        conn.close()
+        return True
+
 def move_quick_note(note_id: int, target_page_id: int = None, target_category_id: int = None, new_page_title: str = None):
     with _lock:
         conn = get_conn()

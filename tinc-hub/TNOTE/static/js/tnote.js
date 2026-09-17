@@ -1019,7 +1019,17 @@ async function loadOverviewQuickNotes() {
             return `
             <div class="ov-quicknote-row" onclick="openQuickNoteDetail(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')}, '${dateStr}')" title="Görüntülemek veya düzenlemek için tıklayın">
                 <span class="ov-quicknote-text">${escapeHtml(n.content)}</span>
-                <button class="ov-quicknote-del" onclick="event.stopPropagation(); deleteOverviewQuickNote(${n.id})" title="Sil">✕</button>
+                <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                    <button class="btn-icon-subtle" onclick="event.stopPropagation(); openQuickNoteDetail(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')}, '${dateStr}')" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);">
+                        <svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg>
+                    </button>
+                    <button class="btn-icon-subtle" onclick="event.stopPropagation(); openTransferQuickNoteModal(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')})" title="Sayfaya Aktar" style="padding:2px 4px; color:var(--text-muted);">
+                        <svg class="svg-icon svg-icon-xs"><use href="#i-folder"/></svg>
+                    </button>
+                    <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteOverviewQuickNote(${n.id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);">
+                        <svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg>
+                    </button>
+                </div>
             </div>
             `;
         }).join('');
@@ -1043,6 +1053,7 @@ async function submitOverviewQuickNote() {
         if (data.ok) {
             input.value = '';
             loadOverviewQuickNotes();
+            if (typeof renderWebQuickTasks === 'function') renderWebQuickTasks();
             if (typeof showToast === 'function') showToast("Hızlı not kaydedildi");
         }
     } catch (e) {
@@ -1051,11 +1062,13 @@ async function submitOverviewQuickNote() {
 }
 
 async function deleteOverviewQuickNote(id) {
+    if (!confirm('Bu hızlı notu silmek istediğinize emin misiniz?')) return;
     try {
         const res = await fetch(`/notes/api/quick-notes/${id}`, { method: 'DELETE' });
         const data = await res.json();
         if (data.ok) {
             loadOverviewQuickNotes();
+            if (typeof renderWebQuickTasks === 'function') renderWebQuickTasks();
             if (typeof showToast === 'function') showToast("Not silindi");
         }
     } catch (e) {
@@ -1189,19 +1202,21 @@ function renderOverview(ov) {
                 </div>`;
         } else {
             pendingContainer.innerHTML = ov.pending_tasks.map(it => `
-                <div class="ov-item-row" id="ov-task-${it.id}">
-                    <div class="ov-item-checkbox-col">
-                        <input type="checkbox" class="ov-task-checkbox" onchange="toggleTaskFromOverview(${it.id}, this)">
+                <div class="ov-item-row" id="ov-task-${it.id}" onclick="loadPage(${it.page_id})" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" title="${escapeHtml(it.page_title)} listesine git">
+                    <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+                        <input type="checkbox" class="ov-task-checkbox" onclick="event.stopPropagation()" onchange="toggleTaskFromOverview(${it.id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;">
+                        <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</span>
                     </div>
-                    <div class="ov-item-body">
-                        <div class="ov-item-title" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</div>
-                        <div class="ov-item-submeta">
-                            <span class="ov-page-tag" onclick="loadPage(${it.page_id})" title="${escapeHtml(it.page_title)} listesine git">
-                                <svg class="svg-icon svg-icon-xs" style="vertical-align:text-bottom; margin-right:3px;"><use href="#i-file-text"/></svg>${escapeHtml(it.page_title)}
-                            </span>
-                            ${it.quantity ? `<span class="ov-meta-pill">${escapeHtml(it.quantity)}</span>` : ''}
-                            ${it.price ? `<span class="ov-meta-pill price">${escapeHtml(it.price)}</span>` : ''}
-                        </div>
+                    <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                        <span class="ov-page-tag" onclick="event.stopPropagation(); loadPage(${it.page_id})" title="${escapeHtml(it.page_title)} listesine git">
+                            ${escapeHtml(it.page_title)}
+                        </span>
+                        <button class="btn-icon-subtle" onclick="event.stopPropagation(); editTaskFromOverview(${it.id}, ${JSON.stringify(it.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);">
+                            <svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg>
+                        </button>
+                        <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteTaskFromOverview(${it.id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);">
+                            <svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg>
+                        </button>
                     </div>
                 </div>
             `).join('');
@@ -1222,7 +1237,7 @@ function renderOverview(ov) {
                 </div>`;
         } else {
             billsContainer.innerHTML = ov.upcoming_bills.map(b => `
-                <div class="ov-bill-row" onclick="loadPage(${b.page_id})" title="Finans sayfasına git">
+                <div class="ov-bill-row" onclick="loadPage(${b.page_id})" title="${escapeHtml(b.page_title)} sayfasına git" style="cursor:pointer;">
                     <div class="ov-bill-left">
                         <span class="ov-bill-day">Gün ${b.due_day}</span>
                         <div>
@@ -1273,7 +1288,7 @@ function renderOverview(ov) {
             recentContainer.innerHTML = pages.map(p => `
                 <div class="ov-recent-row" onclick="loadPage(${p.id})">
                     <div class="ov-recent-left">
-                        <span style="font-size:0.95rem;">${p.icon || '📝'}</span>
+                        <svg class="svg-icon svg-icon-xs" style="margin-right:6px; color:var(--muted);"><use href="#i-file-text"/></svg>
                         <span class="ov-recent-title">${escapeHtml(p.title)}</span>
                     </div>
                     <span class="ov-recent-badge">${escapeHtml(p.category_name || '')} ${p.type === 'checklist' ? `(${p.item_count || 0})` : ''}</span>
@@ -1294,13 +1309,48 @@ async function toggleTaskFromOverview(itemId, checkboxEl) {
                 row.style.textDecoration = 'line-through';
                 setTimeout(() => {
                     row.remove();
-                    // Sayacı ve KPI'yi güncelle
                     loadOverviewPage();
+                    if (typeof renderWebQuickTasks === 'function') renderWebQuickTasks();
                 }, 350);
             }
         }
     } catch (e) {
         console.error("Görev güncelleme hatası:", e);
+    }
+}
+
+async function editTaskFromOverview(itemId, currentTitle) {
+    const newTitle = prompt('Görevi düzenle:', currentTitle);
+    if (!newTitle || newTitle.trim() === '' || newTitle.trim() === currentTitle) return;
+    try {
+        const res = await fetch(`/notes/api/items/${itemId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ title: newTitle.trim() })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            loadOverviewPage();
+            if (typeof renderWebQuickTasks === 'function') renderWebQuickTasks();
+        }
+    } catch(e) {
+        console.error("editTaskFromOverview error:", e);
+    }
+}
+
+async function deleteTaskFromOverview(itemId) {
+    if (!confirm('Bu görevi silmek istediğinize emin misiniz?')) return;
+    try {
+        const res = await fetch(`/notes/api/items/${itemId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+            const row = document.getElementById(`ov-task-${itemId}`);
+            if (row) row.remove();
+            loadOverviewPage();
+            if (typeof renderWebQuickTasks === 'function') renderWebQuickTasks();
+        }
+    } catch(e) {
+        console.error("deleteTaskFromOverview error:", e);
     }
 }
 
@@ -1486,23 +1536,23 @@ function renderChecklist() {
         li.dataset.itemId = item.id;
 
         let metaHtml = '';
-        if (item.price) metaHtml += `<span class="tag-price">💰 ${escapeHtml(item.price)}</span>`;
-        if (item.quantity) metaHtml += `<span class="tag-qty">📦 ${escapeHtml(item.quantity)}</span>`;
+        if (item.price) metaHtml += `<span class="tag-price">${escapeHtml(item.price)}</span>`;
+        if (item.quantity) metaHtml += `<span class="tag-qty">${escapeHtml(item.quantity)}</span>`;
         if (item.remind_at) {
-            metaHtml += `<span class="tag-reminder">⏰ ${item.remind_at.substring(5, 16)}</span>`;
+            metaHtml += `<span class="tag-reminder">${item.remind_at.substring(5, 16)}</span>`;
         }
         if (item.url) {
-            metaHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="tag-link">🔗 Link</a>`;
+            metaHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="tag-link">Link</a>`;
         }
 
         let actionsHtml = `
-            <button class="btn-icon-subtle" title="Maddeyi Düzenle" onclick="openEditItemModal(${item.id})">✏️</button>
-            <button class="btn-icon-subtle" title="Hatırlatıcı Kur" onclick="openReminderModalById(${item.id})">⏰</button>
+            <button class="btn-icon-subtle" title="Maddeyi Düzenle" onclick="openEditItemModal(${item.id})"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+            <button class="btn-icon-subtle" title="Hatırlatıcı Kur" onclick="openReminderModalById(${item.id})"><svg class="svg-icon svg-icon-xs"><use href="#i-clock"/></svg></button>
         `;
         if (item.url) {
-            actionsHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="btn-icon-subtle" title="Ürün Linkini Aç">🔗</a>`;
+            actionsHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="btn-icon-subtle" title="Web Linkini Aç"><svg class="svg-icon svg-icon-xs"><use href="#i-file-text"/></svg></a>`;
         }
-        actionsHtml += `<button class="btn-icon-subtle btn-danger-hover" title="Maddeyi Sil" onclick="deleteItem(${item.id})">🗑️</button>`;
+        actionsHtml += `<button class="btn-icon-subtle btn-danger-hover" title="Maddeyi Sil" onclick="deleteItem(${item.id})"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>`;
 
         const thumbHtml = item.image_url ? `<img src="${sanitizeUrl(item.image_url)}" class="item-thumb" alt="thumb">` : '';
 
@@ -2387,8 +2437,8 @@ function renderFinanceTable(entries) {
             <td style="text-align:center;">${statusBtn}</td>
             <td style="text-align:center;">${alarmHtml}</td>
             <td style="text-align:right;">
-                <button class="btn-icon-subtle" onclick="openEditFinanceModal(${e.id})" title="Düzenle">✏️</button>
-                <button class="btn-icon-subtle btn-danger-hover" onclick="deleteFinanceEntry(${e.id}, '${escapeHtml(e.title)}')" title="Sil">🗑️</button>
+                <button class="btn-icon-subtle" onclick="openEditFinanceModal(${e.id})" title="Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                <button class="btn-icon-subtle btn-danger-hover" onclick="deleteFinanceEntry(${e.id}, '${escapeHtml(e.title)}')" title="Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -2837,7 +2887,7 @@ async function toggleSelectedMilestoneStatus() {
 }
 
 function openAddMilestoneModal() {
-    document.getElementById('milestone-modal-title').textContent = '➕ Yeni Proje Aşaması Ekle';
+    document.getElementById('milestone-modal-title').textContent = 'Yeni Proje Aşaması Ekle';
     document.getElementById('milestone-edit-id').value = '';
     document.getElementById('milestone-title').value = '';
     document.getElementById('milestone-target-date').value = '';
@@ -2852,7 +2902,7 @@ function openEditSelectedMilestone() {
     const m = currentProjectData.milestones.find(item => item.id === selectedMilestoneId);
     if (!m) return;
 
-    document.getElementById('milestone-modal-title').textContent = '✏️ Aşamayı Düzenle';
+    document.getElementById('milestone-modal-title').textContent = 'Aşamayı Düzenle';
     document.getElementById('milestone-edit-id').value = m.id;
     document.getElementById('milestone-title').value = m.title || '';
     document.getElementById('milestone-target-date').value = m.target_date || '';
@@ -3131,17 +3181,17 @@ function renderBOM() {
         const lineTotal = (m.unit_price || 0.0) * qtyNum;
 
         let statusClass = 'is-needed';
-        let statusLabel = '🔍 Aranıyor';
+        let statusLabel = 'Aranıyor';
         if (m.status === 'ordered') {
             statusClass = 'is-ordered';
-            statusLabel = '📦 Sipariş Edildi';
+            statusLabel = 'Sipariş Edildi';
         } else if (m.status === 'available') {
             statusClass = 'is-available';
-            statusLabel = '✅ Elde Var';
+            statusLabel = 'Elde Var';
         }
 
         const statusBtn = `<button class="btn-bom-status ${statusClass}" onclick="toggleMaterialStatus(${m.id})">${statusLabel}</button>`;
-        const linkHtml = m.url ? `<a href="${escapeHtml(m.url)}" target="_blank" rel="noopener" style="color:var(--accent); font-size:0.8rem; text-decoration:none;">🔗 Bağlantı</a>` : '<span style="color:var(--muted); font-size:0.75rem;">-</span>';
+        const linkHtml = m.url ? `<a href="${escapeHtml(m.url)}" target="_blank" rel="noopener" style="color:var(--accent); font-size:0.8rem; text-decoration:none;">Bağlantı</a>` : '<span style="color:var(--muted); font-size:0.75rem;">-</span>';
 
         tr.innerHTML = `
             <td>${statusBtn}</td>
@@ -3152,8 +3202,8 @@ function renderBOM() {
             <td>${linkHtml}</td>
             <td><span style="font-size:0.75rem; color:var(--muted);">${escapeHtml(m.notes || '')}</span></td>
             <td style="text-align:right;">
-                <button class="btn-icon-subtle" onclick="openEditMaterialModal(${m.id})" title="Düzenle">✏️</button>
-                <button class="btn-icon-subtle btn-danger-hover" onclick="deleteMaterial(${m.id}, '${escapeHtml(m.name)}')" title="Sil">🗑️</button>
+                <button class="btn-icon-subtle" onclick="openEditMaterialModal(${m.id})" title="Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                <button class="btn-icon-subtle btn-danger-hover" onclick="deleteMaterial(${m.id}, '${escapeHtml(m.name)}')" title="Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -3187,7 +3237,7 @@ async function toggleMaterialStatus(matId) {
 }
 
 function openAddMaterialModal() {
-    document.getElementById('material-modal-title').textContent = '➕ Malzeme / Parça Ekle';
+    document.getElementById('material-modal-title').textContent = 'Malzeme / Parça Ekle';
     document.getElementById('material-edit-id').value = '';
     document.getElementById('material-name').value = '';
     document.getElementById('material-qty').value = '1';
@@ -3203,7 +3253,7 @@ function openEditMaterialModal(matId) {
     const m = currentProjectData.materials.find(item => item.id === matId);
     if (!m) return;
 
-    document.getElementById('material-modal-title').textContent = '✏️ Malzemeyi Düzenle';
+    document.getElementById('material-modal-title').textContent = 'Malzemeyi Düzenle';
     document.getElementById('material-edit-id').value = m.id;
     document.getElementById('material-name').value = m.name || '';
     document.getElementById('material-qty').value = m.quantity || '1';
@@ -3295,7 +3345,7 @@ function renderLogs() {
                 </div>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="font-size:0.75rem; color:var(--muted);">${log.log_date || ''}</span>
-                    <button class="btn-icon-subtle btn-danger-hover" onclick="deleteProjectLog(${log.id})" title="Sil">🗑️</button>
+                    <button class="btn-icon-subtle btn-danger-hover" onclick="deleteProjectLog(${log.id})" title="Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                 </div>
             </div>
             <div style="font-size:0.88rem; color:var(--text); white-space:pre-wrap; margin-top:4px;">${escapeHtml(log.content)}</div>
@@ -3632,7 +3682,7 @@ async function triggerUndo() {
         const res = await fetch('/notes/api/undo', { method: 'POST' });
         const data = await res.json();
         if (data.ok) {
-            showToast(`↩️ ${data.message || 'İşlem geri alındı!'}`);
+            showToast(data.message || 'İşlem geri alındı!');
             updateTrashBadgeCount();
             if (currentPageId) {
                 loadPage(currentPageId);
@@ -3640,53 +3690,54 @@ async function triggerUndo() {
                 loadOverviewPage();
             }
         } else {
-            showToast(`ℹ️ ${data.error || 'Geri alınacak bir işlem yok.'}`);
+            showToast(data.error || 'Geri alınacak işlem bulunamadı.');
         }
     } catch (e) {
-        showToast(`❌ Geri alma hatası: ${e.message}`);
+        console.error(e);
     }
 }
 
-async function openHistoryModal() {
-    openModal('modal-action-history');
-    const container = document.getElementById('history-timeline-list');
-    container.innerHTML = '<div style="text-align:center; padding:12px; color:var(--muted);">Yükleniyor...</div>';
+function openHistoryModal() {
+    fetchHistoryList();
+    openModal('modal-history');
+}
 
+async function fetchHistoryList() {
+    const container = document.getElementById('history-list-container');
+    if (!container) return;
+    container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">Yükleniyor...</div>';
     try {
         const res = await fetch('/notes/api/history');
         const data = await res.json();
-        if (data.ok) {
-            renderHistoryTimeline(data.history || []);
+        if (!data.history || data.history.length === 0) {
+            container.innerHTML = '<div style="text-align:center; padding:24px; color:var(--muted); font-size:0.88rem;">Henüz kayıtlı bir işlem geçmişi bulunmuyor.</div>';
+            return;
         }
+        renderHistoryList(data.history);
     } catch (e) {
-        container.innerHTML = '<div style="color:red; padding:12px;">Geçmiş yüklenemedi.</div>';
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#ef4444;">Geçmiş yüklenemedi.</div>';
     }
 }
 
-function renderHistoryTimeline(history) {
-    const container = document.getElementById('history-timeline-list');
-    if (!history.length) {
-        container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted); font-size:0.85rem;">Henüz kayıtlı bir işlem yok.</div>';
-        return;
-    }
+function renderHistoryList(items) {
+    const container = document.getElementById('history-list-container');
+    if (!container) return;
 
     const typeIcons = {
-        'create_page': '📄➕',
-        'delete_page': '📄🗑️',
-        'restore_page': '📄↩️',
-        'create_item': '📝➕',
-        'delete_item': '📝🗑️',
-        'toggle_item': '✅',
-        'update_item': '✏️',
-        'clear_completed': '🧹',
-        'create_vault': '🔐➕',
-        'delete_vault': '🔐🗑️',
-        'update_vault': '🔐✏️',
-        'empty_trash': '🗑️💥'
+        'create_page': '📄',
+        'delete_page': '📄',
+        'restore_page': '📄',
+        'create_item': '📝',
+        'delete_item': '📝',
+        'update_item': '📝',
+        'create_vault': '🔐',
+        'delete_vault': '🔐',
+        'update_vault': '🔐',
+        'empty_trash': '🗑️'
     };
 
     let html = '';
-    history.forEach(item => {
+    items.forEach(item => {
         const icon = typeIcons[item.action_type] || '⚡';
         html += `
             <div class="history-item-row">
@@ -3697,8 +3748,8 @@ function renderHistoryTimeline(history) {
                         <span class="history-time">${item.created_at || ''}</span>
                     </div>
                 </div>
-                <button class="btn btn-sm btn-outline" style="font-size:0.75rem; padding:3px 8px; white-space:nowrap;" onclick="undoSpecificAction(${item.id})">
-                    ↩️ Geri Al
+                <button class="btn btn-sm btn-outline" style="font-size:0.75rem; padding:3px 8px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;" onclick="undoSpecificAction(${item.id})">
+                    <svg class="svg-icon svg-icon-xs"><use href="#i-undo"/></svg> Geri Al
                 </button>
             </div>
         `;
@@ -3711,12 +3762,12 @@ async function undoSpecificAction(historyId) {
         const res = await fetch(`/notes/api/history/${historyId}/undo`, { method: 'POST' });
         const data = await res.json();
         if (data.ok) {
-            showToast(`↩️ ${data.message || 'İşlem geri alındı!'}`);
+            showToast(data.message || 'İşlem geri alındı!');
             openHistoryModal();
             updateTrashBadgeCount();
             if (currentPageId) loadPage(currentPageId);
         } else {
-            showToast(`❌ ${data.error || 'İşlem geri alınamadı.'}`);
+            showToast(data.error || 'İşlem geri alınamadı.');
         }
     } catch (e) {
         showToast(`❌ Hata: ${e.message}`);
@@ -3822,11 +3873,11 @@ function renderTrashCards(trashItems) {
                     </div>
                 </div>
                 <div style="display:flex; gap:8px;">
-                    <button class="btn btn-sm btn-primary" onclick="restoreTrashPage(${item.id})" style="font-size:0.78rem; padding:4px 10px;">
-                        ↩️ Geri Yükle
+                    <button class="btn btn-sm btn-primary" onclick="restoreTrashPage(${item.id})" style="font-size:0.78rem; padding:4px 10px; display:inline-flex; align-items:center; gap:4px;">
+                        <svg class="svg-icon svg-icon-xs"><use href="#i-undo"/></svg> Geri Yükle
                     </button>
-                    <button class="btn btn-sm btn-danger" onclick="permanentDeleteTrashPage(${item.id})" style="font-size:0.78rem; padding:4px 10px;">
-                        🗑️ Kalıcı Sil
+                    <button class="btn btn-sm btn-danger" onclick="permanentDeleteTrashPage(${item.id})" style="font-size:0.78rem; padding:4px 10px; display:inline-flex; align-items:center; gap:4px;">
+                        <svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg> Kalıcı Sil
                     </button>
                 </div>
             </div>
@@ -4286,7 +4337,7 @@ function renderVaultCards(entries) {
                         📁 ${escapeHtml(entry.folder_name)} klasörü ➔
                     </button>` : ''}
                     <button class="vault-related-link" style="color:var(--muted); background:var(--surface2);" onclick="openVaultRelatedModal(${entry.id})" title="Bu kayıtla ilişkili diğer şifreleri popup olarak gör">
-                        🔗 İlgililer
+                        İlişkili Kayıtlar
                     </button>
                 </div>
 
@@ -4294,13 +4345,13 @@ function renderVaultCards(entries) {
                     <div>
                         ${entry.url ? `
                         <a href="${escapeHtml(entry.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent); text-decoration:none; font-weight:600; display:inline-flex; align-items:center; gap:3px;">
-                            🔗 Giriş Yap
+                            Giriş Yap
                         </a>
                         ` : '<span style="color:var(--muted); font-size:0.72rem;">' + (entry.created_at || '') + '</span>'}
                     </div>
                     <div style="display:flex; gap:4px;">
-                        <button class="btn-icon-subtle" onclick="openEditVaultModal(${entry.id})" title="Düzenle">✏️</button>
-                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteVaultEntry(${entry.id}, '${escapeHtml(entry.title)}')" title="Sil">🗑️</button>
+                        <button class="btn-icon-subtle" onclick="openEditVaultModal(${entry.id})" title="Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteVaultEntry(${entry.id}, '${escapeHtml(entry.title)}')" title="Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                     </div>
                 </div>
             </div>
@@ -4418,12 +4469,12 @@ async function deleteVaultFolderPrompt(name) {
         });
         const data = await res.json();
         if (data.ok) {
-            showToast(`🗑️ "${name}" klasörü silindi.`);
+            showToast(`"${name}" klasörü silindi.`);
             if (currentVaultFolder === name) currentVaultFolder = 'all';
             fetchVaultEntries();
         }
     } catch (e) {
-        showToast(`❌ Hata: ${e.message}`);
+        showToast(`Hata: ${e.message}`);
     }
 }
 
@@ -4467,7 +4518,7 @@ async function openVaultRelatedModal(entryId) {
                             <div style="display:flex; gap:4px;">
                                 ${item.username ? `<button class="vault-btn-copy" onclick="copyVaultField('${escapeHtml(item.username)}', 'Kullanıcı Adı')" title="Kullanıcı Kopyala">👤</button>` : ''}
                                 <button class="vault-btn-copy" onclick="copyAndFetchVaultPassword(${item.id})" title="Şifreyi Panoya Kopyala">🔑</button>
-                                <button class="btn-icon-subtle" onclick="closeModal('modal-vault-related'); openEditVaultModal(${item.id})" title="Düzenle">✏️</button>
+                                <button class="btn-icon-subtle" onclick="closeModal('modal-vault-related'); openEditVaultModal(${item.id})" title="Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
                             </div>
                         </div>
                     `).join('')}
@@ -4493,7 +4544,7 @@ async function openVaultRelatedModal(entryId) {
                             <div style="display:flex; gap:4px;">
                                 ${item.username ? `<button class="vault-btn-copy" onclick="copyVaultField('${escapeHtml(item.username)}', 'Kullanıcı Adı')" title="Kullanıcı Kopyala">👤</button>` : ''}
                                 <button class="vault-btn-copy" onclick="copyAndFetchVaultPassword(${item.id})" title="Şifreyi Panoya Kopyala">🔑</button>
-                                <button class="btn-icon-subtle" onclick="closeModal('modal-vault-related'); openEditVaultModal(${item.id})" title="Düzenle">✏️</button>
+                                <button class="btn-icon-subtle" onclick="closeModal('modal-vault-related'); openEditVaultModal(${item.id})" title="Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
                             </div>
                         </div>
                     `).join('')}
@@ -4580,7 +4631,7 @@ async function openEditVaultModal(id) {
         const data = await res.json();
         if (data.ok && data.entry) {
             const e = data.entry;
-            document.getElementById('vault-modal-title').textContent = '✏️ Şifre Kaydını Düzenle';
+            document.getElementById('vault-modal-title').textContent = 'Şifre Kaydını Düzenle';
             document.getElementById('vault-entry-id').value = e.id;
             document.getElementById('v-scope').value = e.scope || 'personal';
             document.getElementById('v-category').value = e.category || 'web';
@@ -4692,11 +4743,11 @@ async function deleteVaultEntry(id, title) {
         const res = await fetch(`/notes/api/vault/${id}`, { method: 'DELETE' });
         const data = await res.json();
         if (data.ok) {
-            showToast(`🗑️ "${title}" kaydı silindi (Geri alabilirsiniz).`);
+            showToast(`"${title}" kaydı silindi (Geri alabilirsiniz).`);
             fetchVaultEntries();
         }
     } catch (e) {
-        showToast(`❌ Hata: ${e.message}`);
+        showToast(`Hata: ${e.message}`);
     }
 }
 
@@ -5178,10 +5229,20 @@ async function saveDetailQuickNote() {
     const content = document.getElementById('qn-detail-content').value.trim();
     if (!content) return;
     try {
-        closeModal('modal-quicknote-detail');
-        if (typeof showToast === 'function') showToast("Hızlı not güncellendi");
-        loadOverviewQuickNotes();
-        renderWebQuickNotes();
+        const res = await fetch(`/notes/api/quick-notes/${currentDetailQuickNoteId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ content })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            closeModal('modal-quicknote-detail');
+            if (typeof showToast === 'function') showToast("Hızlı not güncellendi");
+            loadOverviewQuickNotes();
+            if (typeof renderWebQuickTasks === 'function') renderWebQuickTasks();
+        } else {
+            alert(data.error || 'Güncellenemedi');
+        }
     } catch (e) {
         console.error(e);
     }
@@ -5189,12 +5250,16 @@ async function saveDetailQuickNote() {
 
 async function deleteCurrentDetailQuickNote() {
     if (!currentDetailQuickNoteId) return;
+    if (!confirm('Bu hızlı notu silmek istediğinize emin misiniz?')) return;
     try {
-        await fetch(`/notes/api/quick-notes/${currentDetailQuickNoteId}`, { method: 'DELETE' });
-        closeModal('modal-quicknote-detail');
-        if (typeof showToast === 'function') showToast("Not silindi");
-        loadOverviewQuickNotes();
-        renderWebQuickNotes();
+        const res = await fetch(`/notes/api/quick-notes/${currentDetailQuickNoteId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+            closeModal('modal-quicknote-detail');
+            if (typeof showToast === 'function') showToast("Not silindi");
+            loadOverviewQuickNotes();
+            if (typeof renderWebQuickTasks === 'function') renderWebQuickTasks();
+        }
     } catch (e) {
         console.error(e);
     }
