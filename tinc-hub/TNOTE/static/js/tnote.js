@@ -1737,15 +1737,21 @@ async function submitAddCategory() {
     const color = document.getElementById('new-cat-color').value || '#3b82f6';
     if (!name) return;
 
+    const currentNbId = window.CURRENT_NOTEBOOK_ID || 1;
     const res = await fetch('/notes/api/categories', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({name, icon, color})
+        body: JSON.stringify({
+            name, 
+            icon, 
+            color,
+            notebook_id: currentNbId
+        })
     });
     const data = await res.json();
     if (data.ok) {
         closeModal('modal-add-category');
-        window.location.reload();
+        window.location.href = `/notes?notebook_id=${currentNbId}`;
     }
 }
 
@@ -1756,6 +1762,16 @@ function openAddPageForCat(catId, catName) {
     openModal('modal-add-page');
 }
 
+function openAddPageModal() {
+    const sel = document.getElementById('new-page-cat');
+    if (sel && sel.options.length === 0) {
+        alert('Bu not defterinde henüz kategori bulunmuyor. Lütfen önce bir kategori ekleyin.');
+        openModal('modal-add-category');
+        return;
+    }
+    openModal('modal-add-page');
+}
+
 async function submitAddPage() {
     const catId = document.getElementById('new-page-cat').value;
     const title = document.getElementById('new-page-title').value.trim();
@@ -1763,15 +1779,22 @@ async function submitAddPage() {
     const icon = document.getElementById('new-page-icon').value.trim() || '📝';
     if (!title || !catId) return;
 
+    const currentNbId = window.CURRENT_NOTEBOOK_ID || 1;
     const res = await fetch('/notes/api/pages', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({category_id: parseInt(catId), title, type, icon})
+        body: JSON.stringify({
+            category_id: parseInt(catId), 
+            title, 
+            type, 
+            icon,
+            notebook_id: currentNbId
+        })
     });
     const data = await res.json();
     if (data.ok) {
         closeModal('modal-add-page');
-        window.location.reload();
+        window.location.href = `/notes?notebook_id=${currentNbId}`;
     }
 }
 

@@ -216,7 +216,7 @@
                 </div>
             </div>
             <div class="header-actions" id="overview-header-actions" style="display:none;">
-                <button class="btn btn-sm btn-primary" onclick="openModal('modal-add-page')" title="Yeni Liste">
+                <button class="btn btn-sm btn-primary" onclick="openAddPageModal()" title="Yeni Liste">
                     <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-plus"/></svg>Liste
                 </button>
                 <button class="btn-icon" onclick="loadOverviewPage()" title="Yenile">
@@ -869,7 +869,7 @@
 <div class="tnote-modal-backdrop" id="modal-add-category">
     <div class="tnote-modal">
         <div class="modal-header">
-            <span>Yeni Kategori</span>
+            <span>Yeni Kategori <small style="font-size:0.75rem; color:var(--muted); font-weight:normal;">({{ current_notebook.name if current_notebook else 'Defter' }})</small></span>
             <button class="btn-icon" onclick="closeModal('modal-add-category')">✕</button>
         </div>
         <div class="modal-body">

@@ -678,6 +678,15 @@ def get_categories(notebook_id: int = None):
         conn.close()
         return rows
 
+def get_category(cat_id: int):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM categories WHERE id = ?", (cat_id,))
+        row = cur.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
 def add_category(name: str, icon: str = '📁', color: str = '#3b82f6', notebook_id: int = None):
     with _lock:
         conn = get_conn()

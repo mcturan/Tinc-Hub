@@ -172,14 +172,17 @@ def index():
     user_id = user["id"] if user else None
     notebooks = db.get_notebooks(user_id=user_id)
     
-    active_nb_id = request.args.get('notebook_id', type=int) or session.get('active_notebook_id')
+    active_nb_id = request.args.get('notebook_id', type=int) or session.get('active_notebook_id') or db.get_active_notebook_id()
     if active_nb_id and any(n['id'] == active_nb_id for n in notebooks):
         session['active_notebook_id'] = active_nb_id
+        db.set_active_notebook_id(active_nb_id)
     elif notebooks:
         active_nb_id = notebooks[0]['id']
         session['active_notebook_id'] = active_nb_id
+        db.set_active_notebook_id(active_nb_id)
     else:
         active_nb_id = 1
+        db.set_active_notebook_id(1)
 
     current_notebook = db.get_notebook(active_nb_id) or (notebooks[0] if notebooks else None)
     categories = db.get_categories(active_nb_id)
@@ -204,7 +207,9 @@ def settings_page():
     user = get_current_user()
     user_id = user["id"] if user else None
     notebooks = db.get_notebooks(user_id=user_id)
-    active_nb_id = session.get('active_notebook_id') or (notebooks[0]['id'] if notebooks else 1)
+    active_nb_id = request.args.get('notebook_id', type=int) or session.get('active_notebook_id') or db.get_active_notebook_id() or (notebooks[0]['id'] if notebooks else 1)
+    session['active_notebook_id'] = active_nb_id
+    db.set_active_notebook_id(active_nb_id)
     current_notebook = db.get_notebook(active_nb_id) or (notebooks[0] if notebooks else None)
     categories = db.get_categories(active_nb_id)
     pages = db.get_pages(notebook_id=active_nb_id)
@@ -250,6 +255,7 @@ def api_add_notebook():
     desc = data.get("description", "")
     user_id = get_current_user_id()
     new_id = db.add_notebook(name, icon=icon, color=color, description=desc, user_id=user_id)
+    session["active_notebook_id"] = new_id
     db.set_active_notebook_id(new_id)
     return jsonify({
         "ok": True,
@@ -284,6 +290,7 @@ def api_delete_notebook(nb_id):
     notebooks = db.get_notebooks(user_id=user_id)
     active_id = notebooks[0]["id"] if notebooks else 1
     session["active_notebook_id"] = active_id
+    db.set_active_notebook_id(active_id)
     return jsonify({
         "ok": True,
         "notebooks": notebooks,
@@ -299,6 +306,7 @@ def api_switch_notebook():
         return jsonify({"ok": False, "error": "Geçersiz not defteri ID"}), 400
     nb_id = int(nb_id)
     session["active_notebook_id"] = nb_id
+    db.set_active_notebook_id(nb_id)
     return jsonify({
         "ok": True,
         "active_notebook_id": nb_id,
@@ -349,6 +357,7 @@ def api_import_notebook():
         return jsonify(res), 400
 
     new_id = res["notebook_id"]
+    session["active_notebook_id"] = new_id
     db.set_active_notebook_id(new_id)
     return jsonify({
         "ok": True,
@@ -401,7 +410,7 @@ def api_toggle_task():
 @tnote_bp.route('/api/categories', methods=['GET'])
 @auth_check
 def api_get_categories():
-    nb_id = request.args.get('notebook_id', type=int)
+    nb_id = request.args.get('notebook_id', type=int) or session.get('active_notebook_id') or db.get_active_notebook_id()
     return jsonify({"ok": True, "categories": db.get_categories(nb_id)})
 
 @tnote_bp.route('/api/categories', methods=['POST'])
@@ -411,22 +420,28 @@ def api_add_category():
     name = data.get("name", "").strip()
     if not name:
         return jsonify({"ok": False, "error": "Kategori adı gerekli"}), 400
-    nb_id = data.get("notebook_id")
+    nb_id = data.get("notebook_id") or session.get("active_notebook_id") or db.get_active_notebook_id()
+    if nb_id:
+        nb_id = int(nb_id)
+        session["active_notebook_id"] = nb_id
+        db.set_active_notebook_id(nb_id)
     cat_id = db.add_category(name, data.get("icon", "📁"), data.get("color", "#3b82f6"), notebook_id=nb_id)
-    return jsonify({"ok": True, "id": cat_id, "categories": db.get_categories(nb_id)})
+    return jsonify({"ok": True, "id": cat_id, "categories": db.get_categories(nb_id), "notebook_id": nb_id})
 
 @tnote_bp.route('/api/categories/<int:cat_id>', methods=['PUT'])
 @auth_check
 def api_update_category(cat_id):
     data = request.get_json() or {}
     db.update_category(cat_id, data.get("name", ""), data.get("icon", "📁"), data.get("color", "#3b82f6"))
-    return jsonify({"ok": True, "categories": db.get_categories()})
+    nb_id = session.get("active_notebook_id") or db.get_active_notebook_id()
+    return jsonify({"ok": True, "categories": db.get_categories(nb_id)})
 
 @tnote_bp.route('/api/categories/<int:cat_id>', methods=['DELETE'])
 @auth_check
 def api_delete_category(cat_id):
     db.delete_category(cat_id)
-    return jsonify({"ok": True, "categories": db.get_categories()})
+    nb_id = session.get("active_notebook_id") or db.get_active_notebook_id()
+    return jsonify({"ok": True, "categories": db.get_categories(nb_id)})
 
 @tnote_bp.route('/api/categories/reorder', methods=['POST'])
 @auth_check
@@ -435,7 +450,8 @@ def api_reorder_categories():
     category_ids = data.get("category_ids", [])
     if category_ids:
         db.reorder_categories([int(x) for x in category_ids])
-    return jsonify({"ok": True, "categories": db.get_categories()})
+    nb_id = session.get("active_notebook_id") or db.get_active_notebook_id()
+    return jsonify({"ok": True, "categories": db.get_categories(nb_id)})
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REST API: Sayfalar / Listeler
@@ -445,7 +461,8 @@ def api_reorder_categories():
 @auth_check
 def api_get_pages():
     cat_id = request.args.get('category_id', type=int)
-    return jsonify({"ok": True, "pages": db.get_pages(cat_id)})
+    nb_id = request.args.get('notebook_id', type=int) or (None if cat_id else (session.get('active_notebook_id') or db.get_active_notebook_id()))
+    return jsonify({"ok": True, "pages": db.get_pages(category_id=cat_id, notebook_id=nb_id)})
 
 @tnote_bp.route('/api/pages/<int:page_id>', methods=['GET'])
 @auth_check
@@ -464,14 +481,22 @@ def api_add_page():
     cat_id = data.get("category_id")
     if not title or not cat_id:
         return jsonify({"ok": False, "error": "Başlık ve kategori zorunludur"}), 400
+    cat_id = int(cat_id)
+    cat = db.get_category(cat_id)
+    if cat and cat.get("notebook_id"):
+        nb_id = cat["notebook_id"]
+        session["active_notebook_id"] = nb_id
+        db.set_active_notebook_id(nb_id)
+    else:
+        nb_id = data.get("notebook_id") or session.get("active_notebook_id") or db.get_active_notebook_id()
     page_id = db.add_page(
-        category_id=int(cat_id),
+        category_id=cat_id,
         title=title,
         page_type=data.get("type", "checklist"),
         icon=data.get("icon", "📝"),
         content=data.get("content", "")
     )
-    return jsonify({"ok": True, "id": page_id, "pages": db.get_pages()})
+    return jsonify({"ok": True, "id": page_id, "pages": db.get_pages(notebook_id=nb_id), "notebook_id": nb_id})
 
 @tnote_bp.route('/api/pages/<int:page_id>', methods=['PUT'])
 @auth_check
