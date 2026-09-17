@@ -114,13 +114,17 @@
             <span>TincNote</span>
         </a>
         <div class="header-nav">
-            <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9010';" class="header-nav-link" title="TincHub Ana Panosu">
-                <svg class="svg-icon"><use href="#i-home"/></svg>
-                <span>TincHub</span>
+            <a href="/notes" class="header-nav-link {% if request.path == '/notes' or request.path == '/notes/' %}active{% endif %}" title="Notlar & Listeler">
+                <svg class="svg-icon"><use href="#i-file-text"/></svg>
+                <span>Notlar &amp; Listeler</span>
             </a>
             <a href="/notes/settings" class="header-nav-link {% if request.path.startswith('/notes/settings') %}active{% endif %}" title="Ayarlar">
                 <svg class="svg-icon"><use href="#i-settings"/></svg>
                 <span>Ayarlar</span>
+            </a>
+            <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9010';" class="header-nav-link" title="TincHub Ana Panosu">
+                <svg class="svg-icon"><use href="#i-home"/></svg>
+                <span>TincHub</span>
             </a>
         </div>
     </header>

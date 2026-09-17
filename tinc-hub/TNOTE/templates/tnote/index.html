@@ -17,7 +17,7 @@
                 <button class="notebook-select-btn" id="notebook-select-btn" onclick="toggleNotebookDropdown(event)" title="Not Defterini Değiştir">
                     <span class="notebook-btn-icon" id="current-notebook-icon">{{ current_notebook.icon if current_notebook else '📓' }}</span>
                     <span class="notebook-btn-name" id="current-notebook-name">{{ current_notebook.name if current_notebook else 'Kişisel Not Defterim' }}</span>
-                    <span class="notebook-btn-arrow"><svg class="svg-icon svg-icon-sm"><use href="#i-chevron-down"/></svg></span>
+                    <span class="notebook-btn-arrow">▾</span>
                 </button>
                 <div class="notebook-dropdown-menu" id="notebook-dropdown-menu" style="display:none;">
                     <div class="notebook-dropdown-title">Not Defterlerim</div>
@@ -27,61 +27,48 @@
                             <span class="nb-item-icon">{{ nb.icon }}</span>
                             <span class="nb-item-name">{{ nb.name }}</span>
                             {% if current_notebook and current_notebook.id == nb.id %}
-                            <span class="nb-item-check"><svg class="svg-icon svg-icon-sm"><use href="#i-check"/></svg></span>
+                            <span class="nb-item-check">✓</span>
                             {% endif %}
                         </div>
                         {% endfor %}
                     </div>
                     <div class="notebook-dropdown-divider"></div>
                     <div class="notebook-dropdown-item notebook-action-item" onclick="openModal('modal-add-notebook'); toggleNotebookDropdown();">
-                        <svg class="svg-icon svg-icon-sm"><use href="#i-plus"/></svg> Yeni Defter Ekle
+                        <span>➕</span> Yeni Not Defteri Ekle
                     </div>
                     <div class="notebook-dropdown-item notebook-action-item" onclick="exportCurrentNotebook(); toggleNotebookDropdown();">
-                        <svg class="svg-icon svg-icon-sm"><use href="#i-file-text"/></svg> Defteri Dışa Aktar
+                        <span>💾</span> Defteri Dışa Aktar (.tnote)
                     </div>
                     <div class="notebook-dropdown-item notebook-action-item" onclick="document.getElementById('import-notebook-input').click(); toggleNotebookDropdown();">
-                        <svg class="svg-icon svg-icon-sm"><use href="#i-refresh"/></svg> Defteri İçe Aktar
+                        <span>📥</span> Defteri İçe Aktar (.tnote)
                     </div>
                     <input type="file" id="import-notebook-input" accept=".tnote,.json" style="display:none;" onchange="handleNotebookImport(this)">
                     <a href="/notes/settings?tab=notebooks" class="notebook-dropdown-item notebook-action-item">
-                        <svg class="svg-icon svg-icon-sm"><use href="#i-settings"/></svg> Defterleri Yönet
+                        <span>⚙️</span> Defterleri Yönet
                     </a>
                 </div>
             </div>
             <div class="sidebar-header-actions">
-                <button class="btn-icon" onclick="openModal('modal-add-category')" title="Yeni Kategori Ekle"><svg class="svg-icon svg-icon-sm"><use href="#i-plus"/></svg></button>
+                <button class="btn-icon" onclick="openModal('modal-add-category')" title="Bu Deftere Yeni Kategori Ekle">➕</button>
                 <button class="btn-icon sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarManual()" title="Menüyü Daralt ( « )">«</button>
-                <button class="btn-icon sidebar-mobile-close-btn" onclick="closeMobileSidebar()" title="Kapat"><svg class="svg-icon svg-icon-sm"><use href="#i-x"/></svg></button>
             </div>
         </div>
 
-        <!-- Hızlı Gezinme Butonları (Kütüphane) -->
-        <div class="sidebar-nav-block">
-            <div class="sidebar-overview-row active" id="sidebar-overview-btn" onclick="loadOverviewPage()" title="Genel Bakış">
+        <!-- Hızlı Gezinme Butonları -->
+        <div class="sidebar-nav-block" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">
+            <div class="sidebar-overview-row active" id="sidebar-overview-btn" onclick="loadOverviewPage()" title="TincNote Genel Bakış & Özet">
                 <div class="overview-row-left">
-                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-home"/></svg></span>
+                    <span class="ov-row-icon">🏠</span>
                     <span class="overview-btn-text">Genel Bakış</span>
                 </div>
+                <span class="badge-count ov-badge-pill">Özet</span>
             </div>
-            <div class="sidebar-overview-row" id="sidebar-quick-btn" onclick="loadQuickTasksPage()" title="Hızlı Görevler">
+            <div class="sidebar-overview-row" id="sidebar-quick-btn" onclick="loadQuickTasksPage()" title="Hızlı Notlar & Görevler">
                 <div class="overview-row-left">
-                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-zap"/></svg></span>
-                    <span class="overview-btn-text">Hızlı Görevler</span>
+                    <span class="ov-row-icon">⚡</span>
+                    <span class="overview-btn-text">Hızlı Notlar & Görevler</span>
                 </div>
-                <span class="badge-count ov-badge-pill" id="quick-tasks-badge-count" style="display:none;">0</span>
-            </div>
-            <div class="sidebar-overview-row" id="sidebar-vault-btn" onclick="loadVaultPage()" title="Şifre Kasası">
-                <div class="overview-row-left">
-                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-shield"/></svg></span>
-                    <span class="overview-btn-text">Şifre Kasası</span>
-                </div>
-            </div>
-            <div class="sidebar-overview-row" id="sidebar-trash-btn" onclick="loadTrashPage()" title="Çöp Kutusu">
-                <div class="overview-row-left">
-                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-trash"/></svg></span>
-                    <span class="overview-btn-text">Çöp Kutusu</span>
-                </div>
-                <span class="badge-count ov-badge-pill" id="sidebar-trash-badge" style="display:none;">0</span>
+                <span class="badge-count ov-badge-pill" id="quick-tasks-badge-count" style="background:#fef3c7; color:#d97706;">⚡</span>
             </div>
         </div>
 
@@ -97,9 +84,9 @@
                     </div>
                     <div class="category-actions" onclick="event.stopPropagation()">
                         <span class="badge-count" id="cat-badge-{{ cat.id }}">{{ cat.page_count }}</span>
-                        <button class="btn-icon-subtle" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name|e }}" onclick="openAddPageForCat(this.dataset.catId, this.dataset.catName)" title="Bu Kategoriye Liste Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
-                        <button class="btn-icon-subtle" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name|e }}" data-cat-icon="{{ cat.icon|e }}" data-cat-color="{{ cat.color|e }}" onclick="openEditCategoryModal(this.dataset.catId, this.dataset.catName, this.dataset.catIcon, this.dataset.catColor)" title="Kategoriyi Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
-                        <button class="btn-icon-subtle btn-danger-hover" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name|e }}" onclick="deleteCategory(this.dataset.catId, this.dataset.catName)" title="Kategoriyi Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
+                        <button class="btn-icon-subtle" onclick="openAddPageForCat({{ cat.id }}, '{{ cat.name|escape }}')" title="Bu Kategoriye Liste Ekle">➕</button>
+                        <button class="btn-icon-subtle" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|escape }}', '{{ cat.icon|escape }}', '{{ cat.color|escape }}')" title="Kategoriyi Düzenle">✏️</button>
+                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteCategory({{ cat.id }}, '{{ cat.name|escape }}')" title="Kategoriyi Sil">🗑️</button>
                     </div>
                 </div>
                 <ul class="page-list" id="cat-pages-{{ cat.id }}" data-category-id="{{ cat.id }}">
@@ -116,11 +103,11 @@
                                     {% if p.type == 'checklist' %}
                                         {{ p.total_items - p.completed_items }}
                                     {% else %}
-                                        <svg class="svg-icon svg-icon-xs" style="vertical-align:text-top;"><use href="#i-file-text"/></svg>
+                                        📝
                                     {% endif %}
                                 </span>
-                                <button class="btn-icon-subtle" data-page-id="{{ p.id }}" data-page-title="{{ p.title|e }}" data-page-cat="{{ p.category_id }}" data-page-icon="{{ p.icon|e }}" data-page-type="{{ p.type|e }}" onclick="event.stopPropagation(); openEditPageModal(this.dataset.pageId, this.dataset.pageTitle, this.dataset.pageCat, this.dataset.pageIcon, this.dataset.pageType)" title="Sayfayı Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
-                                <button class="btn-icon-subtle btn-danger-hover" data-page-id="{{ p.id }}" data-page-title="{{ p.title|e }}" onclick="event.stopPropagation(); deletePage(this.dataset.pageId, this.dataset.pageTitle)" title="Sayfayı Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
+                                <button class="btn-icon-subtle" onclick="event.stopPropagation(); openEditPageModal({{ p.id }}, '{{ p.title|escape }}', {{ p.category_id }}, '{{ p.icon|escape }}', '{{ p.type|escape }}')" title="Sayfayı Düzenle">✏️</button>
+                                <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deletePage({{ p.id }}, '{{ p.title|escape }}')" title="Sayfayı Sil">🗑️</button>
                             </div>
                         </li>
                         {% endif %}
@@ -130,34 +117,47 @@
             {% endfor %}
         </div>
 
-        <div class="sidebar-footer">
-            <div class="sidebar-user-card" onclick="openUserModal()" title="Kullanıcı / Profil">
-                <div class="sidebar-user-info">
-                    <span class="user-avatar"><svg class="svg-icon svg-icon-sm"><use href="#i-user"/></svg></span>
-                    <span class="sidebar-footer-text user-name">
+        <div class="sidebar-footer" style="margin-top:auto; padding-top:6px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:5px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:4px;">
+                <button class="btn btn-sm" id="sidebar-vault-btn" onclick="loadVaultPage()" style="flex:1; font-size:0.75rem; padding:4px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Şifre Kasası">
+                    <span>🔐</span> <span class="sidebar-footer-text">Kasa</span>
+                </button>
+                <button class="btn btn-sm" id="sidebar-trash-btn" onclick="loadTrashPage()" style="flex:1; font-size:0.75rem; padding:4px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Çöp Kutusu & Geri Dönüşüm">
+                    <span>🗑️</span> <span class="sidebar-footer-text">Çöp Kutusu</span>
+                    <span class="badge-count ov-badge-pill" id="sidebar-trash-badge" style="display:none; padding:1px 4px; font-size:0.65rem;">0</span>
+                </button>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:4px;">
+                <button class="btn btn-sm" onclick="openHistoryModal()" style="flex:1; font-size:0.75rem; padding:3px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Son 100 İşlem Geçmişi (Geri Al)">
+                    <span>📜</span> <span class="sidebar-footer-text">Geçmiş (100)</span>
+                </button>
+                <button class="btn btn-sm" onclick="triggerUndo()" style="flex:1; font-size:0.75rem; padding:3px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Son İşlemi Geri Al (Ctrl+Z)">
+                    <span>↩️</span> <span class="sidebar-footer-text">Geri Al</span>
+                </button>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                <a href="/notes/settings" class="btn btn-sm" style="display:flex; align-items:center; gap:6px; font-size:0.78rem; padding:3px 8px;" title="Ayarlar & Not Defterleri">
+                    <span>⚙️</span> <span class="sidebar-footer-text">Ayarlar</span>
+                </a>
+                <span class="sidebar-footer-text" style="font-size:0.72rem; color: {{ '#0284c7' if bot_status else '#94a3b8' }}; font-weight:600;" title="Telegram Bot Durumu">
+                    ● {{ 'Bot Açık' if bot_status else 'Bot Kapalı' }}
+                </span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding: 4px 6px; background: var(--border, rgba(255,255,255,0.05)); border-radius: 6px;">
+                <div style="display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="openUserModal()" title="Kullanıcı / Oturum">
+                    <span style="font-size:0.85rem;">👤</span>
+                    <span class="sidebar-footer-text" style="font-weight:600; font-size:0.75rem;">
                         {{ user.display_name if user else 'Oturum Aç' }}
                     </span>
                 </div>
-            </div>
-            <div class="sidebar-footer-actions">
-                <a href="/notes/settings" class="btn-footer-link" title="Ayarlar">
-                    <svg class="svg-icon svg-icon-sm"><use href="#i-settings"/></svg>
-                </a>
-                <button type="button" class="btn-footer-link" onclick="openHistoryModal()" title="İşlem Geçmişi">
-                    <svg class="svg-icon svg-icon-sm"><use href="#i-clock"/></svg>
-                </button>
-                <button type="button" class="btn-footer-link" onclick="triggerUndo()" title="Geri Al (Ctrl+Z)">
-                    <svg class="svg-icon svg-icon-sm"><use href="#i-undo"/></svg>
-                </button>
                 {% if user %}
-                <button type="button" class="btn-footer-link btn-logout" onclick="logoutUser()" title="Çıkış">
-                    <svg class="svg-icon svg-icon-sm"><use href="#i-log-out"/></svg>
-                </button>
+                <button class="btn btn-sm btn-icon" onclick="logoutUser()" title="Çıkış Yap" style="font-size:0.75rem; padding:2px 5px;">🚪</button>
+                {% else %}
+                <button class="btn btn-sm btn-primary" onclick="openUserModal()" style="font-size:0.7rem; padding:2px 6px;">Giriş</button>
                 {% endif %}
             </div>
         </div>
     </aside>
-    <div class="tnote-sidebar-backdrop" id="tnote-sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 
     <!-- Ana İçerik Alanı -->
     <main class="tnote-content">
