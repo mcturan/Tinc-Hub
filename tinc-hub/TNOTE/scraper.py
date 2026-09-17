@@ -1,10 +1,34 @@
 import re
 import json
+import socket
+import ipaddress
 from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 
 URL_REGEX = re.compile(r'https?://[^\s<>"]+|www\.[^\s<>"]+')
+
+def is_safe_url(url: str) -> bool:
+    """SSRF Koruması: Localhost, private ve link-local IP'lere erişimi engeller."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        if hostname.lower() in ('localhost', '127.0.0.1', '::1', '0.0.0.0'):
+            return False
+        # DNS çözümleme ve IP kontrolü
+        addr_infos = socket.getaddrinfo(hostname, None)
+        for addr_info in addr_infos:
+            ip_str = addr_info[4][0]
+            ip = ipaddress.ip_address(ip_str)
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                return False
+        return True
+    except Exception:
+        return False
 
 def extract_first_url(text: str) -> str:
     """Metin içindeki ilk URL'yi yakalar."""
@@ -31,6 +55,10 @@ def scrape_url_metadata(url: str) -> dict:
         "description": "",
         "site_name": ""
     }
+
+    if not is_safe_url(url):
+        result["title"] = "Geçersiz veya engellenmiş URL"
+        return result
 
     try:
         domain = urlparse(url).netloc.lower()

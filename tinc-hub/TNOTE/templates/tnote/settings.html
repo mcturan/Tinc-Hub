@@ -236,11 +236,11 @@
                             📤 Dışa Aktar (.tnote)
                         </button>
                         <div style="display:flex; gap:6px;">
-                            <button class="btn btn-ghost btn-sm" onclick="openEditNotebookModal({{ nb.id }}, '{{ nb.name|escape }}', '{{ nb.icon|escape }}', '{{ nb.color|escape }}', '{{ nb.description|escape }}')" title="Düzenle">
+                            <button class="btn btn-ghost btn-sm" data-nb-id="{{ nb.id }}" data-nb-name="{{ nb.name|e }}" data-nb-icon="{{ nb.icon|e }}" data-nb-color="{{ nb.color|e }}" data-nb-desc="{{ nb.description|e }}" onclick="openEditNotebookModal(this.dataset.nbId, this.dataset.nbName, this.dataset.nbIcon, this.dataset.nbColor, this.dataset.nbDesc)" title="Düzenle">
                                 ✏️
                             </button>
                             {% if notebooks|length > 1 %}
-                            <button class="btn btn-ghost btn-sm" onclick="deleteNotebookFromSettings({{ nb.id }}, '{{ nb.name|escape }}')" style="color:var(--danger);" title="Sil">
+                            <button class="btn btn-ghost btn-sm" data-nb-id="{{ nb.id }}" data-nb-name="{{ nb.name|e }}" onclick="deleteNotebookFromSettings(this.dataset.nbId, this.dataset.nbName)" style="color:var(--danger);" title="Sil">
                                 🗑️
                             </button>
                             {% endif %}
@@ -469,7 +469,7 @@
             <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
                 <div class="form-group">
                     <label>Not Defteri Adı *</label>
-                    <input type="text" id="nb-modal-name" class="form-control" placeholder="Örn: Kişisel, İş & Projeler..." required>
+                    <input type="text" id="nb-modal-name" class="form-control" placeholder="Defter adı" required>
                 </div>
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                     <div class="form-group">
@@ -478,12 +478,12 @@
                     </div>
                     <div class="form-group">
                         <label>Renk</label>
-                        <input type="color" id="nb-modal-color" value="#3b82f6" style="height:38px; border:1px solid var(--border); border-radius:6px; width:100%; cursor:pointer;">
+                        <input type="color" id="nb-modal-color" value="#3b82f6" style="height:40px; border:1px solid var(--border); border-radius:6px; width:100%; cursor:pointer;">
                     </div>
                 </div>
                 <div class="form-group">
                     <label>Açıklama (Opsiyonel)</label>
-                    <textarea id="nb-modal-desc" class="form-control" placeholder="Defter içeriği veya kullanım amacı..." style="min-height:70px;"></textarea>
+                    <textarea id="nb-modal-desc" class="form-control" placeholder="Açıklama" style="min-height:70px;"></textarea>
                 </div>
             </div>
             <div class="modal-footer" style="margin-top:12px; display:flex; justify-content:flex-end; gap:8px;">

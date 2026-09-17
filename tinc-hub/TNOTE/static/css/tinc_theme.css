@@ -1,0 +1,43 @@
+/**
+ * TincSuite — Unified Design System & Global Theme Variables
+ * Tüm Tinc uygulamalarında (TincHub, TincSync, TincNet, TincProcess, TincNote)
+ * ortak kurumsal, net ve profesyonel renk paleti.
+ */
+
+:root {
+  /* ── Ana Zemin & Yüzeyler (Açık Kurumsal Slate) ── */
+  --tinc-bg:           #f8fafc;
+  --tinc-surface:      #ffffff;
+  --tinc-surface-alt:  #f1f5f9;
+  --tinc-surface-hover:#e2e8f0;
+  
+  /* ── Kenarlıklar & Çizgiler ── */
+  --tinc-border:       #e2e8f0;
+  --tinc-border-dark:  #cbd5e1;
+  
+  /* ── Tipografi (Slate Grileri) ── */
+  --tinc-text:         #0f172a;
+  --tinc-text-muted:   #64748b;
+  --tinc-text-subtle:  #94a3b8;
+  
+  /* ── Kurumsal Odak & Vurgu Renkleri (Sakin Lacivert/Mavi) ── */
+  --tinc-primary:      #0284c7;
+  --tinc-primary-dark: #0369a1;
+  --tinc-primary-soft: #f0f9ff;
+  
+  /* ── Durum Göstergeleri (Sakin, kurumsal tonlar) ── */
+  --tinc-success:      #0284c7;
+  --tinc-success-soft: #f0f9ff;
+  --tinc-warning:      #f59e0b;
+  --tinc-warning-soft: #fffbeb;
+  --tinc-danger:       #ef4444;
+  --tinc-danger-soft:  #fef2f2;
+  
+  /* ── Ortak Form & Buton Geometrisi ── */
+  --tinc-radius-sm:    5px;
+  --tinc-radius:       8px;
+  --tinc-radius-lg:    12px;
+  --tinc-shadow-sm:    0 1px 2px rgba(0,0,0,0.03);
+  --tinc-shadow:       0 1px 3px rgba(0,0,0,0.05);
+  --tinc-shadow-lg:    0 10px 25px rgba(0,0,0,0.08);
+}

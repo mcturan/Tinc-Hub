@@ -386,6 +386,33 @@ function setSidebarState(collapsed) {
     }
 }
 
+// Mobil Çekmece (Drawer) Kontrolleri
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('tnote-sidebar');
+    if (!sidebar) return;
+    if (sidebar.classList.contains('mobile-open')) {
+        closeMobileSidebar();
+    } else {
+        openMobileSidebar();
+    }
+}
+
+function openMobileSidebar() {
+    const sidebar = document.getElementById('tnote-sidebar');
+    const backdrop = document.getElementById('tnote-sidebar-backdrop');
+    if (sidebar) sidebar.classList.add('mobile-open');
+    if (backdrop) backdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById('tnote-sidebar');
+    const backdrop = document.getElementById('tnote-sidebar-backdrop');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (backdrop) backdrop.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
 // ─────────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────
 // HIZLI NOTLAR & GÖREVLER (HIZLI ALAN & BİRLEŞİK GÖREVLER)
@@ -394,6 +421,7 @@ function setSidebarState(collapsed) {
 let webQuickNotesDebounce = null;
 
 async function loadQuickTasksPage() {
+    closeMobileSidebar();
     currentPageId = null;
     currentPageData = null;
 
@@ -413,9 +441,9 @@ async function loadQuickTasksPage() {
     const titleEl = document.getElementById('current-page-title');
     const iconEl = document.getElementById('current-page-icon');
     const badgeEl = document.getElementById('current-page-badge');
-    if (titleEl) titleEl.textContent = 'Hızlı Notlar & Görevler';
+    if (titleEl) titleEl.textContent = 'Hızlı Görevler';
     if (iconEl) iconEl.textContent = '⚡';
-    if (badgeEl) badgeEl.textContent = 'Hızlı Alan & Birleşik Görevler';
+    if (badgeEl) badgeEl.textContent = '';
 
     // Header aksiyonları
     const pageActions = document.getElementById('page-header-actions');
@@ -464,7 +492,7 @@ async function renderWebQuickTasks() {
             const notesListEl = document.getElementById('web-quick-notes-list');
             if (notesListEl) {
                 if (notes.length === 0) {
-                    notesListEl.innerHTML = `<div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Henüz hızlı not yok. Yukarıdan ekleyebilirsiniz.</div>`;
+                    notesListEl.innerHTML = `<div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Not yok</div>`;
                 } else {
                     notesListEl.innerHTML = notes.map(n => {
                         const dateStr = n.created_at ? n.created_at.slice(5, 16) : '';
@@ -510,13 +538,13 @@ async function renderWebQuickTasks() {
         const generalTasks = tasks.filter(t => t.due_urgency !== 2.5 && (!t.due_badge || !t.due_badge.includes('Hızlı Görev')));
 
         if (directCountEl) directCountEl.textContent = directTasks.length;
-        if (badge) badge.textContent = `${generalTasks.length} Görev / Ödeme`;
+        if (badge) badge.textContent = generalTasks.length;
         if (sideBadge) sideBadge.textContent = tasks.length;
 
         // A) Doğrudan Hızlı Görevler Listesi
         if (directListEl) {
             if (directTasks.length === 0) {
-                directListEl.innerHTML = `<div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Henüz doğrudan hızlı görev yok.</div>`;
+                directListEl.innerHTML = `<div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Görev yok</div>`;
             } else {
                 directListEl.innerHTML = directTasks.map(t => `
                     <div class="ov-item-row" id="web-unified-task-${t.id}">
@@ -536,7 +564,7 @@ async function renderWebQuickTasks() {
         // B) Diğer Sayfa ve Kategorilerden Gelen Görevler & Ödemeler
         if (container) {
             if (generalTasks.length === 0) {
-                container.innerHTML = `<div style="padding:16px; text-align:center; color:var(--muted); font-size:0.82rem;">🎉 Harika! Bekleyen başka görev veya ödeme yok.</div>`;
+                container.innerHTML = `<div style="padding:16px; text-align:center; color:var(--muted); font-size:0.82rem;">Bekleyen görev veya ödeme yok</div>`;
             } else {
                 container.innerHTML = generalTasks.map(t => {
                     let badgeBg = '#f1f5f9';
@@ -765,6 +793,7 @@ async function toggleWebUnifiedTask(taskType, rawId, checkboxEl) {
 let currentOverviewData = null;
 
 async function loadOverviewPage() {
+    closeMobileSidebar();
     currentPageId = null;
     currentPageData = null;
 
@@ -784,9 +813,9 @@ async function loadOverviewPage() {
     const titleEl = document.getElementById('current-page-title');
     const iconEl = document.getElementById('current-page-icon');
     const badgeEl = document.getElementById('current-page-badge');
-    if (titleEl) titleEl.textContent = 'Genel Bakış & Durum';
+    if (titleEl) titleEl.textContent = 'Genel Bakış';
     if (iconEl) iconEl.textContent = '🏠';
-    if (badgeEl) badgeEl.textContent = 'Özet Paneli';
+    if (badgeEl) badgeEl.textContent = '';
 
     // Header aksiyonları
     const pageActions = document.getElementById('page-header-actions');
@@ -850,11 +879,11 @@ function renderOverview(ov) {
     const tasksTotalEl = document.getElementById('ov-tasks-total');
     const tasksSubEl = document.getElementById('ov-tasks-sub');
     const tasksBadgeEl = document.getElementById('ov-tasks-badge');
-    const tasksBarEl = document.getElementById('ov-tasks-bar');
+    const tasksBarEl = document.getElementById('ov-tasks-bar-fill') || document.getElementById('ov-tasks-bar');
 
     if (tasksTotalEl) tasksTotalEl.textContent = totalItems;
-    if (tasksSubEl) tasksSubEl.textContent = `${pendingItems} bekleyen, ${completedItems} bitti`;
-    if (tasksBadgeEl) tasksBadgeEl.textContent = `%${taskPct} Bitti`;
+    if (tasksSubEl) tasksSubEl.textContent = `${pendingItems} bekleyen`;
+    if (tasksBadgeEl) tasksBadgeEl.textContent = `%${taskPct}`;
     if (tasksBarEl) tasksBarEl.style.width = `${taskPct}%`;
 
     // Finans
@@ -867,31 +896,60 @@ function renderOverview(ov) {
 
     const fNetEl = document.getElementById('ov-finance-net');
     const fSubEl = document.getElementById('ov-finance-sub');
-    const fBarEl = document.getElementById('ov-finance-bar');
+    const fBarEl = document.getElementById('ov-finance-bar-fill') || document.getElementById('ov-finance-bar');
     const fPeriodEl = document.getElementById('ov-finance-period');
 
     if (fNetEl) {
-        fNetEl.textContent = (net >= 0 ? '+' : '') + net.toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' TL';
-        fNetEl.style.color = net >= 0 ? '#10b981' : '#ef4444';
+        if (net > 0) {
+            fNetEl.textContent = '+' + net.toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' TL';
+            fNetEl.style.color = 'var(--text, #0f172a)';
+        } else if (net < 0) {
+            fNetEl.textContent = net.toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' TL';
+            fNetEl.style.color = 'var(--danger, #dc2626)';
+        } else {
+            fNetEl.textContent = '0,00 TL';
+            fNetEl.style.color = 'var(--text-secondary, #64748b)';
+        }
     }
-    if (fSubEl) fSubEl.textContent = `Gelir: ${income.toLocaleString('tr-TR')} TL | Gider: ${expense.toLocaleString('tr-TR')} TL`;
+    if (fSubEl) {
+        if (income === 0 && expense === 0) {
+            fSubEl.textContent = 'Kayıt yok';
+        } else {
+            fSubEl.textContent = `+${income.toLocaleString('tr-TR')} / -${expense.toLocaleString('tr-TR')} TL`;
+        }
+    }
     if (fPeriodEl) fPeriodEl.textContent = f.period || 'Bu Ay';
     if (fBarEl) {
         const fRatio = (income + expense) > 0 ? Math.min(100, Math.round((expense / (income || 1)) * 100)) : 0;
         fBarEl.style.width = `${Math.min(100, fRatio)}%`;
-        fBarEl.style.background = net >= 0 ? '#10b981' : '#ef4444';
+        if (net > 0) {
+            fBarEl.style.background = 'var(--primary, #0284c7)';
+        } else if (net < 0) {
+            fBarEl.style.background = 'var(--danger, #dc2626)';
+        } else {
+            fBarEl.style.background = 'var(--border, #e2e8f0)';
+        }
     }
 
     // Bekleyen Faturalar
     const billsTotalEl = document.getElementById('ov-bills-total');
     const billsSubEl = document.getElementById('ov-bills-sub');
     const billsTagEl = document.getElementById('ov-bills-count-tag');
-    const billsBarEl = document.getElementById('ov-bills-bar');
 
     if (billsTotalEl) billsTotalEl.textContent = unpaid.toLocaleString('tr-TR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' TL';
-    if (billsSubEl) billsSubEl.textContent = unpaidCount > 0 ? `${unpaidCount} bekleyen ödeme var` : 'Tüm faturalar ödendi 👍';
-    if (billsTagEl) billsTagEl.textContent = `${unpaidCount} Bekleyen`;
-    if (billsBarEl) billsBarEl.style.width = unpaidCount > 0 ? '70%' : '0%';
+    if (billsSubEl) billsSubEl.textContent = unpaidCount > 0 ? `${unpaidCount} bekleyen` : 'Bekleyen yok';
+    if (billsTagEl) {
+        billsTagEl.textContent = unpaidCount;
+        if (unpaidCount > 0) {
+            billsTagEl.className = 'kpi-tag kpi-badge-amber';
+            billsTagEl.style.background = '#fef3c7';
+            billsTagEl.style.color = '#d97706';
+        } else {
+            billsTagEl.className = 'kpi-tag kpi-badge-neutral';
+            billsTagEl.style.background = 'var(--surface2, #f1f5f9)';
+            billsTagEl.style.color = 'var(--muted, #64748b)';
+        }
+    }
 
     // Projeler
     const projects = ov.projects || [];
@@ -900,39 +958,54 @@ function renderOverview(ov) {
     const projTagEl = document.getElementById('ov-proj-count-tag');
 
     if (projTotalEl) projTotalEl.textContent = projects.length;
-    if (projSubEl) projSubEl.textContent = projects.length > 0 ? `${projects.length} proje yürütülüyor` : 'Henüz proje eklenmedi';
-    if (projTagEl) projTagEl.textContent = `${projects.length} Proje`;
+    if (projSubEl) projSubEl.textContent = projects.length > 0 ? `${projects.length} aktif` : 'Aktif yok';
+    if (projTagEl) {
+        projTagEl.textContent = projects.length;
+        if (projects.length > 0) {
+            projTagEl.className = 'kpi-tag kpi-badge-purple';
+            projTagEl.style.background = '#f3e8ff';
+            projTagEl.style.color = '#9333ea';
+        } else {
+            projTagEl.className = 'kpi-tag kpi-badge-neutral';
+            projTagEl.style.background = 'var(--surface2, #f1f5f9)';
+            projTagEl.style.color = 'var(--muted, #64748b)';
+        }
+    }
 
-    // 2. Bekleyen Görevler Listesi
+    // 2. Bekleyen Görevler Listesi (Modern 2-Line Task Cards)
     const pendingContainer = document.getElementById('ov-pending-items-container');
     const pendingBadge = document.getElementById('ov-pending-count-badge');
-    if (pendingBadge) pendingBadge.textContent = `${(ov.pending_tasks || []).length} görev`;
+    if (pendingBadge) pendingBadge.textContent = (ov.pending_tasks || []).length;
 
     if (pendingContainer) {
         if (!ov.pending_tasks || ov.pending_tasks.length === 0) {
-            pendingContainer.innerHTML = `<div style="padding:16px; text-align:center; color:var(--muted); font-size:0.82rem;">🎉 Harika! Bekleyen görev veya yapılacak madde yok.</div>`;
+            pendingContainer.innerHTML = `<div class="empty-state-slim"><svg class="svg-icon svg-icon-sm" style="color:var(--text-secondary, #64748b); vertical-align:text-bottom; margin-right:4px;"><use href="#i-check"/></svg> Bekleyen görev bulunmuyor</div>`;
         } else {
             pendingContainer.innerHTML = ov.pending_tasks.map(it => `
                 <div class="ov-item-row" id="ov-task-${it.id}">
-                    <div class="ov-item-left">
-                        <input type="checkbox" onchange="toggleTaskFromOverview(${it.id}, this)" style="cursor:pointer; width:16px; height:16px;">
-                        <span class="ov-item-text" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</span>
+                    <div class="ov-item-checkbox-col">
+                        <input type="checkbox" class="ov-task-checkbox" onchange="toggleTaskFromOverview(${it.id}, this)">
                     </div>
-                    <div class="ov-item-meta">
-                        ${it.quantity ? `<span style="color:var(--muted); font-size:0.72rem;">${escapeHtml(it.quantity)}</span>` : ''}
-                        ${it.price ? `<span style="color:#0284c7; font-size:0.72rem; font-weight:600;">${escapeHtml(it.price)}</span>` : ''}
-                        <span class="ov-page-tag" onclick="loadPage(${it.page_id})" title="${escapeHtml(it.page_title)} sayfasına git">${it.page_icon || '📝'} ${escapeHtml(it.page_title)}</span>
+                    <div class="ov-item-body">
+                        <div class="ov-item-title" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</div>
+                        <div class="ov-item-submeta">
+                            <span class="ov-page-tag" onclick="loadPage(${it.page_id})" title="${escapeHtml(it.page_title)} listesine git">
+                                <svg class="svg-icon svg-icon-xs" style="vertical-align:text-bottom; margin-right:3px;"><use href="#i-file-text"/></svg>${escapeHtml(it.page_title)}
+                            </span>
+                            ${it.quantity ? `<span class="ov-meta-pill">${escapeHtml(it.quantity)}</span>` : ''}
+                            ${it.price ? `<span class="ov-meta-pill price">${escapeHtml(it.price)}</span>` : ''}
+                        </div>
                     </div>
                 </div>
             `).join('');
         }
     }
 
-    // 3. Vadesi Yaklaşan Faturalar & Ödemeler
+    // 3. Vadesi Yaklaşan Faturalar & Ödemeler (Slim Empty Notice)
     const billsContainer = document.getElementById('ov-upcoming-bills-container');
     if (billsContainer) {
         if (!ov.upcoming_bills || ov.upcoming_bills.length === 0) {
-            billsContainer.innerHTML = `<div style="padding:16px; text-align:center; color:var(--muted); font-size:0.82rem;">✅ Bu ay için bekleyen fatura veya düzenli ödeme yok.</div>`;
+            billsContainer.innerHTML = `<div class="empty-state-slim"><svg class="svg-icon svg-icon-sm" style="color:var(--text-secondary, #64748b); vertical-align:text-bottom; margin-right:4px;"><use href="#i-check"/></svg> Bu ay bekleyen ödeme bulunmuyor</div>`;
         } else {
             billsContainer.innerHTML = ov.upcoming_bills.map(b => `
                 <div class="ov-bill-row" onclick="loadPage(${b.page_id})" title="Finans sayfasına git">
@@ -940,7 +1013,7 @@ function renderOverview(ov) {
                         <span class="ov-bill-day">Gün ${b.due_day}</span>
                         <div>
                             <div class="ov-bill-title">${escapeHtml(b.title)}</div>
-                            <div style="font-size:0.70rem; color:var(--muted);">${escapeHtml(b.category || 'Genel')} • ${escapeHtml(b.page_title)}</div>
+                            <div style="font-size:0.72rem; color:var(--muted);">${escapeHtml(b.category || 'Genel')} • ${escapeHtml(b.page_title)}</div>
                         </div>
                     </div>
                     <div class="ov-bill-amount">-${parseFloat(b.amount).toLocaleString('tr-TR', {minimumFractionDigits:2})} TL</div>
@@ -954,17 +1027,17 @@ function renderOverview(ov) {
     if (projContainer) {
         if (projects.length === 0) {
             projContainer.innerHTML = `
-                <div style="padding:16px; text-align:center; color:var(--muted); font-size:0.82rem;">
-                    Henüz proje oluşturulmadı.
-                    <div style="margin-top:6px;">
-                        <button class="btn btn-sm btn-outline" onclick="openAddProjectModal()">➕ İlk Projeyi Başlat</button>
-                    </div>
+                <div class="empty-state-slim" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Aktif proje bulunmuyor</span>
+                    <button class="btn btn-sm btn-outline" style="padding:2px 8px; font-size:0.75rem;" onclick="openAddProjectModal()">
+                        <svg class="svg-icon svg-icon-xs" style="margin-right:3px;"><use href="#i-plus"/></svg>Yeni Proje
+                    </button>
                 </div>`;
         } else {
             projContainer.innerHTML = projects.map(p => `
                 <div class="ov-project-row" onclick="loadPage(${p.id})">
                     <div class="ov-proj-header">
-                        <span class="ov-proj-title">${p.icon || '⚡'} ${escapeHtml(p.title)}</span>
+                        <span class="ov-proj-title"><svg class="svg-icon svg-icon-xs" style="vertical-align:text-bottom; margin-right:4px; color:var(--purple, #8b5cf6);"><use href="#i-layers"/></svg>${escapeHtml(p.title)}</span>
                         <span class="ov-proj-pct">%${p.progress || 0}</span>
                     </div>
                     <div class="ov-progress-track">
@@ -975,12 +1048,12 @@ function renderOverview(ov) {
         }
     }
 
-    // 5. Son Kullanılan Sayfalar
+    // 5. Son Kullanılan Sayfalar (Opsiyonel)
     const recentContainer = document.getElementById('ov-recent-pages-container');
     if (recentContainer) {
         const pages = ov.recent_pages || [];
         if (pages.length === 0) {
-            recentContainer.innerHTML = `<div style="padding:16px; text-align:center; color:var(--muted); font-size:0.82rem;">Henüz sayfa yok.</div>`;
+            recentContainer.innerHTML = `<div class="empty-state-slim">Sayfa yok</div>`;
         } else {
             recentContainer.innerHTML = pages.map(p => `
                 <div class="ov-recent-row" onclick="loadPage(${p.id})">
@@ -1039,6 +1112,7 @@ function jumpToFirstProject() {
 // ─────────────────────────────────────────────────────────────
 
 async function loadPage(pageId) {
+    closeMobileSidebar();
     if (isDraggingAny) return;
     currentPageId = pageId;
 
@@ -1137,7 +1211,7 @@ function renderPageHeader() {
         if (btnBulkAdd) btnBulkAdd.style.display = 'none';
         if (btnClearDone) btnClearDone.style.display = 'none';
         if (btnResetList) btnResetList.style.display = 'none';
-        if (badgeEl) badgeEl.textContent = 'Serbest Metin / Not';
+        if (badgeEl) badgeEl.textContent = 'Not';
     } else if (currentPageData.type === 'finance') {
         if (checklistArea) checklistArea.style.display = 'none';
         if (noteArea) noteArea.style.display = 'none';
@@ -1147,7 +1221,7 @@ function renderPageHeader() {
         if (btnBulkAdd) btnBulkAdd.style.display = 'none';
         if (btnClearDone) btnClearDone.style.display = 'none';
         if (btnResetList) btnResetList.style.display = 'none';
-        if (badgeEl) badgeEl.textContent = 'Finans & Fatura Tablosu';
+        if (badgeEl) badgeEl.textContent = 'Finans';
     } else if (currentPageData.type === 'project') {
         if (checklistArea) checklistArea.style.display = 'none';
         if (noteArea) noteArea.style.display = 'none';
@@ -1157,7 +1231,7 @@ function renderPageHeader() {
         if (btnBulkAdd) btnBulkAdd.style.display = 'none';
         if (btnClearDone) btnClearDone.style.display = 'none';
         if (btnResetList) btnResetList.style.display = 'none';
-        if (badgeEl) badgeEl.textContent = 'Proje / İnşa & Atölye';
+        if (badgeEl) badgeEl.textContent = 'Proje';
     } else {
         if (noteArea) noteArea.style.display = 'none';
         if (financeArea) financeArea.style.display = 'none';
@@ -1168,7 +1242,7 @@ function renderPageHeader() {
         if (btnClearDone) btnClearDone.style.display = 'inline-block';
         if (btnResetList) btnResetList.style.display = 'inline-block';
         const pendingCount = currentItems.filter(i => !i.is_done).length;
-        if (badgeEl) badgeEl.textContent = `${pendingCount} bekleyen / ${currentItems.length} toplam`;
+        if (badgeEl) badgeEl.textContent = `${pendingCount}/${currentItems.length}`;
     }
 }
 
@@ -1203,19 +1277,19 @@ function renderChecklist() {
             metaHtml += `<span class="tag-reminder">⏰ ${item.remind_at.substring(5, 16)}</span>`;
         }
         if (item.url) {
-            metaHtml += `<a href="${escapeHtml(item.url)}" target="_blank" class="tag-link">🔗 Link</a>`;
+            metaHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="tag-link">🔗 Link</a>`;
         }
 
         let actionsHtml = `
             <button class="btn-icon-subtle" title="Maddeyi Düzenle" onclick="openEditItemModal(${item.id})">✏️</button>
-            <button class="btn-icon-subtle" title="Hatırlatıcı Kur" onclick="openReminderModal(${item.id}, '${escapeHtml(item.title)}')">⏰</button>
+            <button class="btn-icon-subtle" title="Hatırlatıcı Kur" onclick="openReminderModalById(${item.id})">⏰</button>
         `;
         if (item.url) {
-            actionsHtml += `<a href="${escapeHtml(item.url)}" target="_blank" class="btn-icon-subtle" title="Ürün Linkini Aç">🔗</a>`;
+            actionsHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="btn-icon-subtle" title="Ürün Linkini Aç">🔗</a>`;
         }
         actionsHtml += `<button class="btn-icon-subtle btn-danger-hover" title="Maddeyi Sil" onclick="deleteItem(${item.id})">🗑️</button>`;
 
-        const thumbHtml = item.image_url ? `<img src="${escapeHtml(item.image_url)}" class="item-thumb" alt="thumb">` : '';
+        const thumbHtml = item.image_url ? `<img src="${sanitizeUrl(item.image_url)}" class="item-thumb" alt="thumb">` : '';
 
         li.setAttribute('draggable', 'true');
 
@@ -1301,15 +1375,125 @@ function renderChecklist() {
     });
 }
 
+function renderMarkdownToHtml(md) {
+    if (!md || !md.trim()) return '<p style="color:var(--muted); font-style:italic;">İçerik boş. Düzenlemek için "Düzenle" moduna geçin.</p>';
+    let html = escapeHtml(md);
+    html = html.replace(/```([a-z0-9_-]*)\n([\s\S]*?)```/g, '<pre class="md-code-block"><code>$2</code></pre>');
+    html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
+    html = html.replace(/^### (.*$)/gim, '<h3 class="md-h3">$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2 class="md-h2">$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h1 class="md-h1">$1</h1>');
+    html = html.replace(/^\> (.*$)/gim, '<blockquote class="md-quote">$1</blockquote>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    html = html.replace(/^- \[x\] (.*$)/gim, '<div class="md-task-item"><input type="checkbox" checked disabled> <span style="text-decoration:line-through; opacity:0.6;">$1</span></div>');
+    html = html.replace(/^- \[ \] (.*$)/gim, '<div class="md-task-item"><input type="checkbox" disabled> <span>$1</span></div>');
+    html = html.replace(/^- (.*$)/gim, '<li class="md-li">$1</li>');
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>');
+    html = html.replace(/\n\n/g, '</p><p>');
+    html = html.replace(/\n/g, '<br>');
+    return '<div class="md-rendered-body"><p>' + html + '</p></div>';
+}
+
+function updateNoteStats() {
+    const ta = document.getElementById('note-content-textarea');
+    const cntEl = document.getElementById('note-char-count');
+    if (!ta || !cntEl) return;
+    const len = ta.value.length;
+    const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
+    cntEl.textContent = `${len} karakter • ${words} kelime`;
+}
+
+let noteAutoSaveTimer = null;
+function handleNoteInput() {
+    updateNoteStats();
+    const statusEl = document.getElementById('note-save-status');
+    if (statusEl) statusEl.textContent = "Kaydediliyor...";
+    clearTimeout(noteAutoSaveTimer);
+    noteAutoSaveTimer = setTimeout(() => {
+        saveNoteContent(true);
+    }, 1000);
+}
+
+function insertMarkdownSyntax(before, after = '') {
+    const ta = document.getElementById('note-content-textarea');
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const val = ta.value;
+    const selected = val.substring(start, end);
+    const replacement = before + selected + after;
+    ta.value = val.substring(0, start) + replacement + val.substring(end);
+    ta.focus();
+    ta.selectionStart = start + before.length;
+    ta.selectionEnd = start + before.length + selected.length;
+    handleNoteInput();
+}
+
+function toggleNoteEditorMode(mode) {
+    const editBtn = document.getElementById('btn-note-mode-edit');
+    const prevBtn = document.getElementById('btn-note-mode-preview');
+    const ta = document.getElementById('note-content-textarea');
+    const prev = document.getElementById('note-markdown-preview');
+    if (!ta || !prev) return;
+
+    if (mode === 'preview') {
+        ta.style.display = 'none';
+        prev.style.display = 'block';
+        prev.innerHTML = renderMarkdownToHtml(ta.value);
+        if (editBtn) editBtn.classList.remove('active');
+        if (prevBtn) prevBtn.classList.add('active');
+    } else {
+        ta.style.display = 'block';
+        prev.style.display = 'none';
+        ta.focus();
+        if (editBtn) editBtn.classList.add('active');
+        if (prevBtn) prevBtn.classList.remove('active');
+    }
+}
+
+function toggleMoreActionsDropdown(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('page-more-dropdown');
+    if (!menu) return;
+    const isShown = menu.style.display === 'flex';
+    menu.style.display = isShown ? 'none' : 'flex';
+}
+
+function closeMoreActionsDropdown() {
+    const menu = document.getElementById('page-more-dropdown');
+    if (menu) menu.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+    const container = document.querySelector('.action-dropdown-container');
+    if (container && !container.contains(e.target)) {
+        closeMoreActionsDropdown();
+    }
+});
+
+function focusQuickAdd() {
+    const quickInput = document.getElementById('quick-item-title');
+    if (quickInput) {
+        quickInput.focus();
+        quickInput.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+}
+
 function renderNoteEditor() {
     const textarea = document.getElementById('note-content-textarea');
     if (textarea && currentPageData) {
         textarea.value = currentPageData.content || '';
+        updateNoteStats();
+        toggleNoteEditorMode('edit');
+        const statusEl = document.getElementById('note-save-status');
+        if (statusEl) statusEl.textContent = "Tüm değişiklikler kaydedildi";
     }
 }
 
-async function saveNoteContent() {
+async function saveNoteContent(isAutoSave = false) {
     const textarea = document.getElementById('note-content-textarea');
+    const statusEl = document.getElementById('note-save-status');
     if (!textarea || !currentPageId) return;
 
     try {
@@ -1320,10 +1504,14 @@ async function saveNoteContent() {
         });
         const data = await res.json();
         if (data.ok) {
-            showToast("Not kaydedildi!");
+            if (statusEl) statusEl.textContent = "Tüm değişiklikler kaydedildi ✓";
+            if (!isAutoSave) {
+                showToast("Not başarıyla kaydedildi!");
+            }
         }
     } catch (e) {
         console.error("Not kaydetme hatası:", e);
+        if (statusEl) statusEl.textContent = "Kaydetme başarısız!";
     }
 }
 
@@ -1785,12 +1973,29 @@ function showToast(msg) {
 }
 
 function escapeHtml(str) {
-    if (!str) return '';
+    if (str === null || str === undefined) return '';
     return String(str)
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/`/g, '&#96;');
+}
+
+function sanitizeUrl(url) {
+    if (!url) return '';
+    const clean = String(url).trim();
+    if (/^https?:\/\//i.test(clean) || clean.startsWith('/') || clean.startsWith('#')) {
+        return escapeHtml(clean);
+    }
+    return '#';
+}
+
+function openReminderModalById(itemId) {
+    const it = (currentItems || []).find(x => x.id === itemId);
+    const title = it ? it.title : "Madde";
+    openReminderModal(itemId, title);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1827,7 +2032,7 @@ async function loadFinanceData(period) {
         const netEl = document.getElementById('kpi-balance-val');
         const netVal = sum.net_balance || 0;
         netEl.textContent = formatCurrency(netVal);
-        netEl.style.color = netVal >= 0 ? '#16a34a' : '#dc2626';
+        netEl.style.color = netVal > 0 ? 'var(--text, #0f172a)' : (netVal < 0 ? 'var(--danger, #dc2626)' : 'var(--text-secondary, #64748b)');
 
         document.getElementById('kpi-unpaid-val').textContent = formatCurrency(sum.unpaid_expense || 0);
         const unpaidCount = entries.filter(e => e.entry_type === 'expense' && !e.is_paid).length;
@@ -1858,7 +2063,7 @@ function renderFinanceTable(entries) {
         const typeIcon = isInc ? '<span class="tag-income-type" title="Gelir">📈 Gelir</span>' : '<span class="tag-expense-type" title="Gider">📉 Gider</span>';
         const dueText = e.due_day ? `<span class="tag-due">Ayın ${e.due_day}. günü</span>` : '<span class="tag-due">-</span>';
         const notesHtml = e.notes ? `<div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">${escapeHtml(e.notes)}</div>` : '';
-        const amountColor = isInc ? '#16a34a' : '#dc2626';
+        const amountColor = isInc ? 'var(--text, #0f172a)' : '#dc2626';
         const amountPrefix = isInc ? '+' : '-';
 
         // Tekrarlama & Bitiş
@@ -2617,8 +2822,8 @@ function renderBOMSummary() {
     bar.innerHTML = `
         <div>Toplam Kalem: <strong>${stats.total_materials || 0}</strong></div>
         <div>Eksik / Aranıyor: <strong style="color:#ef4444;">${stats.needed_materials || 0}</strong></div>
-        <div>Temin Edilen Tutar: <strong style="color:#10b981;">${formatCurrency(stats.available_mat_cost || 0)}</strong></div>
-        <div>Toplam Proje Maliyeti: <strong style="color:#2563eb;">${formatCurrency(stats.total_mat_cost || 0)}</strong></div>
+        <div>Temin Edilen Tutar: <strong>${formatCurrency(stats.available_mat_cost || 0)}</strong></div>
+        <div>Toplam Proje Maliyeti: <strong style="color:var(--primary, #0284c7);">${formatCurrency(stats.total_mat_cost || 0)}</strong></div>
     `;
 }
 
@@ -3176,6 +3381,7 @@ async function undoSpecificAction(historyId) {
 // ─────────────────────────────────────────────────────────────
 
 async function loadTrashPage() {
+    closeMobileSidebar();
     currentPageId = null;
     currentPageData = null;
 
@@ -3192,9 +3398,9 @@ async function loadTrashPage() {
     const titleEl = document.getElementById('current-page-title');
     const iconEl = document.getElementById('current-page-icon');
     const badgeEl = document.getElementById('current-page-badge');
-    if (titleEl) titleEl.textContent = 'Çöp Kutusu & Geri Dönüşüm';
+    if (titleEl) titleEl.textContent = 'Çöp Kutusu';
     if (iconEl) iconEl.textContent = '🗑️';
-    if (badgeEl) badgeEl.textContent = 'Geri Yükleme';
+    if (badgeEl) badgeEl.textContent = '';
 
     const pageActions = document.getElementById('page-header-actions');
     const ovActions = document.getElementById('overview-header-actions');
@@ -3361,6 +3567,7 @@ let currentVaultProfilesList = [];
 let currentVaultTagsList = [];
 
 async function loadVaultPage() {
+    closeMobileSidebar();
     currentPageId = null;
     currentPageData = null;
 
@@ -3377,9 +3584,9 @@ async function loadVaultPage() {
     const titleEl = document.getElementById('current-page-title');
     const iconEl = document.getElementById('current-page-icon');
     const badgeEl = document.getElementById('current-page-badge');
-    if (titleEl) titleEl.textContent = 'Şifre & Kimlik Bilgileri Kasası';
+    if (titleEl) titleEl.textContent = 'Şifre Kasası';
     if (iconEl) iconEl.textContent = '🔐';
-    if (badgeEl) badgeEl.textContent = 'Güvenli Kasa';
+    if (badgeEl) badgeEl.textContent = '';
 
     const pageActions = document.getElementById('page-header-actions');
     const ovActions = document.getElementById('overview-header-actions');
@@ -3690,15 +3897,15 @@ function renderVaultCards(entries) {
                 </div>
                 ` : ''}
 
-                ${entry.password ? `
+                ${entry.has_password || entry.password ? `
                 <div class="vault-field-row">
                     <div style="flex:1; min-width:0;">
                         <div class="vault-field-label">Şifre / Parola</div>
-                        <div class="vault-field-val" id="v-val-pwd-${entry.id}" data-real="${escapeHtml(entry.password)}">${maskedPwd}</div>
+                        <div class="vault-field-val" id="v-val-pwd-${entry.id}" data-revealed="false">••••••••</div>
                     </div>
                     <div class="vault-field-actions">
                         <button class="vault-btn-copy" onclick="toggleCardPasswordVisibility(${entry.id})" title="Şifreyi Göster/Gizle">👁️</button>
-                        <button class="vault-btn-copy" onclick="copyVaultField('${escapeHtml(entry.password)}', 'Şifre')" title="Şifreyi Kopyala">📋</button>
+                        <button class="vault-btn-copy" onclick="copyVaultPassword(${entry.id})" title="Şifreyi Kopyala">📋</button>
                     </div>
                 </div>
                 ` : ''}
@@ -3749,14 +3956,39 @@ function renderVaultCards(entries) {
     grid.innerHTML = html;
 }
 
-function toggleCardPasswordVisibility(id) {
+async function toggleCardPasswordVisibility(id) {
     const el = document.getElementById(`v-val-pwd-${id}`);
     if (!el) return;
-    const real = el.getAttribute('data-real');
-    if (el.textContent === '••••••••••••') {
-        el.textContent = real;
-    } else {
-        el.textContent = '••••••••••••';
+    if (el.dataset.revealed === 'true') {
+        el.textContent = '••••••••';
+        el.dataset.revealed = 'false';
+        return;
+    }
+    try {
+        const res = await fetch(`/notes/api/vault/${id}/reveal`, {method: 'POST'});
+        const data = await res.json();
+        if (data.ok && data.password) {
+            el.textContent = data.password;
+            el.dataset.revealed = 'true';
+        } else {
+            showToast("Şifre alınamadı");
+        }
+    } catch (e) {
+        showToast("Şifre çözme hatası");
+    }
+}
+
+async function copyVaultPassword(id) {
+    try {
+        const res = await fetch(`/notes/api/vault/${id}/reveal`, {method: 'POST'});
+        const data = await res.json();
+        if (data.ok && data.password) {
+            copyVaultField(data.password, 'Şifre');
+        } else {
+            showToast("Kopyalanacak şifre bulunamadı");
+        }
+    } catch (e) {
+        showToast("Şifre kopyalanamadı");
     }
 }
 
@@ -4025,29 +4257,29 @@ function updateVaultFormHints() {
 
     if (cat === 'bank') {
         uLabel.textContent = 'Müşteri No / T.C. Kimlik';
-        uInput.placeholder = 'Örn: 1234567';
-        secLabel.textContent = 'IBAN / Kart Son 4 Hane';
-        secInput.placeholder = 'TR00 ...';
+        uInput.placeholder = 'Müşteri No / T.C.';
+        secLabel.textContent = 'IBAN / Kart';
+        secInput.placeholder = 'TR00...';
     } else if (cat === 'wifi') {
         uLabel.textContent = 'Wi-Fi Ağ Adı (SSID)';
-        uInput.placeholder = 'Örn: Ev_5GHz';
-        secLabel.textContent = 'Router IP / Giriş Adresi';
+        uInput.placeholder = 'SSID';
+        secLabel.textContent = 'Router IP';
         secInput.placeholder = '192.168.1.1';
     } else if (cat === 'device') {
-        uLabel.textContent = 'Cihaz / Telefon Modeli';
-        uInput.placeholder = 'Örn: iPhone 14, Samsung A52';
-        secLabel.textContent = 'SIM PIN / PUK Kodu';
-        secInput.placeholder = 'PIN: 1234, PUK: 887129...';
+        uLabel.textContent = 'Cihaz / Model';
+        uInput.placeholder = 'Cihaz';
+        secLabel.textContent = 'PIN / PUK';
+        secInput.placeholder = 'PIN / PUK';
     } else if (cat === 'server') {
-        uLabel.textContent = 'Kullanıcı Adı (root, admin)';
-        uInput.placeholder = 'root';
+        uLabel.textContent = 'Kullanıcı Adı';
+        uInput.placeholder = 'root / kullanıcı';
         secLabel.textContent = 'Port / IP / Host';
-        secInput.placeholder = '22 / 10.0.0.1';
+        secInput.placeholder = 'Port / IP';
     } else {
-        uLabel.textContent = 'Kullanıcı Adı / E-posta / ID';
-        uInput.placeholder = 'kullanici@mail.com veya username';
-        secLabel.textContent = 'Ek Bilgi (PIN / IBAN / Port)';
-        secInput.placeholder = 'İsteğe bağlı ek bilgi...';
+        uLabel.textContent = 'Kullanıcı Adı / E-posta';
+        uInput.placeholder = 'Kullanıcı adı / E-posta';
+        secLabel.textContent = 'Ek Bilgi';
+        secInput.placeholder = 'İkincil bilgi';
     }
 }
 

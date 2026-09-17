@@ -170,13 +170,17 @@ def api_get_users():
 def index():
     user = get_current_user()
     user_id = user["id"] if user else None
-    active_nb_id = request.args.get('notebook_id', type=int)
-    if active_nb_id:
-        db.set_active_notebook_id(active_nb_id)
-    else:
-        active_nb_id = db.get_active_notebook_id()
-
     notebooks = db.get_notebooks(user_id=user_id)
+    
+    active_nb_id = request.args.get('notebook_id', type=int) or session.get('active_notebook_id')
+    if active_nb_id and any(n['id'] == active_nb_id for n in notebooks):
+        session['active_notebook_id'] = active_nb_id
+    elif notebooks:
+        active_nb_id = notebooks[0]['id']
+        session['active_notebook_id'] = active_nb_id
+    else:
+        active_nb_id = 1
+
     current_notebook = db.get_notebook(active_nb_id) or (notebooks[0] if notebooks else None)
     categories = db.get_categories(active_nb_id)
     pages = db.get_pages(notebook_id=active_nb_id)
@@ -199,8 +203,8 @@ def index():
 def settings_page():
     user = get_current_user()
     user_id = user["id"] if user else None
-    active_nb_id = db.get_active_notebook_id()
     notebooks = db.get_notebooks(user_id=user_id)
+    active_nb_id = session.get('active_notebook_id') or (notebooks[0]['id'] if notebooks else 1)
     current_notebook = db.get_notebook(active_nb_id) or (notebooks[0] if notebooks else None)
     categories = db.get_categories(active_nb_id)
     pages = db.get_pages(notebook_id=active_nb_id)
@@ -257,6 +261,8 @@ def api_add_notebook():
 @tnote_bp.route('/api/notebooks/<int:nb_id>', methods=['PUT'])
 @auth_check
 def api_update_notebook(nb_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
     data = request.get_json() or {}
     name = data.get("name", "").strip()
     if not name:
@@ -265,18 +271,23 @@ def api_update_notebook(nb_id):
     color = data.get("color", "#3b82f6")
     desc = data.get("description", "")
     db.update_notebook(nb_id, name, icon, color, desc)
-    return jsonify({"ok": True, "notebook": db.get_notebook(nb_id), "notebooks": db.get_notebooks()})
+    return jsonify({"ok": True, "notebook": db.get_notebook(nb_id), "notebooks": db.get_notebooks(user_id=user_id)})
 
 @tnote_bp.route('/api/notebooks/<int:nb_id>', methods=['DELETE'])
 @auth_check
 def api_delete_notebook(nb_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
     success = db.delete_notebook(nb_id)
     if not success:
         return jsonify({"ok": False, "error": "Son kalan not defteri silinemez"}), 400
+    notebooks = db.get_notebooks(user_id=user_id)
+    active_id = notebooks[0]["id"] if notebooks else 1
+    session["active_notebook_id"] = active_id
     return jsonify({
         "ok": True,
-        "notebooks": db.get_notebooks(),
-        "active_notebook_id": db.get_active_notebook_id()
+        "notebooks": notebooks,
+        "active_notebook_id": active_id
     })
 
 @tnote_bp.route('/api/notebooks/switch', methods=['POST'])
@@ -286,13 +297,14 @@ def api_switch_notebook():
     nb_id = data.get("notebook_id")
     if not nb_id:
         return jsonify({"ok": False, "error": "Geçersiz not defteri ID"}), 400
-    db.set_active_notebook_id(int(nb_id))
+    nb_id = int(nb_id)
+    session["active_notebook_id"] = nb_id
     return jsonify({
         "ok": True,
-        "active_notebook_id": int(nb_id),
-        "notebook": db.get_notebook(int(nb_id)),
-        "categories": db.get_categories(int(nb_id)),
-        "pages": db.get_pages(notebook_id=int(nb_id))
+        "active_notebook_id": nb_id,
+        "notebook": db.get_notebook(nb_id),
+        "categories": db.get_categories(nb_id),
+        "pages": db.get_pages(notebook_id=nb_id)
     })
 
 @tnote_bp.route('/api/notebooks/<int:nb_id>/export', methods=['GET'])
@@ -855,9 +867,9 @@ def api_upload_project_file(page_id):
     
     import time
     ext = os.path.splitext(file.filename)[1].lower()
-    allowed_exts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.pdf']
+    allowed_exts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf']
     if ext not in allowed_exts:
-        return jsonify({"ok": False, "error": "Desteklenmeyen dosya türü (PNG, JPG, WEBP, SVG, PDF)"}), 400
+        return jsonify({"ok": False, "error": "Desteklenmeyen dosya türü (PNG, JPG, WEBP, GIF, PDF)"}), 400
 
     filename = f"p{page_id}_{int(time.time())}_{secure_filename(file.filename)}"
     os.makedirs(UPLOADS_DIR, exist_ok=True)
@@ -873,8 +885,12 @@ def api_upload_project_file(page_id):
     return jsonify({"ok": True, "url": file_url, "drawing": item})
 
 @tnote_bp.route('/uploads/<path:filename>')
+@auth_check
 def serve_uploaded_file(filename):
-    return send_from_directory(UPLOADS_DIR, filename)
+    resp = send_from_directory(UPLOADS_DIR, filename)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Content-Security-Policy"] = "default-src 'self'"
+    return resp
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REST API: Veri İçe Aktarma (Google Keep, Evernote, Microsoft To-Do)
@@ -1044,13 +1060,15 @@ def api_global_search():
 @tnote_bp.route('/api/vault', methods=['GET'])
 @auth_check
 def api_get_vault():
+    user = get_current_user()
+    user_id = user["id"] if user else None
     scope = request.args.get("scope")
     category = request.args.get("category")
     profile = request.args.get("profile")
     folder = request.args.get("folder")
     tag = request.args.get("tag")
     search = request.args.get("q")
-    entries = db.get_vault_entries(scope=scope, category=category, profile_name=profile, folder_name=folder, tag=tag, search=search)
+    entries = db.get_vault_entries(scope=scope, category=category, profile_name=profile, folder_name=folder, tag=tag, search=search, user_id=user_id)
     profiles = db.get_vault_profiles()
     folders = db.get_vault_folders()
     tags = db.get_vault_tags()
@@ -1107,14 +1125,32 @@ def api_get_vault_related(entry_id):
 @tnote_bp.route('/api/vault/<int:entry_id>', methods=['GET'])
 @auth_check
 def api_get_vault_entry(entry_id):
-    entry = db.get_vault_entry(entry_id)
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    entry = db.get_vault_entry(entry_id, user_id=user_id)
     if not entry:
         return jsonify({"ok": False, "error": "Kayıt bulunamadı"}), 404
     return jsonify({"ok": True, "entry": entry})
 
+@tnote_bp.route('/api/vault/<int:entry_id>/reveal', methods=['POST'])
+@auth_check
+def api_reveal_vault_entry(entry_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    entry = db.get_vault_entry_decrypted(entry_id, user_id=user_id)
+    if not entry:
+        return jsonify({"ok": False, "error": "Kayıt bulunamadı veya yetkisiz erişim"}), 404
+    return jsonify({
+        "ok": True,
+        "password": entry.get("password", ""),
+        "secondary_info": entry.get("secondary_info", "")
+    })
+
 @tnote_bp.route('/api/vault', methods=['POST'])
 @auth_check
 def api_create_vault_entry():
+    user = get_current_user()
+    user_id = user["id"] if user else 1
     data = request.get_json() or {}
     title = data.get("title", "").strip()
     if not title:
@@ -1134,20 +1170,31 @@ def api_create_vault_entry():
         notes=data.get("notes", ""),
         icon=data.get("icon", "🔐"),
         color=data.get("color", "#3b82f6"),
-        is_favorite=int(data.get("is_favorite", 0))
+        is_favorite=int(data.get("is_favorite", 0)),
+        user_id=user_id
     )
-    return jsonify({"ok": True, "id": new_id, "entry": db.get_vault_entry(new_id)})
+    return jsonify({"ok": True, "id": new_id, "entry": db.get_vault_entry(new_id, user_id=user_id)})
 
 @tnote_bp.route('/api/vault/<int:entry_id>', methods=['PUT'])
 @auth_check
 def api_update_vault_entry(entry_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    entry = db.get_vault_entry(entry_id, user_id=user_id)
+    if not entry:
+        return jsonify({"ok": False, "error": "Kayıt bulunamadı veya düzenleme yetkiniz yok"}), 403
     data = request.get_json() or {}
     db.update_vault_entry(entry_id, **data)
-    return jsonify({"ok": True, "entry": db.get_vault_entry(entry_id)})
+    return jsonify({"ok": True, "entry": db.get_vault_entry(entry_id, user_id=user_id)})
 
 @tnote_bp.route('/api/vault/<int:entry_id>', methods=['DELETE'])
 @auth_check
 def api_delete_vault_entry(entry_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    entry = db.get_vault_entry(entry_id, user_id=user_id)
+    if not entry:
+        return jsonify({"ok": False, "error": "Kayıt bulunamadı veya silme yetkiniz yok"}), 403
     permanent = request.args.get("permanent", "0") == "1"
     db.delete_vault_entry(entry_id, permanent=permanent)
     return jsonify({"ok": True})

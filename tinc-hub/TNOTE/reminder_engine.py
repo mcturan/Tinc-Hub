@@ -14,6 +14,17 @@ _reminder_thread = None
 _stop_event = threading.Event()
 _is_running = False
 
+def _notify_tinc_hub_event(level="WARN", category="task", message="", data=None):
+    try:
+        from shared.db import log_event
+        log_event("tnote", level=level, message=message, category=category, data=data)
+    except Exception:
+        try:
+            import shared.db as sdb
+            sdb.log_event("tnote", level=level, message=message, category=category, data=data)
+        except Exception:
+            log.info(f"UI Event [{level}]: {message}")
+
 def _process_due_reminders():
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     due_list = db.get_due_reminders(now_str)
@@ -51,16 +62,22 @@ def _process_due_reminders():
             ]
         ]
         keyboard = {"inline_keyboard": buttons}
-        send_notification_to_all_chats(text, reply_markup=keyboard)
+        try:
+            send_notification_to_all_chats(text, reply_markup=keyboard)
+        except Exception as e:
+            log.error(f"Telegram hatırlatıcı gönderme hatası: {e}")
 
         # 2. Tinc-Hub UI Bildirim Zili
         if db.get_setting("ui_notify_enabled", "1") == "1":
-            _notify_tinc_hub_event(
-                level="WARN",
-                category="task",
-                message=f"TNOTE Hatırlatma: {title} ({page_title})",
-                data={"target_type": target_type, "target_id": target_id, "url": url}
-            )
+            try:
+                _notify_tinc_hub_event(
+                    level="WARN",
+                    category="task",
+                    message=f"TNOTE Hatırlatma: {title} ({page_title})",
+                    data={"target_type": target_type, "target_id": target_id, "url": url}
+                )
+            except Exception as e:
+                log.debug(f"UI bildirimi gönderilemedi: {e}")
 
         # 3. Tekrarlanma veya Tamamlanma Hesaplama
         next_time = None

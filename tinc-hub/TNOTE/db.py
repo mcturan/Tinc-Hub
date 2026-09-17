@@ -1,14 +1,65 @@
 import sqlite3
 import os
 import json
+import base64
+import hashlib
 import threading
 from datetime import datetime
-from .config import DB_PATH
+from .config import DB_PATH, DATA_DIR, SECRET_KEY
 
 _lock = threading.Lock()
+_vault_cipher = None
+
+def _get_vault_cipher():
+    global _vault_cipher
+    if _vault_cipher is None:
+        try:
+            from cryptography.fernet import Fernet
+            key_file = os.path.join(DATA_DIR, "vault.key")
+            if os.path.exists(key_file):
+                with open(key_file, "rb") as f:
+                    key = f.read().strip()
+            else:
+                derived = hashlib.sha256((SECRET_KEY + "_tnote_vault_salt_2026").encode()).digest()
+                key = base64.urlsafe_b64encode(derived)
+                try:
+                    with open(key_file, "wb") as f:
+                        f.write(key)
+                except Exception:
+                    pass
+            _vault_cipher = Fernet(key)
+        except Exception:
+            _vault_cipher = None
+    return _vault_cipher
+
+def encrypt_vault_secret(plain_text: str) -> str:
+    if not plain_text:
+        return ""
+    cipher = _get_vault_cipher()
+    if not cipher:
+        return plain_text
+    try:
+        token = cipher.encrypt(plain_text.encode('utf-8'))
+        return "enc::" + token.decode('utf-8')
+    except Exception:
+        return plain_text
+
+def decrypt_vault_secret(cipher_text: str) -> str:
+    if not cipher_text:
+        return ""
+    if not str(cipher_text).startswith("enc::"):
+        return str(cipher_text)
+    cipher = _get_vault_cipher()
+    if not cipher:
+        return str(cipher_text)
+    try:
+        raw_token = cipher_text[5:].encode('utf-8')
+        return cipher.decrypt(raw_token).decode('utf-8')
+    except Exception:
+        return "[Şifre Çözülemedi]"
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -287,8 +338,16 @@ def init_db():
             cur.execute("ALTER TABLE vault_entries ADD COLUMN folder_name TEXT DEFAULT ''")
         if 'tags' not in v_cols:
             cur.execute("ALTER TABLE vault_entries ADD COLUMN tags TEXT DEFAULT ''")
+        if 'user_id' not in v_cols:
+            cur.execute("ALTER TABLE vault_entries ADD COLUMN user_id INTEGER DEFAULT 1")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_vault_user ON vault_entries(user_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_vault_folder ON vault_entries(folder_name)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_vault_tags ON vault_entries(tags)")
+
+        cur.execute("PRAGMA table_info(vault_folders)")
+        vf_cols = [r[1] for r in cur.fetchall()]
+        if 'user_id' not in vf_cols:
+            cur.execute("ALTER TABLE vault_folders ADD COLUMN user_id INTEGER DEFAULT 1")
 
         # Migration: Mevcut finance_entries tablosuna eksik sütunları ekle
         cur = conn.cursor()
@@ -2027,12 +2086,15 @@ def global_search(query: str) -> dict:
 # Şifreler & Kimlik Bilgileri Kasası (Vault)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_vault_entries(scope: str = None, category: str = None, profile_name: str = None, folder_name: str = None, tag: str = None, search: str = None):
+def get_vault_entries(scope: str = None, category: str = None, profile_name: str = None, folder_name: str = None, tag: str = None, search: str = None, user_id: int = None):
     with _lock:
         conn = get_conn()
         cur = conn.cursor()
         query = "SELECT * FROM vault_entries WHERE is_archived = 0"
         params = []
+        if user_id is not None:
+            query += " AND (user_id = ? OR user_id IS NULL OR scope = 'shared')"
+            params.append(user_id)
         if scope and scope != 'all':
             query += " AND scope = ?"
             params.append(scope)
@@ -2057,7 +2119,19 @@ def get_vault_entries(scope: str = None, category: str = None, profile_name: str
         cur.execute(query, params)
         rows = [dict(r) for r in cur.fetchall()]
         conn.close()
-        return rows
+
+        # Güvenlik: Asla açık şifre dönme, sadece varlık bilgisi ve maskeli değer dön
+        clean_rows = []
+        for r in rows:
+            entry = dict(r)
+            raw_pwd = entry.get('password') or ""
+            entry['has_password'] = bool(raw_pwd)
+            entry['password'] = "••••••••" if raw_pwd else ""
+            raw_sec = entry.get('secondary_info') or ""
+            entry['has_secondary_info'] = bool(raw_sec)
+            entry['secondary_info'] = "••••••••" if raw_sec else ""
+            clean_rows.append(entry)
+        return clean_rows
 
 def get_vault_folders():
     """Tüm kasa klasörlerini ve içlerindeki aktif şifre sayılarını döner."""
@@ -2220,30 +2294,44 @@ def get_related_vault_entries(entry_id: int):
             "by_domain": by_domain
         }
 
-def get_vault_entry(entry_id: int):
+def get_vault_entry(entry_id: int, user_id: int = None):
     with _lock:
         conn = get_conn()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM vault_entries WHERE id = ?", (entry_id,))
+        if user_id is not None:
+            cur.execute("SELECT * FROM vault_entries WHERE id = ? AND (user_id = ? OR user_id IS NULL OR scope = 'shared')", (entry_id, user_id))
+        else:
+            cur.execute("SELECT * FROM vault_entries WHERE id = ?", (entry_id,))
         row = cur.fetchone()
         conn.close()
-        return dict(row) if row else None
+        if not row:
+            return None
+        d = dict(row)
+        d['password'] = decrypt_vault_secret(d.get('password', ''))
+        d['secondary_info'] = decrypt_vault_secret(d.get('secondary_info', ''))
+        return d
+
+def get_vault_entry_decrypted(entry_id: int, user_id: int = None):
+    return get_vault_entry(entry_id, user_id=user_id)
 
 def add_vault_entry(title: str, category: str = "web", scope: str = "personal", profile_name: str = "",
                     folder_name: str = "", tags: str = "",
                     username: str = "", password: str = "", url: str = "", secondary_info: str = "",
-                    notes: str = "", icon: str = "🔐", color: str = "#3b82f6", is_favorite: int = 0) -> int:
+                    notes: str = "", icon: str = "🔐", color: str = "#3b82f6", is_favorite: int = 0, user_id: int = 1) -> int:
     with _lock:
         conn = get_conn()
         cur = conn.cursor()
         folder_clean = folder_name.strip()
         if folder_clean:
-            cur.execute("INSERT OR IGNORE INTO vault_folders (name) VALUES (?)", (folder_clean,))
+            cur.execute("INSERT OR IGNORE INTO vault_folders (name, user_id) VALUES (?, ?)", (folder_clean, user_id or 1))
+
+        enc_pwd = encrypt_vault_secret(password)
+        enc_sec = encrypt_vault_secret(secondary_info)
 
         cur.execute("""
-            INSERT INTO vault_entries (title, category, scope, profile_name, folder_name, tags, username, password, url, secondary_info, notes, icon, color, is_favorite)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (title.strip(), category, scope, profile_name.strip(), folder_clean, tags.strip(), username.strip(), password, url.strip(), secondary_info.strip(), notes.strip(), icon or "🔐", color or "#3b82f6", is_favorite))
+            INSERT INTO vault_entries (title, category, scope, profile_name, folder_name, tags, username, password, url, secondary_info, notes, icon, color, is_favorite, user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (title.strip(), category, scope, profile_name.strip(), folder_clean, tags.strip(), username.strip(), enc_pwd, url.strip(), enc_sec, notes.strip(), icon or "🔐", color or "#3b82f6", is_favorite, user_id or 1))
         new_id = cur.lastrowid
         conn.commit()
         conn.close()
@@ -2264,9 +2352,17 @@ def update_vault_entry(entry_id: int, **kwargs):
         if "folder_name" in kwargs and kwargs["folder_name"]:
             cur.execute("INSERT OR IGNORE INTO vault_folders (name) VALUES (?)", (kwargs["folder_name"].strip(),))
 
+        if "password" in kwargs and kwargs["password"]:
+            if not str(kwargs["password"]).startswith("enc::"):
+                kwargs["password"] = encrypt_vault_secret(str(kwargs["password"]))
+
+        if "secondary_info" in kwargs and kwargs["secondary_info"]:
+            if not str(kwargs["secondary_info"]).startswith("enc::"):
+                kwargs["secondary_info"] = encrypt_vault_secret(str(kwargs["secondary_info"]))
+
         fields = []
         params = []
-        allowed = ["title", "category", "scope", "profile_name", "folder_name", "tags", "username", "password", "url", "secondary_info", "notes", "icon", "color", "is_favorite", "is_archived"]
+        allowed = ["title", "category", "scope", "profile_name", "folder_name", "tags", "username", "password", "url", "secondary_info", "notes", "icon", "color", "is_favorite", "is_archived", "user_id"]
         for k in allowed:
             if k in kwargs:
                 fields.append(f"{k} = ?")

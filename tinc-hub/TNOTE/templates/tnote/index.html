@@ -3,19 +3,21 @@
 {% block title %}TincNote — Notlar & Listeler{% endblock %}
 
 {% block head %}
+<link rel="stylesheet" href="{{ url_for('tnote.static', filename='css/tinc_theme.css') }}">
 <link rel="stylesheet" href="{{ url_for('tnote.static', filename='css/tnote.css') }}">
 {% endblock %}
 
 {% block content %}
+{% include "tnote/_icons.html" %}
 <div class="tnote-container">
     <!-- Sol Sidebar (Kategoriler & Sayfalar) -->
-    <aside class="tnote-sidebar">
+    <aside class="tnote-sidebar" id="tnote-sidebar">
         <div class="sidebar-header sidebar-notebook-header">
             <div class="notebook-dropdown-container">
                 <button class="notebook-select-btn" id="notebook-select-btn" onclick="toggleNotebookDropdown(event)" title="Not Defterini Değiştir">
                     <span class="notebook-btn-icon" id="current-notebook-icon">{{ current_notebook.icon if current_notebook else '📓' }}</span>
                     <span class="notebook-btn-name" id="current-notebook-name">{{ current_notebook.name if current_notebook else 'Kişisel Not Defterim' }}</span>
-                    <span class="notebook-btn-arrow">▾</span>
+                    <span class="notebook-btn-arrow"><svg class="svg-icon svg-icon-sm"><use href="#i-chevron-down"/></svg></span>
                 </button>
                 <div class="notebook-dropdown-menu" id="notebook-dropdown-menu" style="display:none;">
                     <div class="notebook-dropdown-title">Not Defterlerim</div>
@@ -25,48 +27,61 @@
                             <span class="nb-item-icon">{{ nb.icon }}</span>
                             <span class="nb-item-name">{{ nb.name }}</span>
                             {% if current_notebook and current_notebook.id == nb.id %}
-                            <span class="nb-item-check">✓</span>
+                            <span class="nb-item-check"><svg class="svg-icon svg-icon-sm"><use href="#i-check"/></svg></span>
                             {% endif %}
                         </div>
                         {% endfor %}
                     </div>
                     <div class="notebook-dropdown-divider"></div>
                     <div class="notebook-dropdown-item notebook-action-item" onclick="openModal('modal-add-notebook'); toggleNotebookDropdown();">
-                        <span>➕</span> Yeni Not Defteri Ekle
+                        <svg class="svg-icon svg-icon-sm"><use href="#i-plus"/></svg> Yeni Defter Ekle
                     </div>
                     <div class="notebook-dropdown-item notebook-action-item" onclick="exportCurrentNotebook(); toggleNotebookDropdown();">
-                        <span>💾</span> Defteri Dışa Aktar (.tnote)
+                        <svg class="svg-icon svg-icon-sm"><use href="#i-file-text"/></svg> Defteri Dışa Aktar
                     </div>
                     <div class="notebook-dropdown-item notebook-action-item" onclick="document.getElementById('import-notebook-input').click(); toggleNotebookDropdown();">
-                        <span>📥</span> Defteri İçe Aktar (.tnote)
+                        <svg class="svg-icon svg-icon-sm"><use href="#i-refresh"/></svg> Defteri İçe Aktar
                     </div>
                     <input type="file" id="import-notebook-input" accept=".tnote,.json" style="display:none;" onchange="handleNotebookImport(this)">
                     <a href="/notes/settings?tab=notebooks" class="notebook-dropdown-item notebook-action-item">
-                        <span>⚙️</span> Defterleri Yönet
+                        <svg class="svg-icon svg-icon-sm"><use href="#i-settings"/></svg> Defterleri Yönet
                     </a>
                 </div>
             </div>
             <div class="sidebar-header-actions">
-                <button class="btn-icon" onclick="openModal('modal-add-category')" title="Bu Deftere Yeni Kategori Ekle">➕</button>
+                <button class="btn-icon" onclick="openModal('modal-add-category')" title="Yeni Kategori Ekle"><svg class="svg-icon svg-icon-sm"><use href="#i-plus"/></svg></button>
                 <button class="btn-icon sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarManual()" title="Menüyü Daralt ( « )">«</button>
+                <button class="btn-icon sidebar-mobile-close-btn" onclick="closeMobileSidebar()" title="Kapat"><svg class="svg-icon svg-icon-sm"><use href="#i-x"/></svg></button>
             </div>
         </div>
 
-        <!-- Hızlı Gezinme Butonları -->
-        <div class="sidebar-nav-block" style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px;">
-            <div class="sidebar-overview-row active" id="sidebar-overview-btn" onclick="loadOverviewPage()" title="TincNote Genel Bakış & Özet">
+        <!-- Hızlı Gezinme Butonları (Kütüphane) -->
+        <div class="sidebar-nav-block">
+            <div class="sidebar-overview-row active" id="sidebar-overview-btn" onclick="loadOverviewPage()" title="Genel Bakış">
                 <div class="overview-row-left">
-                    <span class="ov-row-icon">🏠</span>
+                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-home"/></svg></span>
                     <span class="overview-btn-text">Genel Bakış</span>
                 </div>
-                <span class="badge-count ov-badge-pill">Özet</span>
             </div>
-            <div class="sidebar-overview-row" id="sidebar-quick-btn" onclick="loadQuickTasksPage()" title="Hızlı Notlar & Görevler">
+            <div class="sidebar-overview-row" id="sidebar-quick-btn" onclick="loadQuickTasksPage()" title="Hızlı Görevler">
                 <div class="overview-row-left">
-                    <span class="ov-row-icon">⚡</span>
-                    <span class="overview-btn-text">Hızlı Notlar & Görevler</span>
+                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-zap"/></svg></span>
+                    <span class="overview-btn-text">Hızlı Görevler</span>
                 </div>
-                <span class="badge-count ov-badge-pill" id="quick-tasks-badge-count" style="background:#fef3c7; color:#d97706;">⚡</span>
+                <span class="badge-count ov-badge-pill" id="quick-tasks-badge-count" style="display:none;">0</span>
+            </div>
+            <div class="sidebar-overview-row" id="sidebar-vault-btn" onclick="loadVaultPage()" title="Şifre Kasası">
+                <div class="overview-row-left">
+                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-shield"/></svg></span>
+                    <span class="overview-btn-text">Şifre Kasası</span>
+                </div>
+            </div>
+            <div class="sidebar-overview-row" id="sidebar-trash-btn" onclick="loadTrashPage()" title="Çöp Kutusu">
+                <div class="overview-row-left">
+                    <span class="ov-row-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-trash"/></svg></span>
+                    <span class="overview-btn-text">Çöp Kutusu</span>
+                </div>
+                <span class="badge-count ov-badge-pill" id="sidebar-trash-badge" style="display:none;">0</span>
             </div>
         </div>
 
@@ -82,9 +97,9 @@
                     </div>
                     <div class="category-actions" onclick="event.stopPropagation()">
                         <span class="badge-count" id="cat-badge-{{ cat.id }}">{{ cat.page_count }}</span>
-                        <button class="btn-icon-subtle" onclick="openAddPageForCat({{ cat.id }}, '{{ cat.name|escape }}')" title="Bu Kategoriye Liste Ekle">➕</button>
-                        <button class="btn-icon-subtle" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|escape }}', '{{ cat.icon|escape }}', '{{ cat.color|escape }}')" title="Kategoriyi Düzenle">✏️</button>
-                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteCategory({{ cat.id }}, '{{ cat.name|escape }}')" title="Kategoriyi Sil">🗑️</button>
+                        <button class="btn-icon-subtle" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name|e }}" onclick="openAddPageForCat(this.dataset.catId, this.dataset.catName)" title="Bu Kategoriye Liste Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
+                        <button class="btn-icon-subtle" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name|e }}" data-cat-icon="{{ cat.icon|e }}" data-cat-color="{{ cat.color|e }}" onclick="openEditCategoryModal(this.dataset.catId, this.dataset.catName, this.dataset.catIcon, this.dataset.catColor)" title="Kategoriyi Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                        <button class="btn-icon-subtle btn-danger-hover" data-cat-id="{{ cat.id }}" data-cat-name="{{ cat.name|e }}" onclick="deleteCategory(this.dataset.catId, this.dataset.catName)" title="Kategoriyi Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                     </div>
                 </div>
                 <ul class="page-list" id="cat-pages-{{ cat.id }}" data-category-id="{{ cat.id }}">
@@ -101,11 +116,11 @@
                                     {% if p.type == 'checklist' %}
                                         {{ p.total_items - p.completed_items }}
                                     {% else %}
-                                        📝
+                                        <svg class="svg-icon svg-icon-xs" style="vertical-align:text-top;"><use href="#i-file-text"/></svg>
                                     {% endif %}
                                 </span>
-                                <button class="btn-icon-subtle" onclick="event.stopPropagation(); openEditPageModal({{ p.id }}, '{{ p.title|escape }}', {{ p.category_id }}, '{{ p.icon|escape }}', '{{ p.type|escape }}')" title="Sayfayı Düzenle">✏️</button>
-                                <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deletePage({{ p.id }}, '{{ p.title|escape }}')" title="Sayfayı Sil">🗑️</button>
+                                <button class="btn-icon-subtle" data-page-id="{{ p.id }}" data-page-title="{{ p.title|e }}" data-page-cat="{{ p.category_id }}" data-page-icon="{{ p.icon|e }}" data-page-type="{{ p.type|e }}" onclick="event.stopPropagation(); openEditPageModal(this.dataset.pageId, this.dataset.pageTitle, this.dataset.pageCat, this.dataset.pageIcon, this.dataset.pageType)" title="Sayfayı Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                                <button class="btn-icon-subtle btn-danger-hover" data-page-id="{{ p.id }}" data-page-title="{{ p.title|e }}" onclick="event.stopPropagation(); deletePage(this.dataset.pageId, this.dataset.pageTitle)" title="Sayfayı Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                             </div>
                         </li>
                         {% endif %}
@@ -115,235 +130,229 @@
             {% endfor %}
         </div>
 
-        <div class="sidebar-footer" style="margin-top:auto; padding-top:6px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:5px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:4px;">
-                <button class="btn btn-sm" id="sidebar-vault-btn" onclick="loadVaultPage()" style="flex:1; font-size:0.75rem; padding:4px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Şifre Kasası">
-                    <span>🔐</span> <span class="sidebar-footer-text">Kasa</span>
-                </button>
-                <button class="btn btn-sm" id="sidebar-trash-btn" onclick="loadTrashPage()" style="flex:1; font-size:0.75rem; padding:4px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Çöp Kutusu & Geri Dönüşüm">
-                    <span>🗑️</span> <span class="sidebar-footer-text">Çöp Kutusu</span>
-                    <span class="badge-count ov-badge-pill" id="sidebar-trash-badge" style="display:none; padding:1px 4px; font-size:0.65rem;">0</span>
-                </button>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:4px;">
-                <button class="btn btn-sm" onclick="openHistoryModal()" style="flex:1; font-size:0.75rem; padding:3px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Son 100 İşlem Geçmişi (Geri Al)">
-                    <span>📜</span> <span class="sidebar-footer-text">Geçmiş (100)</span>
-                </button>
-                <button class="btn btn-sm" onclick="triggerUndo()" style="flex:1; font-size:0.75rem; padding:3px 6px; display:flex; align-items:center; justify-content:center; gap:4px;" title="Son İşlemi Geri Al (Ctrl+Z)">
-                    <span>↩️</span> <span class="sidebar-footer-text">Geri Al</span>
-                </button>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                <a href="/notes/settings" class="btn btn-sm" style="display:flex; align-items:center; gap:6px; font-size:0.78rem; padding:3px 8px;" title="Ayarlar & Not Defterleri">
-                    <span>⚙️</span> <span class="sidebar-footer-text">Ayarlar</span>
-                </a>
-                <span class="sidebar-footer-text" style="font-size:0.72rem; color: {{ '#10b981' if bot_status else '#94a3b8' }}; font-weight:600;" title="Telegram Bot Durumu">
-                    ● {{ 'Bot Açık' if bot_status else 'Bot Kapalı' }}
-                </span>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; padding: 4px 6px; background: var(--border, rgba(255,255,255,0.05)); border-radius: 6px;">
-                <div style="display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="openUserModal()" title="Kullanıcı / Oturum">
-                    <span style="font-size:0.85rem;">👤</span>
-                    <span class="sidebar-footer-text" style="font-weight:600; font-size:0.75rem;">
+        <div class="sidebar-footer">
+            <div class="sidebar-user-card" onclick="openUserModal()" title="Kullanıcı / Profil">
+                <div class="sidebar-user-info">
+                    <span class="user-avatar"><svg class="svg-icon svg-icon-sm"><use href="#i-user"/></svg></span>
+                    <span class="sidebar-footer-text user-name">
                         {{ user.display_name if user else 'Oturum Aç' }}
                     </span>
                 </div>
+            </div>
+            <div class="sidebar-footer-actions">
+                <a href="/notes/settings" class="btn-footer-link" title="Ayarlar">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-settings"/></svg>
+                </a>
+                <button type="button" class="btn-footer-link" onclick="openHistoryModal()" title="İşlem Geçmişi">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-clock"/></svg>
+                </button>
+                <button type="button" class="btn-footer-link" onclick="triggerUndo()" title="Geri Al (Ctrl+Z)">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-undo"/></svg>
+                </button>
                 {% if user %}
-                <button class="btn btn-sm btn-icon" onclick="logoutUser()" title="Çıkış Yap" style="font-size:0.75rem; padding:2px 5px;">🚪</button>
-                {% else %}
-                <button class="btn btn-sm btn-primary" onclick="openUserModal()" style="font-size:0.7rem; padding:2px 6px;">Giriş</button>
+                <button type="button" class="btn-footer-link btn-logout" onclick="logoutUser()" title="Çıkış">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-log-out"/></svg>
+                </button>
                 {% endif %}
             </div>
         </div>
     </aside>
+    <div class="tnote-sidebar-backdrop" id="tnote-sidebar-backdrop" onclick="closeMobileSidebar()"></div>
 
     <!-- Ana İçerik Alanı -->
     <main class="tnote-content">
         <!-- Sayfa Başlığı ve Aksiyonlar -->
         <div class="content-header">
             <div class="content-title-area">
-                <span id="current-page-icon" style="font-size:1.25rem;">📝</span>
-                <div>
+                <button type="button" class="btn-mobile-sidebar-toggle" id="btn-mobile-sidebar-toggle" onclick="toggleMobileSidebar()" title="Listeleri Göster">
+                    <span class="mobile-toggle-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-folder"/></svg></span>
+                    <span class="mobile-toggle-text">Listeler</span>
+                </button>
+                <span id="current-page-icon" style="font-size:1.15rem;">📝</span>
+                <div class="content-title-wrapper">
                     <h2 class="content-title" id="current-page-title">Yükleniyor...</h2>
-                    <span class="badge-count" id="current-page-badge" style="margin-top:2px; display:inline-block;"></span>
+                    <span class="badge-count" id="current-page-badge" style="display:inline-block;"></span>
                 </div>
             </div>
 
             <!-- Global Arama Çubuğu (Spotlight Search) -->
-            <div class="global-search-trigger" onclick="openGlobalSearchModal()" title="Hızlı Arama (Ctrl + K veya /)">
-                <span class="search-trigger-icon">🔍</span>
-                <span class="search-trigger-text">Not, madde, finans veya şifre ara...</span>
+            <div class="global-search-trigger" onclick="openGlobalSearchModal()" title="Arama (Ctrl+K)">
+                <span class="search-trigger-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-search"/></svg></span>
                 <kbd class="search-trigger-kbd">Ctrl K</kbd>
             </div>
 
             <div class="header-actions" id="page-header-actions">
-                <button class="btn-icon" onclick="openSendTelegramModal()" title="Telegram ile Gönder">✈️</button>
-                <button class="btn-icon" id="btn-copy-clip" onclick="copyListToClipboard()" title="Metin Olarak Kopyala">📋</button>
-                <button class="btn-icon" id="btn-reset-list" onclick="resetCurrentList()" title="Tikleri Sıfırla">🔄</button>
-                <button class="btn-icon" id="btn-bulk-add" onclick="openModal('modal-bulk-add')" title="Toplu Ekle">📑</button>
-                <button class="btn-icon" id="btn-clear-done" onclick="clearCompleted()" title="Tamamlananları Temizle">🧹</button>
-                <button class="btn-icon" onclick="openEditCurrentPageModal()" title="Düzenle">✏️</button>
-                <button class="btn-icon btn-danger-hover" onclick="deletePage(currentPageId)" title="Sil">🗑️</button>
+                <button class="btn btn-sm btn-primary header-add-btn" id="btn-header-add" onclick="focusQuickAdd()" title="Ekle">
+                    <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-plus"/></svg><span>Ekle</span>
+                </button>
+                <div class="action-dropdown-container">
+                    <button class="btn-icon-subtle btn-more-actions" onclick="toggleMoreActionsDropdown(event)" title="İşlemler">
+                        <svg class="svg-icon svg-icon-sm"><use href="#i-more-vertical"/></svg>
+                    </button>
+                    <div class="action-dropdown-menu" id="page-more-dropdown" style="display:none;">
+                        <div class="dropdown-item" onclick="openSendTelegramModal(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-zap"/></svg></span> Telegram'a Gönder
+                        </div>
+                        <div class="dropdown-item" onclick="copyListToClipboard(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-file-text"/></svg></span> Kopyala
+                        </div>
+                        <div class="dropdown-item" onclick="resetCurrentList(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-undo"/></svg></span> Tikleri Sıfırla
+                        </div>
+                        <div class="dropdown-item" onclick="openModal('modal-bulk-add'); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-plus"/></svg></span> Toplu Ekle
+                        </div>
+                        <div class="dropdown-item" onclick="clearCompleted(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-trash"/></svg></span> Tamamlananları Sil
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-item" onclick="openEditCurrentPageModal(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-edit"/></svg></span> Düzenle
+                        </div>
+                        <div class="dropdown-item text-danger" onclick="deletePage(currentPageId); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-trash"/></svg></span> Sil
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="header-actions" id="overview-header-actions" style="display:none;">
-                <button class="btn-icon" onclick="openModal('modal-add-page')" title="Yeni Liste Ekle">➕ Liste</button>
-                <button class="btn-icon" onclick="loadOverviewPage()" title="Özeti Yenile">🔄 Yenile</button>
+                <button class="btn btn-sm btn-primary" onclick="openModal('modal-add-page')" title="Yeni Liste">
+                    <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-plus"/></svg>Liste
+                </button>
+                <button class="btn-icon" onclick="loadOverviewPage()" title="Yenile">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-refresh"/></svg>
+                </button>
             </div>
             <div class="header-actions" id="vault-header-actions" style="display:none;">
-                <button class="btn-icon" onclick="openPasswordGeneratorModal()" title="🎲 Şifre Üretici">🎲</button>
-                <button class="btn btn-sm btn-primary" onclick="openAddVaultModal()" style="font-size:0.8rem; padding:4px 8px;">➕ Yeni Şifre</button>
+                <button class="btn-icon" onclick="openPasswordGeneratorModal()" title="Şifre Üretici">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-shield"/></svg>
+                </button>
+                <button class="btn btn-sm btn-primary" onclick="openAddVaultModal()" style="font-size:0.8rem; padding:4px 8px;">
+                    <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-plus"/></svg>Yeni
+                </button>
             </div>
             <div class="header-actions" id="trash-header-actions" style="display:none;">
-                <button class="btn btn-sm btn-danger" onclick="confirmEmptyTrash()" style="font-size:0.8rem; padding:4px 8px;">🧹 Çöpü Boşalt</button>
+                <button class="btn btn-sm btn-danger" id="btn-empty-trash" onclick="confirmEmptyTrash()" style="font-size:0.8rem; padding:4px 8px;">
+                    <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-trash"/></svg>Boşalt
+                </button>
             </div>
         </div>
 
-        <!-- Hızlı Madde / Ürün Ekleme (Checklist için) -->
+        <!-- Hızlı Madde Ekleme (Checklist için) -->
         <div class="quick-add-box" id="quick-add-container">
             <div class="quick-add-main">
-                <input type="text" id="quick-item-title" class="quick-input" placeholder="Yeni madde veya link... (Enter)">
-                <button type="button" class="btn-icon" onclick="toggleQuickDetails()" title="Fiyat, Miktar ve Link">⚙️</button>
-                <button type="button" class="btn-icon btn-primary-icon" onclick="submitQuickItem()" title="Ekle">➕</button>
+                <input type="text" id="quick-item-title" class="quick-input" placeholder="Yeni madde...">
+                <button type="button" class="btn-icon" onclick="toggleQuickDetails()" title="Detaylar">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-settings"/></svg>
+                </button>
+                <button type="button" class="btn-icon btn-primary-icon" onclick="submitQuickItem()" title="Ekle">
+                    <svg class="svg-icon svg-icon-sm"><use href="#i-plus"/></svg>
+                </button>
             </div>
             <div class="quick-details" id="quick-details-box">
-                <input type="text" id="quick-item-qty" class="form-control" placeholder="Miktar (Örn: 2 adet)">
-                <input type="text" id="quick-item-price" class="form-control" placeholder="Fiyat (Örn: 250 TL)">
-                <input type="text" id="quick-item-url" class="form-control" placeholder="Link (isteğe bağlı)">
+                <input type="text" id="quick-item-qty" class="form-control" placeholder="Miktar">
+                <input type="text" id="quick-item-price" class="form-control" placeholder="Fiyat">
+                <input type="text" id="quick-item-url" class="form-control" placeholder="Link">
             </div>
         </div>
 
-        <!-- GENEL BAKIŞ & ÖZET SAYFASI (ANA SAYFA) -->
-        <div id="overview-view" style="display:flex; flex-direction:column; gap:16px;">
-            <!-- 1. Hoşgeldin ve Tarih Kartı -->
-            <div class="overview-welcome-card">
-                <div class="welcome-text-area">
-                    <div style="font-size:1.02rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
-                        <span>🏠</span> <span>TincNote Genel Bakış & Durum</span>
-                    </div>
-                    <div class="welcome-sub" id="overview-date-str" style="font-size:0.80rem; color:var(--muted); margin-top:3px;">
-                        Yükleniyor...
-                    </div>
-                </div>
-                <div class="overview-actions-bar">
-                    <button class="btn btn-sm btn-outline" onclick="openModal('modal-add-page')" title="Yeni Liste veya Not Sayfası Ekle">
-                        ➕ Yeni Liste
-                    </button>
-                    <button class="btn btn-sm btn-outline" onclick="openAddFinanceModal()" title="Gelir veya Gider Ekle">
-                        💰 Gelir / Gider
-                    </button>
-                    <button class="btn btn-sm btn-primary" onclick="loadOverviewPage()" title="Verileri Güncelle">
-                        🔄 Yenile
-                    </button>
-                </div>
-            </div>
+        <!-- GENEL BAKIŞ SAYFASI -->
+        <div id="overview-view" style="display:flex; flex-direction:column; gap:8px;">
+            <span id="overview-date-str" style="display:none;"></span>
 
-            <!-- 2. Üst 4'lü KPI Kartları -->
+            <!-- Üst 4'lü KPI Kartları (Sade & Kompakt) -->
             <div class="overview-kpi-grid">
-                <!-- Görevler / Maddeler -->
-                <div class="overview-kpi-card" onclick="jumpToFirstChecklist()" title="Yapılacaklar listesine git">
+                <!-- Görevler -->
+                <div class="overview-kpi-card" onclick="jumpToFirstChecklist()">
                     <div class="kpi-top">
-                        <span class="kpi-icon-badge" style="background:#e0f2fe; color:#0284c7;">📝</span>
+                        <span class="kpi-icon-badge"><svg class="svg-icon"><use href="#i-check-square"/></svg></span>
                         <span class="kpi-tag" id="ov-tasks-badge">%0</span>
                     </div>
                     <div class="kpi-num" id="ov-tasks-total">0</div>
-                    <div class="kpi-title">Toplam Madde & Görev</div>
-                    <div class="kpi-sub" id="ov-tasks-sub">0 bekleyen, 0 bitti</div>
-                    <div class="ov-progress-track">
-                        <div class="ov-progress-fill" id="ov-tasks-bar" style="width:0%;"></div>
-                    </div>
+                    <div class="kpi-title">Görevler</div>
+                    <div class="kpi-sub" id="ov-tasks-sub">0 bekleyen</div>
+                    <div class="kpi-progress-track"><div class="kpi-progress-fill" id="ov-tasks-bar-fill" style="width:0%;"></div></div>
                 </div>
 
-                <!-- Finans: Bu Ayın Net Durumu -->
-                <div class="overview-kpi-card" onclick="jumpToFinancePage()" title="Finans sayfasına git">
+                <!-- Finans: Net Durumu -->
+                <div class="overview-kpi-card" onclick="jumpToFinancePage()">
                     <div class="kpi-top">
-                        <span class="kpi-icon-badge" style="background:#dcfce7; color:#16a34a;">💰</span>
+                        <span class="kpi-icon-badge"><svg class="svg-icon"><use href="#i-credit-card"/></svg></span>
                         <span class="kpi-tag" id="ov-finance-period">Bu Ay</span>
                     </div>
-                    <div class="kpi-num" id="ov-finance-net">0.00 TL</div>
-                    <div class="kpi-title">Aylık Net Kalan</div>
-                    <div class="kpi-sub" id="ov-finance-sub">Gelir: 0 TL | Gider: 0 TL</div>
-                    <div class="ov-progress-track">
-                        <div class="ov-progress-fill" id="ov-finance-bar" style="width:50%; background:#10b981;"></div>
-                    </div>
+                    <div class="kpi-num neutral-num" id="ov-finance-net">0,00 TL</div>
+                    <div class="kpi-title">Net Bakiye</div>
+                    <div class="kpi-sub" id="ov-finance-sub">Kayıt yok</div>
+                    <div class="kpi-progress-track"><div class="kpi-progress-fill" id="ov-finance-bar-fill" style="width:0%;"></div></div>
                 </div>
 
-                <!-- Bekleyen Faturalar / Düzenli Ödemeler -->
-                <div class="overview-kpi-card" onclick="jumpToFinancePage()" title="Ödemeleri gör">
+                <!-- Bekleyen Faturalar -->
+                <div class="overview-kpi-card" onclick="jumpToFinancePage()">
                     <div class="kpi-top">
-                        <span class="kpi-icon-badge" style="background:#fef3c7; color:#d97706;">⏳</span>
-                        <span class="kpi-tag" id="ov-bills-count-tag" style="background:#fee2e2; color:#ef4444;">0 Bekleyen</span>
+                        <span class="kpi-icon-badge"><svg class="svg-icon"><use href="#i-clock"/></svg></span>
+                        <span class="kpi-tag" id="ov-bills-count-tag">0</span>
                     </div>
-                    <div class="kpi-num" id="ov-bills-total">0.00 TL</div>
-                    <div class="kpi-title">Bekleyen Fatura & Ödemeler</div>
-                    <div class="kpi-sub" id="ov-bills-sub">Vadesi gelmiş veya yaklaşan</div>
-                    <div class="ov-progress-track">
-                        <div class="ov-progress-fill" id="ov-bills-bar" style="width:0%; background:#f59e0b;"></div>
-                    </div>
+                    <div class="kpi-num" id="ov-bills-total">0,00 TL</div>
+                    <div class="kpi-title">Faturalar</div>
+                    <div class="kpi-sub" id="ov-bills-sub">Bekleyen</div>
                 </div>
 
                 <!-- Aktif Projeler -->
-                <div class="overview-kpi-card" onclick="jumpToFirstProject()" title="Projeleri gör">
+                <div class="overview-kpi-card" onclick="jumpToFirstProject()">
                     <div class="kpi-top">
-                        <span class="kpi-icon-badge" style="background:#f3e8ff; color:#9333ea;">⚡</span>
-                        <span class="kpi-tag" id="ov-proj-count-tag">0 Proje</span>
+                        <span class="kpi-icon-badge"><svg class="svg-icon"><use href="#i-layers"/></svg></span>
+                        <span class="kpi-tag" id="ov-proj-count-tag">0</span>
                     </div>
                     <div class="kpi-num" id="ov-projects-total">0</div>
-                    <div class="kpi-title">Aktif Projeler & İnşa</div>
-                    <div class="kpi-sub" id="ov-projects-sub">Aşama ve malzeme takibi</div>
-                    <div class="ov-progress-track">
-                        <div class="ov-progress-fill" id="ov-projects-bar" style="width:0%; background:#a855f7;"></div>
-                    </div>
+                    <div class="kpi-title">Projeler</div>
+                    <div class="kpi-sub" id="ov-projects-sub">Aktif</div>
                 </div>
             </div>
 
-            <!-- 3. İki Sütunlu Detay Tabloları -->
+            <!-- İki Sütunlu Detay Tabloları (Sol: Görevler, Sağ: Yaklaşan Ödemeler + Projeler) -->
             <div class="overview-grid-2col">
-                <!-- Sol Sütun -->
+                <!-- Sol Sütun: Bekleyen Görevler -->
                 <div class="overview-col">
-                    <!-- Bekleyen Görevler -->
-                    <div class="overview-section-box">
+                    <div class="overview-section-box" style="height:100%; display:flex; flex-direction:column;">
                         <div class="section-box-header">
-                            <span class="section-box-title">📌 Bekleyen Öncelikli Görevler</span>
+                            <span class="section-box-title">
+                                <svg class="svg-icon svg-icon-sm" style="margin-right:6px; color:var(--text-secondary);"><use href="#i-check-square"/></svg>Bekleyen Görevler
+                            </span>
                             <span class="badge-count" id="ov-pending-count-badge">0</span>
                         </div>
-                        <div class="overview-items-list" id="ov-pending-items-container">
-                            <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Yükleniyor...</div>
-                        </div>
-                    </div>
-
-                    <!-- Vadesi Yaklaşan Ödemeler -->
-                    <div class="overview-section-box" style="margin-top:14px;">
-                        <div class="section-box-header">
-                            <span class="section-box-title">📅 Vadesi Yaklaşan Fatura & Ödemeler</span>
-                            <span class="badge-count" id="ov-upcoming-bills-badge">Bu Ay</span>
-                        </div>
-                        <div class="overview-bills-list" id="ov-upcoming-bills-container">
+                        <div class="overview-items-list" id="ov-pending-items-container" style="flex:1;">
                             <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Yükleniyor...</div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Sağ Sütun -->
-                <div class="overview-col">
-                    <!-- Aktif Projeler -->
+                <!-- Sağ Sütun: Yaklaşan Ödemeler ve Projeler -->
+                <div class="overview-col" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- Vadesi Yaklaşan Ödemeler -->
                     <div class="overview-section-box">
                         <div class="section-box-header">
-                            <span class="section-box-title">🚀 Proje Durumları & İlerleme</span>
-                            <button class="btn-icon-subtle" onclick="openAddProjectModal()" title="Yeni Proje Ekle">➕</button>
+                            <span class="section-box-title">
+                                <svg class="svg-icon svg-icon-sm" style="margin-right:6px; color:var(--text-secondary);"><use href="#i-calendar"/></svg>Yaklaşan Ödemeler
+                            </span>
+                            <span class="badge-count" id="ov-upcoming-bills-badge">Bu Ay</span>
                         </div>
-                        <div class="overview-projects-list" id="ov-projects-container">
-                            <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Yükleniyor...</div>
+                        <div class="overview-bills-list" id="ov-upcoming-bills-container">
+                            <div style="padding:8px; text-align:center; color:var(--muted); font-size:0.78rem;">Yükleniyor...</div>
                         </div>
                     </div>
 
-                    <!-- Son Kullanılan Sayfalar / Listeler -->
-                    <div class="overview-section-box" style="margin-top:14px;">
+                    <!-- Aktif Projeler -->
+                    <div class="overview-section-box">
                         <div class="section-box-header">
-                            <span class="section-box-title">📂 Sayfalar & Listeler</span>
-                            <button class="btn-icon-subtle" onclick="openModal('modal-add-page')" title="Yeni Liste Ekle">➕</button>
+                            <span class="section-box-title">
+                                <svg class="svg-icon svg-icon-sm" style="margin-right:6px; color:var(--text-secondary);"><use href="#i-layers"/></svg>Projeler
+                            </span>
+                            <button class="btn-icon-subtle" onclick="openAddProjectModal()" title="Yeni Proje Ekle">
+                                <svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg>
+                            </button>
                         </div>
-                        <div class="overview-recent-pages-list" id="ov-recent-pages-container">
-                            <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Yükleniyor...</div>
+                        <div class="overview-projects-list" id="ov-projects-container">
+                            <div style="padding:8px; text-align:center; color:var(--muted); font-size:0.78rem;">Yükleniyor...</div>
                         </div>
                     </div>
                 </div>
@@ -351,25 +360,8 @@
         </div>
 
         <!-- HIZLI NOTLAR & GÖREVLER (ÖZEL HIZLI ALAN) -->
-        <div id="quick-tasks-view" style="display:none; flex-direction:column; gap:16px;">
-            <!-- 1. Hoşgeldin ve Bilgi Kartı -->
-            <div class="overview-welcome-card">
-                <div class="welcome-text-area">
-                    <div style="font-size:1.05rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
-                        <span>⚡</span> <span>Hızlı Notlar &amp; Görevler</span>
-                    </div>
-                    <div class="welcome-sub" style="font-size:0.80rem; color:var(--muted); margin-top:3px;">
-                        Basit notlar, hızlı yapılacaklar ve tüm sayfalardan tarih sırasına göre derlenen işler &amp; ödemeler
-                    </div>
-                </div>
-                <div class="overview-actions-bar">
-                    <button class="btn btn-sm btn-primary" onclick="loadQuickTasksPage()" title="Yenile">
-                        🔄 Yenile
-                    </button>
-                </div>
-            </div>
-
-            <!-- 2. İki Sütunlu Hızlı Alan (Hızlı Notlar & Hızlı Görevler) -->
+        <div id="quick-tasks-view" style="display:none; flex-direction:column; gap:12px;">
+            <!-- 1. İki Sütunlu Hızlı Alan (Hızlı Notlar & Hızlı Görevler) -->
             <div class="overview-grid-2col">
                 <!-- Sol: Hızlı Notlar (Quick Notes Inbox) -->
                 <div class="overview-col">
@@ -378,13 +370,13 @@
                             <span class="section-box-title">📝 Hızlı Notlar</span>
                             <span class="badge-count" id="web-quick-notes-count">0</span>
                         </div>
-                        <div style="padding:12px;">
-                            <div style="display:flex; gap:6px; margin-bottom:10px;">
-                                <input type="text" id="web-quick-note-input" class="form-control" placeholder="Aklınıza gelen hızlı bir not yazın..." onkeydown="if(event.key==='Enter') addWebQuickNote()">
-                                <button class="btn btn-sm btn-primary" onclick="addWebQuickNote()">➕ Not Ekle</button>
+                        <div style="padding:10px;">
+                            <div style="display:flex; gap:6px; margin-bottom:8px;">
+                                <input type="text" id="web-quick-note-input" class="form-control" placeholder="Hızlı not..." onkeydown="if(event.key==='Enter') addWebQuickNote()">
+                                <button class="btn btn-sm btn-primary" onclick="addWebQuickNote()">➕ Ekle</button>
                             </div>
                             <div id="web-quick-notes-list" class="overview-items-list" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
-                                <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Henüz hızlı not yok.</div>
+                                <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Not yok</div>
                             </div>
                         </div>
                     </div>
@@ -397,26 +389,23 @@
                             <span class="section-box-title">⚡ Hızlı Görevler</span>
                             <span class="badge-count" id="web-quick-direct-count">0</span>
                         </div>
-                        <div style="padding:12px;">
-                            <div style="display:flex; gap:6px; margin-bottom:10px;">
-                                <input type="text" id="web-quick-task-input" class="form-control" placeholder="Hızlı görev yazın ve Enter'a basın..." onkeydown="if(event.key==='Enter') addWebQuickTask()">
-                                <button class="btn btn-sm btn-primary" onclick="addWebQuickTask()">➕ Görev Ekle</button>
+                        <div style="padding:10px;">
+                            <div style="display:flex; gap:6px; margin-bottom:8px;">
+                                <input type="text" id="web-quick-task-input" class="form-control" placeholder="Hızlı görev..." onkeydown="if(event.key==='Enter') addWebQuickTask()">
+                                <button class="btn btn-sm btn-primary" onclick="addWebQuickTask()">➕ Ekle</button>
                             </div>
                             <div id="web-quick-direct-list" class="overview-items-list" style="max-height:280px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
-                                <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Henüz hızlı görev yok.</div>
+                                <div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Görev yok</div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 3. Kategori ve Sayfalardan Gelen Görevler (Tarih Sıralı) -->
+            <!-- 2. Kategori ve Sayfalardan Gelen Görevler (Tarih Sıralı) -->
             <div class="overview-section-box">
                 <div class="section-box-header">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span class="section-box-title">📅 Tüm Kategori &amp; Sayfalardan Gelen Görevler &amp; Ödemeler</span>
-                        <span style="font-size:0.75rem; color:var(--muted); font-weight:normal;">(Tarih Sıralı • Yaklaşan / Gecikmiş Ödemeler Dahil)</span>
-                    </div>
+                    <span class="section-box-title">📅 Planlanan Görev &amp; Ödemeler</span>
                     <span class="badge-count" id="web-unified-tasks-count">0</span>
                 </div>
                 <div class="overview-items-list" id="web-unified-tasks-container">
@@ -433,10 +422,10 @@
                     <button class="filter-btn" data-filter="pending" onclick="setFilter('pending')">Bekleyenler</button>
                     <button class="filter-btn" data-filter="done" onclick="setFilter('done')">Tamamlananlar</button>
                 </div>
-                <input type="text" id="items-search" placeholder="Listede ara..." oninput="onSearchItems()" style="padding:4px 10px; border:1px solid var(--border); border-radius:6px; font-size:0.82rem;">
+                <input type="text" id="items-search" placeholder="Ara..." oninput="onSearchItems()" style="padding:4px 10px; border:1px solid var(--border); border-radius:6px; font-size:0.82rem;">
             </div>
 
-            <ul class="items-list" id="items-container" style="margin-top:14px;">
+            <ul class="items-list" id="items-container" style="margin-top:6px;">
                 <!-- JavaScript ile doldurulur -->
             </ul>
         </div>
@@ -688,57 +677,57 @@
             </div>
         </div>
 
-        <!-- Not / Serbest Metin Görünümü -->
+        <!-- Not / Serbest Metin Görünümü (Modern Markdown Editor) -->
         <div id="note-view" class="note-editor-area" style="display:none;">
-            <textarea id="note-content-textarea" class="note-textarea" placeholder="Buraya notlarınızı, kodlarınızı veya markdown metninizi yazabilirsiniz..."></textarea>
-            <div style="display:flex; justify-content:flex-end;">
-                <button class="btn btn-primary" onclick="saveNoteContent()">💾 Notu Kaydet</button>
+            <div class="note-toolbar">
+                <div class="note-toolbar-group">
+                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('**', '**')" title="Kalın (Ctrl+B)"><b>B</b></button>
+                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('*', '*')" title="İtalik (Ctrl+I)"><i>I</i></button>
+                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('# ')" title="Başlık 1">H1</button>
+                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('## ')" title="Başlık 2">H2</button>
+                    <span class="tb-divider"></span>
+                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('- ')" title="Madde İşareti">• Liste</button>
+                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('- [ ] ')" title="Yapılacak Kutusu">☑ Görev</button>
+                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('`', '`')" title="Kod Satırı">`Kod`</button>
+                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('> ')" title="Alıntı">❝</button>
+                </div>
+                <div class="note-toolbar-group">
+                    <div class="btn-group-segmented">
+                        <button type="button" id="btn-note-mode-edit" class="btn-seg active" onclick="toggleNoteEditorMode('edit')">✏️ Düzenle</button>
+                        <button type="button" id="btn-note-mode-preview" class="btn-seg" onclick="toggleNoteEditorMode('preview')">👁️ Önizle</button>
+                    </div>
+                    <span id="note-save-status" class="note-save-status">Kaydedildi</span>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="saveNoteContent()">Kaydet</button>
+                </div>
+            </div>
+            <textarea id="note-content-textarea" class="note-textarea" oninput="handleNoteInput()" placeholder="Not..."></textarea>
+            <div id="note-markdown-preview" class="note-markdown-preview" style="display:none;"></div>
+            <div class="note-footer-bar">
+                <span id="note-char-count" style="font-size:0.75rem; color:var(--muted);">0 karakter</span>
             </div>
         </div>
 
         <!-- ŞİFRE & KİMLİK KASASI SAYFASI -->
-        <div id="vault-view" style="display:none; flex-direction:column; gap:16px;">
-            <!-- Kasa Üst Banner ve Aksiyonlar -->
-            <div class="vault-top-banner">
-                <div class="vault-banner-info">
-                    <div style="font-size:1.05rem; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px;">
-                        <span>🔐</span> <span>Şifre & Kimlik Bilgileri Kasası</span>
-                    </div>
-                    <div style="font-size:0.78rem; color:var(--muted); margin-top:3px;">
-                        Kişisel, aile ve iş hesaplarınız; banka, Wi-Fi, sunucu ve cihaz PIN'leriniz tek bir güvenli yerde.
-                    </div>
-                </div>
-                <div class="vault-banner-actions">
-                    <button class="btn btn-sm btn-outline" style="color:#fff; border-color:rgba(255,255,255,0.4);" onclick="openPasswordGeneratorModal()" title="Güçlü Rastgele Şifre Oluştur">
-                        🎲 Şifre Üretici
-                    </button>
-                    <button class="btn btn-sm btn-primary" onclick="openAddVaultModal()" title="Yeni Şifre / Hesap Ekle">
-                        ➕ Yeni Kayıt Ekle
-                    </button>
-                </div>
-            </div>
-
-            <!-- Kasa Klasörleri & Proje Grupları Şeridi -->
+        <div id="vault-view" style="display:none; flex-direction:column; gap:12px;">
+            <!-- Kasa Klasörleri Şeridi -->
             <div class="vault-folders-container">
                 <div class="vault-folders-header">
                     <span style="font-weight:700; font-size:0.83rem; color:var(--text); display:flex; align-items:center; gap:6px;">
-                        <span>📁</span> <span>Klasörler & Projeler</span>
+                        <span>📁</span> <span>Klasörler</span>
                     </span>
-                    <button class="btn btn-xs btn-outline" onclick="openNewVaultFolderModal()" title="Yeni Kasa Klasörü Ekle" style="font-size:0.75rem; padding:2px 8px; border-radius:12px;">
-                        ➕ Yeni Klasör
+                    <button class="btn btn-xs btn-outline" onclick="openNewVaultFolderModal()" title="Yeni Klasör Ekle" style="font-size:0.75rem; padding:2px 8px; border-radius:12px;">
+                        ➕ Ekle
                     </button>
                 </div>
                 <div class="vault-folders-strip" id="vault-folders-strip">
-                    <!-- Dinamik Klasör Butonları (Tümü, Turan, Ahmet, Proje X...) -->
+                    <!-- Dinamik Klasör Butonları -->
                 </div>
             </div>
 
-            <!-- Aktif Filtre Çubuğu (Kişi, Klasör veya Etikete tıklandığında) -->
+            <!-- Aktif Filtre Çubuğu -->
             <div id="vault-active-filter-bar" class="vault-active-filter-bar" style="display:none;">
-                <div class="vault-active-filter-content" id="vault-active-filter-text">
-                    <!-- Dinamik: 🔍 Filtre: 👤 Ahmet (3 şifre) -->
-                </div>
-                <button class="vault-active-filter-clear" onclick="clearAllVaultFilters()" title="Filtreyi Temizle">✕ Filtreyi Temizle</button>
+                <div class="vault-active-filter-content" id="vault-active-filter-text"></div>
+                <button class="vault-active-filter-clear" onclick="clearAllVaultFilters()" title="Filtreyi Temizle">✕ Temizle</button>
             </div>
 
             <!-- Kasa Filtreleme & Arama Çubuğu -->
@@ -748,12 +737,12 @@
                     <button class="vault-tab-btn active" data-scope="all" onclick="setVaultScope('all')">Tümü</button>
                     <button class="vault-tab-btn" data-scope="personal" onclick="setVaultScope('personal')">👤 Kişisel</button>
                     <button class="vault-tab-btn" data-scope="family" onclick="setVaultScope('family')">👨‍👩‍👧 Aile</button>
-                    <button class="vault-tab-btn" data-scope="work" onclick="setVaultScope('work')">💼 İş / Şirket</button>
+                    <button class="vault-tab-btn" data-scope="work" onclick="setVaultScope('work')">💼 İş</button>
                 </div>
 
                 <!-- Profil & Klasör & Kategori & Arama Araçları -->
                 <div class="vault-filter-tools">
-                    <input type="text" id="vault-search-input" class="form-control" placeholder="Kasa içinde ara..." style="font-size:0.8rem; padding:5px 8px; width:160px;" oninput="debounceVaultSearch()">
+                    <input type="text" id="vault-search-input" class="form-control" placeholder="Ara..." style="font-size:0.8rem; padding:5px 8px; width:160px;" oninput="debounceVaultSearch()">
 
                     <select id="vault-folder-filter" class="form-control" style="font-size:0.8rem; padding:5px 8px; width:135px;" onchange="setVaultFolder(this.value)">
                         <option value="all">📁 Tüm Klasörler</option>
@@ -765,13 +754,13 @@
 
                     <select id="vault-category-filter" class="form-control" style="font-size:0.8rem; padding:5px 8px; width:135px;" onchange="setVaultCategory(this.value)">
                         <option value="all">📂 Tüm Türler</option>
-                        <option value="web">🌐 Web / Uygulama</option>
-                        <option value="bank">💳 Banka / Finans</option>
-                        <option value="wifi">📶 Wi-Fi / Ağ</option>
-                        <option value="device">📱 Cihaz / PIN / PUK</option>
-                        <option value="server">🖥️ Sunucu / API / SSH</option>
+                        <option value="web">🌐 Web</option>
+                        <option value="bank">💳 Banka</option>
+                        <option value="wifi">📶 Wi-Fi</option>
+                        <option value="device">📱 Cihaz / PIN</option>
+                        <option value="server">🖥️ Sunucu / SSH</option>
                         <option value="email">📧 E-posta</option>
-                        <option value="other">🔒 Diğer / Not</option>
+                        <option value="other">🔒 Diğer</option>
                     </select>
                 </div>
             </div>
@@ -783,23 +772,7 @@
         </div>
 
         <!-- ÇÖP KUTUSU SAYFASI -->
-        <div id="trash-view" style="display:none; flex-direction:column; gap:16px;">
-            <div class="trash-top-banner">
-                <div class="trash-banner-info">
-                    <div style="font-size:1.02rem; font-weight:700; color:#991b1b; display:flex; align-items:center; gap:8px;">
-                        <span>🗑️</span> <span>Çöp Kutusu & Geri Dönüşüm</span>
-                    </div>
-                    <div style="font-size:0.78rem; color:#7f1d1d; margin-top:3px;">
-                        Silinen sayfalar burada saklanır. İstediğiniz zaman tek tıkla geri yükleyebilir veya kalıcı olarak temizleyebilirsiniz.
-                    </div>
-                </div>
-                <div class="trash-banner-actions">
-                    <button class="btn btn-sm btn-danger" onclick="confirmEmptyTrash()" id="btn-empty-trash" title="Tüm silinenleri kalıcı olarak temizle">
-                        🧹 Çöp Kutusunu Boşalt
-                    </button>
-                </div>
-            </div>
-
+        <div id="trash-view" style="display:none; flex-direction:column; gap:12px;">
             <div id="trash-list-container" class="trash-list">
                 <!-- Dinamik doldurulur -->
             </div>
@@ -847,13 +820,13 @@
                 </div>
                 <div class="form-group" style="margin-bottom:12px;">
                     <label for="transfer-new-page-title" style="font-size:0.82rem; font-weight:600;">Yeni Sayfa Başlığı:</label>
-                    <input type="text" id="transfer-new-page-title" class="form-control" placeholder="Örn: Toplantı Notu">
+                    <input type="text" id="transfer-new-page-title" class="form-control" placeholder="Sayfa adı">
                 </div>
             </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-sm" onclick="closeModal('modal-transfer-quick-note')">İptal</button>
-            <button class="btn btn-sm btn-primary" onclick="submitTransferQuickNote()">🚀 Aktar ve Hızlı Notlardan Kaldır</button>
+            <button class="btn btn-sm btn-primary" onclick="submitTransferQuickNote()">🚀 Aktar</button>
         </div>
     </div>
 </div>
@@ -862,13 +835,13 @@
 <div class="tnote-modal-backdrop" id="modal-add-notebook">
     <div class="tnote-modal">
         <div class="modal-header">
-            <span>📓 Yeni Not Defteri Oluştur</span>
+            <span>📓 Yeni Defter</span>
             <button class="btn-icon" onclick="closeModal('modal-add-notebook')">✕</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
                 <label>Not Defteri Adı *</label>
-                <input type="text" id="nb-new-name" class="form-control" placeholder="Örn: İş & Projeler, Üniversite, Kişisel..." required>
+                <input type="text" id="nb-new-name" class="form-control" placeholder="Defter adı" required>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                 <div class="form-group">
@@ -882,7 +855,7 @@
             </div>
             <div class="form-group">
                 <label>Açıklama (Opsiyonel)</label>
-                <input type="text" id="nb-new-desc" class="form-control" placeholder="Bu defterin kullanım amacı...">
+                <input type="text" id="nb-new-desc" class="form-control" placeholder="Açıklama">
             </div>
         </div>
         <div class="modal-footer">
@@ -896,13 +869,13 @@
 <div class="tnote-modal-backdrop" id="modal-add-category">
     <div class="tnote-modal">
         <div class="modal-header">
-            <span>Yeni Kategori Oluştur</span>
+            <span>Yeni Kategori</span>
             <button class="btn-icon" onclick="closeModal('modal-add-category')">✕</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
                 <label>Kategori Adı</label>
-                <input type="text" id="new-cat-name" class="form-control" placeholder="Örn: Ev & Yaşam">
+                <input type="text" id="new-cat-name" class="form-control" placeholder="Kategori adı">
             </div>
             <div class="form-group">
                 <label>İkon (Emoji)</label>
@@ -924,7 +897,7 @@
 <div class="tnote-modal-backdrop" id="modal-add-page">
     <div class="tnote-modal">
         <div class="modal-header">
-            <span>Yeni Liste / Not Sayfası</span>
+            <span>Yeni Liste / Sayfa</span>
             <button class="btn-icon" onclick="closeModal('modal-add-page')">✕</button>
         </div>
         <div class="modal-body">
@@ -938,7 +911,7 @@
             </div>
             <div class="form-group">
                 <label>Sayfa Başlığı</label>
-                <input type="text" id="new-page-title" class="form-control" placeholder="Örn: Haftalık Market">
+                <input type="text" id="new-page-title" class="form-control" placeholder="Sayfa adı">
             </div>
             <div class="form-group">
                 <label>Sayfa Tipi</label>
@@ -1056,19 +1029,19 @@
             </div>
             <div class="form-group">
                 <label>Miktar / Adet</label>
-                <input type="text" id="edit-item-qty" class="form-control" placeholder="Örn: 2 adet, 1 kg">
+                <input type="text" id="edit-item-qty" class="form-control" placeholder="Miktar">
             </div>
             <div class="form-group">
                 <label>Fiyat</label>
-                <input type="text" id="edit-item-price" class="form-control" placeholder="Örn: 350 TL">
+                <input type="text" id="edit-item-price" class="form-control" placeholder="Fiyat">
             </div>
             <div class="form-group">
                 <label>Ürün / Web Linki</label>
-                <input type="text" id="edit-item-url" class="form-control" placeholder="https://...">
+                <input type="text" id="edit-item-url" class="form-control" placeholder="Link">
             </div>
             <div class="form-group">
                 <label>Açıklama / Not</label>
-                <input type="text" id="edit-item-desc" class="form-control" placeholder="İsteğe bağlı ek açıklama...">
+                <input type="text" id="edit-item-desc" class="form-control" placeholder="Açıklama">
             </div>
         </div>
         <div class="modal-footer">
@@ -1127,12 +1100,12 @@
                 </div>
                 <div class="form-group">
                     <label>Kategori</label>
-                    <input type="text" id="fin-add-cat" class="form-control" placeholder="Örn: Fatura" value="Fatura">
+                    <input type="text" id="fin-add-cat" class="form-control" placeholder="Kategori" value="Fatura">
                 </div>
             </div>
             <div class="form-group">
                 <label>Açıklama</label>
-                <input type="text" id="fin-add-title" class="form-control" placeholder="Fatura veya kalem adı...">
+                <input type="text" id="fin-add-title" class="form-control" placeholder="Açıklama">
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group">
@@ -1157,7 +1130,7 @@
                 </div>
                 <div class="form-group">
                     <label>Bitiş Ayı</label>
-                    <input type="month" id="fin-add-endperiod" class="form-control" placeholder="YYYY-MM (boşsa süresiz)">
+                    <input type="month" id="fin-add-endperiod" class="form-control" placeholder="YYYY-MM">
                 </div>
             </div>
             <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
@@ -1166,7 +1139,7 @@
             </div>
             <div class="form-group" style="margin-top:6px;">
                 <label>Notlar</label>
-                <input type="text" id="fin-add-notes" class="form-control" placeholder="İsteğe bağlı not...">
+                <input type="text" id="fin-add-notes" class="form-control" placeholder="Not">
             </div>
         </div>
         <div class="modal-footer">
@@ -1246,7 +1219,7 @@
             <input type="hidden" id="milestone-edit-id">
             <div class="form-group">
                 <label>Aşama Adı</label>
-                <input type="text" id="milestone-title" class="form-control" placeholder="Aşama başlığı...">
+                <input type="text" id="milestone-title" class="form-control" placeholder="Başlık">
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group">
@@ -1264,11 +1237,11 @@
             </div>
             <div class="form-group">
                 <label>Açıklama</label>
-                <textarea id="milestone-desc" class="form-control" rows="2" placeholder="Açıklama (isteğe bağlı)..."></textarea>
+                <textarea id="milestone-desc" class="form-control" rows="2" placeholder="Açıklama"></textarea>
             </div>
             <div class="form-group">
-                <label>Adımlar (Her satıra bir adım)</label>
-                <textarea id="milestone-reqs" class="form-control" rows="3" placeholder="Her satıra bir adım..."></textarea>
+                <label>Adımlar</label>
+                <textarea id="milestone-reqs" class="form-control" rows="3" placeholder="Adımlar"></textarea>
             </div>
         </div>
         <div class="modal-footer">
@@ -1289,7 +1262,7 @@
             <input type="hidden" id="material-edit-id">
             <div class="form-group">
                 <label>Parça Adı</label>
-                <input type="text" id="material-name" class="form-control" placeholder="Parça veya bileşen adı">
+                <input type="text" id="material-name" class="form-control" placeholder="Parça adı">
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group">
@@ -1311,11 +1284,11 @@
             </div>
             <div class="form-group">
                 <label>Satıcı Linki</label>
-                <input type="url" id="material-url" class="form-control" placeholder="https://... (isteğe bağlı)">
+                <input type="url" id="material-url" class="form-control" placeholder="Link">
             </div>
             <div class="form-group">
                 <label>Teknik Not</label>
-                <input type="text" id="material-notes" class="form-control" placeholder="Teknik detay veya not...">
+                <input type="text" id="material-notes" class="form-control" placeholder="Not">
             </div>
         </div>
         <div class="modal-footer">
@@ -1350,15 +1323,15 @@
             </div>
             <div class="form-group">
                 <label>Başlık</label>
-                <input type="text" id="proj-log-title" class="form-control" placeholder="Özet başlık...">
+                <input type="text" id="proj-log-title" class="form-control" placeholder="Başlık">
             </div>
             <div class="form-group">
                 <label>Not / Gözlem</label>
-                <textarea id="proj-log-content" class="form-control" rows="4" placeholder="Yapılan işlem veya notlar..."></textarea>
+                <textarea id="proj-log-content" class="form-control" rows="4" placeholder="Notlar..."></textarea>
             </div>
             <div class="form-group">
                 <label>Görsel Linki</label>
-                <input type="text" id="proj-log-image" class="form-control" placeholder="Görsel linki (isteğe bağlı)">
+                <input type="text" id="proj-log-image" class="form-control" placeholder="Görsel linki">
             </div>
         </div>
         <div class="modal-footer">
@@ -1378,15 +1351,15 @@
         <div class="modal-body">
             <div class="form-group">
                 <label>Başlık</label>
-                <input type="text" id="drawing-title" class="form-control" placeholder="Örn: Devre Şeması">
+                <input type="text" id="drawing-title" class="form-control" placeholder="Başlık">
             </div>
             <div class="form-group">
                 <label>Görsel Linki</label>
-                <input type="url" id="drawing-url" class="form-control" placeholder="https://...">
+                <input type="url" id="drawing-url" class="form-control" placeholder="Link">
             </div>
             <div class="form-group">
                 <label>Açıklama</label>
-                <input type="text" id="drawing-desc" class="form-control" placeholder="Kısa not...">
+                <input type="text" id="drawing-desc" class="form-control" placeholder="Not">
             </div>
         </div>
         <div class="modal-footer">
@@ -1416,7 +1389,7 @@
         </div>
         <div class="modal-body">
             <p style="font-size:0.85rem; color:var(--muted); margin:0;">
-                Bu listeyi veya özet tabloyu Telegram sohbetinize interaktif butonlarla gönderin. Butonlara basıldığında maddeler çift yönlü olarak tamamlanabilir.
+                Bu listeyi veya özet tabloyu Telegram sohbetinize interaktif butonlarla gönderin.
             </p>
             <div class="form-group">
                 <label>Alıcı Telegram Kullanıcısı / Chat</label>
@@ -1437,7 +1410,7 @@
     <div class="tnote-modal spotlight-modal" onclick="event.stopPropagation()">
         <div class="spotlight-header">
             <span class="spotlight-search-icon">🔍</span>
-            <input type="text" id="spotlight-input" class="spotlight-input" placeholder="Not, madde, finans veya şifre ara... (Çıkmak için Esc)" autocomplete="off">
+            <input type="text" id="spotlight-input" class="spotlight-input" placeholder="Ara..." autocomplete="off">
             <button class="btn-icon" onclick="closeModal('modal-global-search')">✕</button>
         </div>
         <div class="spotlight-filter-tabs">
@@ -1449,7 +1422,7 @@
             <button class="spotlight-tab" data-type="projects" onclick="setSpotlightFilter('projects')">Projeler</button>
         </div>
         <div class="spotlight-results" id="spotlight-results">
-            <div class="spotlight-hint">Aramak için yazmaya başlayın... (Başlık, içerik, kullanıcı adı, notlar taranır)</div>
+            <div class="spotlight-hint">Aramak için yazın...</div>
         </div>
         <div class="spotlight-footer">
             <span><kbd>↑</kbd> <kbd>↓</kbd> Gezin</span>
@@ -1496,12 +1469,12 @@
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group">
                     <label>📁 Klasör / Proje</label>
-                    <input type="text" id="v-folder" class="form-control" placeholder="Örn: Ahmet, Turan, Web Sitesi" list="vault-folder-datalist">
+                    <input type="text" id="v-folder" class="form-control" placeholder="Klasör" list="vault-folder-datalist">
                     <datalist id="vault-folder-datalist"></datalist>
                 </div>
                 <div class="form-group">
                     <label>👤 Sahip / Kişi (Profil)</label>
-                    <input type="text" id="v-profile" class="form-control" placeholder="Örn: Turan, Ahmet, Eşim" list="vault-profile-datalist">
+                    <input type="text" id="v-profile" class="form-control" placeholder="Kişi" list="vault-profile-datalist">
                     <datalist id="vault-profile-datalist"></datalist>
                 </div>
             </div>
@@ -1509,18 +1482,18 @@
             <div style="display:grid; grid-template-columns:2fr 1fr; gap:10px;">
                 <div class="form-group">
                     <label>Başlık / Hesap Adı *</label>
-                    <input type="text" id="v-title" class="form-control" placeholder="Örn: Garanti BBVA, Netflix, Ev Wi-Fi">
+                    <input type="text" id="v-title" class="form-control" placeholder="Kayıt adı">
                 </div>
                 <div class="form-group">
                     <label>🏷️ Etiketler (Tags)</label>
-                    <input type="text" id="v-tags" class="form-control" placeholder="#api, #proje, #gmail" list="vault-tags-datalist">
+                    <input type="text" id="v-tags" class="form-control" placeholder="Etiketler" list="vault-tags-datalist">
                     <datalist id="vault-tags-datalist"></datalist>
                 </div>
             </div>
 
             <div class="form-group">
                 <label id="v-username-label">Kullanıcı Adı / E-posta / Müşteri No</label>
-                <input type="text" id="v-username" class="form-control" placeholder="kullanici@mail.com veya 12345678">
+                <input type="text" id="v-username" class="form-control" placeholder="Kullanıcı adı / E-posta">
             </div>
 
             <div class="form-group">
@@ -1531,7 +1504,7 @@
                     </button>
                 </div>
                 <div style="display:flex; gap:6px;">
-                    <input type="password" id="v-password" class="form-control" placeholder="Şifre veya parola" style="flex:1;">
+                    <input type="password" id="v-password" class="form-control" placeholder="Şifre" style="flex:1;">
                     <button type="button" class="btn-icon" onclick="togglePasswordVisibility('v-password')" title="Göster / Gizle">👁️</button>
                 </div>
             </div>
@@ -1539,17 +1512,17 @@
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
                 <div class="form-group">
                     <label id="v-url-label">Web Adresi / URL</label>
-                    <input type="url" id="v-url" class="form-control" placeholder="https://...">
+                    <input type="url" id="v-url" class="form-control" placeholder="Link">
                 </div>
                 <div class="form-group">
                     <label id="v-secondary-label">Ek Bilgi (PIN / IBAN / Port)</label>
-                    <input type="text" id="v-secondary" class="form-control" placeholder="PIN, PUK, IBAN vb.">
+                    <input type="text" id="v-secondary" class="form-control" placeholder="İkincil / PIN / IBAN">
                 </div>
             </div>
 
             <div class="form-group">
                 <label>Gizli Notlar / Güvenlik Soruları</label>
-                <textarea id="v-notes" class="form-control" rows="2" placeholder="Örn: Kurtarma kodları, şube kodu, hatırlatmalar vb."></textarea>
+                <textarea id="v-notes" class="form-control" rows="2" placeholder="Notlar"></textarea>
             </div>
         </div>
         <div class="modal-footer">
@@ -1586,7 +1559,7 @@
             <input type="hidden" id="v-folder-old-name" value="">
             <div class="form-group">
                 <label>Klasör / Proje Adı *</label>
-                <input type="text" id="v-folder-input-name" class="form-control" placeholder="Örn: Ahmet, Turan, E-Ticaret, Apartman">
+                <input type="text" id="v-folder-input-name" class="form-control" placeholder="Klasör adı">
             </div>
             <div class="form-group">
                 <label>Klasör İkonu</label>
