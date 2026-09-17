@@ -166,7 +166,10 @@
             <span>🤖</span> Telegram Botu & İzinler
         </button>
         <button class="settings-tab-btn" id="tab-btn-import" onclick="switchSettingsTab('import')">
-            <span>📥</span> Dışarıdan Veri İçe Aktar & Yedekle
+            <span>📥</span> Dışarıdan Veri İçe Aktar &amp; Yedekle
+        </button>
+        <button class="settings-tab-btn" id="tab-btn-ai" onclick="switchSettingsTab('ai')">
+            <span>✨</span> Yapay Zeka (AI Eklentisi)
         </button>
     </div>
 
@@ -455,6 +458,88 @@
             </div>
         </div>
     </div>
+
+    <!-- ─────────────────────────────────────────────────────────────────
+         SEKME 4: ✨ YAPAY ZEKA (AI EKLENTİSİ)
+         ───────────────────────────────────────────────────────────────── -->
+    <div class="settings-tab-panel" id="settings-tab-ai">
+        <div class="settings-grid">
+            <!-- Sol Kolon: AI Sağlayıcı ve API Yapılandırması -->
+            <div class="settings-card">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:10px;">
+                    <div>
+                        <h3 style="margin:0; font-size:1rem; display:flex; align-items:center; gap:8px;">
+                            ✨ TincAI Asistan Yapılandırması
+                        </h3>
+                        <p style="margin:4px 0 0 0; font-size:0.8rem; color:var(--muted);">
+                            Proje ve notlarınızda yapay zeka analizlerini kullanmak için API anahtarınızı yapılandırın.
+                        </p>
+                    </div>
+                    <span id="ai-status-badge" style="background:#f1f5f9; color:#64748b; font-size:0.75rem; font-weight:700; padding:3px 8px; border-radius:12px;">
+                        Kontrol ediliyor...
+                    </span>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:0.85rem;">AI Sağlayıcı (Provider)</label>
+                        <select id="cfg-ai-provider" class="form-control" onchange="handleAiProviderChange()">
+                            <option value="gemini">Google Gemini (Önerilen &amp; Entegre)</option>
+                            <option value="openai">OpenAI / Uyumlu API</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="font-weight:600; font-size:0.85rem;">Model Seçimi</label>
+                        <select id="cfg-ai-model" class="form-control">
+                            <option value="gemini-2.0-flash">gemini-2.0-flash (Ultra Hızlı &amp; Güncel)</option>
+                            <option value="gemini-1.5-pro">gemini-1.5-pro (Derin Akıl Yürütme)</option>
+                            <option value="gemini-1.5-flash">gemini-1.5-flash (Standart Hızlı)</option>
+                            <option value="gpt-4o-mini">gpt-4o-mini (OpenAI)</option>
+                            <option value="gpt-4o">gpt-4o (OpenAI)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <label style="font-weight:600; font-size:0.85rem;">API Anahtarı (API Key)</label>
+                            <span id="ai-key-masked-hint" style="font-size:0.72rem; color:var(--muted);"></span>
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <input type="password" id="cfg-ai-api-key" class="form-control" placeholder="AIzaSy... veya sk-..." autocomplete="off">
+                            <button type="button" class="btn btn-sm btn-outline" onclick="toggleAiKeyVisibility()" title="Göster/Gizle">👁️</button>
+                        </div>
+                        <small style="font-size:0.72rem; color:var(--muted); margin-top:4px; display:block;">
+                            Google AI Studio (aistudio.google.com) veya OpenAI platformundan ücretsiz API anahtarı alabilirsiniz.
+                        </small>
+                    </div>
+
+                    <div style="display:flex; gap:8px; margin-top:6px;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="saveAiSettings()" id="btn-save-ai">
+                            💾 Ayarları Kaydet
+                        </button>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="testAiConnection()" id="btn-test-ai">
+                            🔌 Bağlantıyı Sına
+                        </button>
+                    </div>
+
+                    <div id="ai-test-result-box" style="display:none; padding:10px 12px; border-radius:6px; font-size:0.82rem; margin-top:6px;"></div>
+                </div>
+            </div>
+
+            <!-- Sağ Kolon: Yetenekler & Bilgi Kartı -->
+            <div class="settings-card" style="background:var(--surface2);">
+                <h4 style="margin:0 0 8px 0; font-size:0.9rem;">🧠 TincAI Neler Yapabilir?</h4>
+                <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text); line-height:1.6; display:flex; flex-direction:column; gap:6px;">
+                    <li><strong>📋 Projeyi / Notu Özetleme:</strong> Sayfanın hedefini, ilerlemesini ve kilometre taşlarını yönetici özeti olarak derler.</li>
+                    <li><strong>⚖️ Risk &amp; Gidişat Değerlendirmesi:</strong> Mühendislik, maliyet, güvenlik ve tedarik açısından kritik darboğazları tespit eder.</li>
+                    <li><strong>🔍 Eksik Bulucu:</strong> Projenin malzeme listesindeki (BOM) eksik bileşenleri veya unutulmuş adımları ortaya çıkarır.</li>
+                    <li><strong>🚀 Sonraki Adımlar:</strong> Projenin bulunduğu aşamaya göre en öncelikli 3 somut eylemi planlar.</li>
+                    <li><strong>💬 Serbest Sohbet:</strong> Sayfa üzerindeki "✨ AI" butonu ile istediğiniz mühendislik sorusunu sorabilirsiniz.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal: Not Defteri Ekle / Düzenle -->
@@ -511,7 +596,144 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab') || 'notebooks';
     switchSettingsTab(tab);
+    loadAiSettings();
 });
+
+// ─────────────────────────────────────────────────────────────
+// Yapay Zeka (TincAI) Ayarları
+// ─────────────────────────────────────────────────────────────
+function toggleAiKeyVisibility() {
+    const input = document.getElementById('cfg-ai-api-key');
+    if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
+    }
+}
+
+function handleAiProviderChange() {
+    const provider = document.getElementById('cfg-ai-provider').value;
+    const modelSelect = document.getElementById('cfg-ai-model');
+    if (provider === 'openai') {
+        modelSelect.innerHTML = `
+            <option value="gpt-4o-mini">gpt-4o-mini (Hızlı &amp; Dengeli)</option>
+            <option value="gpt-4o">gpt-4o (Tam Kapasite)</option>
+            <option value="o3-mini">o3-mini (Akıl Yürütme)</option>
+        `;
+    } else {
+        modelSelect.innerHTML = `
+            <option value="gemini-2.0-flash">gemini-2.0-flash (Ultra Hızlı &amp; Güncel)</option>
+            <option value="gemini-1.5-pro">gemini-1.5-pro (Derin Akıl Yürütme)</option>
+            <option value="gemini-1.5-flash">gemini-1.5-flash (Standart Hızlı)</option>
+        `;
+    }
+}
+
+async function loadAiSettings() {
+    try {
+        const res = await fetch('/notes/api/ai/settings');
+        const data = await res.json();
+        if (data.ok && data.settings) {
+            const s = data.settings;
+            if (s.provider) {
+                document.getElementById('cfg-ai-provider').value = s.provider;
+                handleAiProviderChange();
+            }
+            if (s.model) {
+                document.getElementById('cfg-ai-model').value = s.model;
+            }
+            const hint = document.getElementById('ai-key-masked-hint');
+            const badge = document.getElementById('ai-status-badge');
+            if (s.has_key) {
+                if (hint) hint.textContent = `Aktif Key: ${s.masked_key}`;
+                if (badge) {
+                    badge.textContent = '🟢 Anahtar Kayıtlı';
+                    badge.style.background = '#ecfdf5';
+                    badge.style.color = '#065f46';
+                }
+            } else {
+                if (hint) hint.textContent = 'Henüz anahtar kaydedilmedi';
+                if (badge) {
+                    badge.textContent = '⚪ Yapılandırılmadı';
+                    badge.style.background = '#f1f5f9';
+                    badge.style.color = '#64748b';
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('loadAiSettings error:', e);
+    }
+}
+
+async function saveAiSettings() {
+    const btn = document.getElementById('btn-save-ai');
+    const provider = document.getElementById('cfg-ai-provider').value;
+    const model = document.getElementById('cfg-ai-model').value;
+    const apiKey = document.getElementById('cfg-ai-api-key').value.trim();
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Kaydediliyor...';
+    try {
+        const res = await fetch('/notes/api/ai/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider: provider,
+                model: model,
+                api_key: apiKey
+            })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            alert('✅ AI Ayarları başarıyla kaydedildi!');
+            document.getElementById('cfg-ai-api-key').value = '';
+            loadAiSettings();
+        } else {
+            alert('❌ Hata: ' + (data.error || 'Kaydedilemedi'));
+        }
+    } catch (e) {
+        alert('Bağlantı hatası: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Ayarları Kaydet';
+    }
+}
+
+async function testAiConnection() {
+    const btn = document.getElementById('btn-test-ai');
+    const box = document.getElementById('ai-test-result-box');
+    box.style.display = 'block';
+    box.style.background = 'var(--surface2)';
+    box.style.color = 'var(--text)';
+    box.textContent = '⏳ Test isteği gönderiliyor...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch('/notes/api/ai/assist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'summarize',
+                custom_prompt: 'Test bağlantısı'
+            })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            box.style.background = data.live ? '#ecfdf5' : '#fffbeb';
+            box.style.color = data.live ? '#065f46' : '#92400e';
+            box.style.border = data.live ? '1px solid #a7f3d0' : '1px solid #fde68a';
+            box.innerHTML = `<strong>${data.live ? '✅ Bağlantı Başarılı (Canlı AI Aktif)' : '⚠️ Yerel Mod (API Key Girilmedi)'}:</strong><br><div style="margin-top:4px; font-size:0.78rem;">${(data.reply ? data.reply.slice(0, 150) + '...' : 'Tamam')}</div>`;
+        } else {
+            box.style.background = '#fef2f2';
+            box.style.color = '#991b1b';
+            box.textContent = '❌ Test başarısız: ' + (data.error || 'Bilinmeyen hata');
+        }
+    } catch (e) {
+        box.style.background = '#fef2f2';
+        box.style.color = '#991b1b';
+        box.textContent = '❌ Ağ hatası: ' + e.message;
+    } finally {
+        btn.disabled = false;
+    }
+}
 
 // Not Defteri Ekle / Düzenle Modal
 function openCreateNotebookModal() {

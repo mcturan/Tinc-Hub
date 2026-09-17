@@ -379,7 +379,7 @@ def api_get_overview():
 @tnote_bp.route('/api/unified-tasks', methods=['GET'])
 @auth_check
 def api_get_unified_tasks():
-    nb_id = request.args.get('notebook_id', type=int)
+    nb_id = request.args.get('notebook_id', type=int) or session.get('active_notebook_id') or db.get_active_notebook_id()
     tasks = db.get_unified_tasks(nb_id)
     return jsonify({"ok": True, "tasks": tasks, "total_count": len(tasks)})
 
@@ -1417,5 +1417,279 @@ def download_apk():
         if os.path.exists(p):
             return send_file(p, as_attachment=True, download_name="TincNote-v1.5.3.apk")
     return "APK dosyası bulunamadı", 404
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DIŞA AKTARMA (PAGE EXPORT: MARKDOWN, TXT, JSON)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/pages/<int:page_id>/export', methods=['GET'])
+@auth_check
+def api_export_page(page_id):
+    fmt = request.args.get('format', 'md').lower()
+    page = db.get_page(page_id)
+    if not page:
+        return jsonify({"ok": False, "error": "Sayfa bulunamadı"}), 404
+
+    title = page.get('title', 'Not')
+    page_type = page.get('type', 'checklist')
+    safe_title = "".join(c for c in title if c.isalnum() or c in (' ', '-', '_')).strip().replace(' ', '_')
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    filename = f"{safe_title}_{timestamp}.{fmt}"
+
+    if fmt == 'json':
+        export_data = {
+            "title": title,
+            "type": page_type,
+            "icon": page.get('icon'),
+            "category": page.get('category_name'),
+            "exported_at": datetime.now().isoformat()
+        }
+        if page_type == 'checklist':
+            export_data["items"] = db.get_items(page_id)
+        elif page_type == 'finance':
+            export_data["entries"] = db.get_finance_entries(page_id)
+        elif page_type == 'project':
+            export_data["project"] = db.get_project_data(page_id)
+            export_data["items"] = db.get_items(page_id)
+        else:
+            export_data["content"] = page.get('content', '')
+
+        bio = io.BytesIO(json.dumps(export_data, ensure_ascii=False, indent=2).encode('utf-8'))
+        return send_file(bio, as_attachment=True, download_name=filename, mimetype='application/json')
+
+    elif fmt in ('md', 'txt'):
+        lines = []
+        if fmt == 'md':
+            lines.append(f"# {page.get('icon', '')} {title}\n")
+            lines.append(f"> Kategori: **{page.get('category_name', 'Genel')}** | Tür: *{page_type}* | Dışa Aktarım: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n---\n")
+        else:
+            lines.append(f"{title}")
+            lines.append(f"Kategori: {page.get('category_name', 'Genel')} | Tür: {page_type} | Tarih: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+            lines.append("=" * 40 + "\n")
+
+        if page_type == 'checklist':
+            items = db.get_items(page_id)
+            for it in items:
+                status = "[x]" if it["is_done"] else "[ ]"
+                meta_parts = []
+                if it.get("quantity"): meta_parts.append(it["quantity"])
+                if it.get("price"): meta_parts.append(it["price"])
+                meta_str = f" ({', '.join(meta_parts)})" if meta_parts else ""
+                lines.append(f"- {status} {it['title']}{meta_str}")
+
+        elif page_type == 'finance':
+            entries = db.get_finance_entries(page_id)
+            if fmt == 'md':
+                lines.append("| Tür | Vade | Başlık / Açıklama | Kategori | Tutar | Durum |")
+                lines.append("|:---|:---|:---|:---|---:|:---:|")
+                for e in entries:
+                    e_type = "Gelir" if e["entry_type"] == 'income' else "Gider"
+                    due = e.get("due_date") or f"Gün {e.get('due_day', '-')}"
+                    paid = "Ödendi" if e.get("is_paid") else "Bekliyor"
+                    lines.append(f"| {e_type} | {due} | {e['title']} | {e.get('category', '')} | {e.get('amount', 0):,.2f} TL | {paid} |")
+            else:
+                for e in entries:
+                    e_type = "Gelir" if e["entry_type"] == 'income' else "Gider"
+                    paid = "Ödendi" if e.get("is_paid") else "Bekliyor"
+                    lines.append(f"[{e_type}] {e['title']}: {e.get('amount', 0):,.2f} TL ({paid})")
+
+        elif page_type == 'project':
+            proj = db.get_project_data(page_id)
+            det = proj.get("details") or {}
+            if fmt == 'md':
+                lines.append(f"### Durum: `{det.get('status', 'planning')}`\n")
+                lines.append(f"## 💡 Amaç & Kapsam\n{det.get('concept', 'Not yok.')}\n")
+                lines.append(f"## 📐 Teknik Detaylar & Şartname\n{det.get('specs', 'Not yok.')}\n")
+                
+                lines.append("## ⏳ Aşamalar (Milestones)")
+                for m in proj.get("milestones", []):
+                    m_status = "✅" if m["status"] == 'completed' else ("⚙️" if m["status"] == 'in_progress' else "⏳")
+                    lines.append(f"- {m_status} **{m['title']}** ({m.get('target_date', '')}): {m.get('description', '')}")
+                lines.append("")
+
+                lines.append("## 🧰 Malzemeler (BOM)")
+                lines.append("| Durum | Malzeme | Miktar | Birim Fiyat | Notlar |")
+                lines.append("|:---|:---|---:|---:|:---|")
+                for mat in proj.get("materials", []):
+                    lines.append(f"| {mat['status']} | {mat['name']} | {mat['quantity']} | {mat['unit_price']} TL | {mat.get('notes', '')} |")
+                lines.append("")
+
+                lines.append("## 📋 Proje Notları & Maddeleri")
+                items = db.get_items(page_id)
+                for it in items:
+                    status = "[x]" if it["is_done"] else "[ ]"
+                    lines.append(f"- {status} {it['title']}")
+                lines.append("")
+
+                lines.append("## 🛠️ Günlük (Logs)")
+                for l in proj.get("logs", []):
+                    lines.append(f"### {l.get('log_date', '')} — {l['title']}\n{l['content']}\n")
+            else:
+                lines.append(f"DURUM: {det.get('status', 'planning')}\n")
+                lines.append(f"KONSEPT:\n{det.get('concept', '')}\n")
+                lines.append(f"ŞARTNAME:\n{det.get('specs', '')}\n")
+        else:
+            lines.append(page.get('content', ''))
+
+        mimetype = 'text/markdown; charset=utf-8' if fmt == 'md' else 'text/plain; charset=utf-8'
+        bio = io.BytesIO("\n".join(lines).encode('utf-8'))
+        return send_file(bio, as_attachment=True, download_name=filename, mimetype=mimetype)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# YAPAY ZEKA ASİSTANI (TINCAI ASSISTANT)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/ai/settings', methods=['GET', 'POST'])
+@auth_check
+def api_ai_settings():
+    if request.method == 'POST':
+        data = request.get_json() or {}
+        if 'ai_api_key' in data:
+            db.set_setting('ai_api_key', data['ai_api_key'].strip())
+        if 'ai_provider' in data:
+            db.set_setting('ai_provider', data['ai_provider'].strip())
+        if 'ai_model' in data:
+            db.set_setting('ai_model', data['ai_model'].strip())
+        return jsonify({"ok": True, "message": "AI ayarları kaydedildi."})
+    else:
+        api_key = db.get_setting('ai_api_key', '')
+        masked_key = (api_key[:4] + '...' + api_key[-4:]) if len(api_key) > 8 else ('' if not api_key else '****')
+        return jsonify({
+            "ok": True,
+            "has_key": bool(api_key),
+            "masked_key": masked_key,
+            "ai_provider": db.get_setting('ai_provider', 'gemini'),
+            "ai_model": db.get_setting('ai_model', 'gemini-2.0-flash')
+        })
+
+@tnote_bp.route('/api/ai/assist', methods=['POST'])
+@auth_check
+def api_ai_assist():
+    data = request.get_json() or {}
+    page_id = data.get('page_id')
+    action = data.get('action', 'summarize')
+    custom_prompt = data.get('prompt', '').strip()
+
+    # Sayfa ve bağlam verisini topla
+    context_text = ""
+    page_title = "Not"
+    if page_id:
+        page = db.get_page(page_id)
+        if page:
+            page_title = page.get('title', 'Not')
+            p_type = page.get('type')
+            if p_type == 'project':
+                proj = db.get_project_data(page_id)
+                det = proj.get('details') or {}
+                m_list = [f"- {m['title']} ({m['status']}): {m.get('description', '')}" for m in proj.get('milestones', [])]
+                bom_list = [f"- {b['name']} ({b['quantity']}x, {b['unit_price']} TL, {b['status']})" for b in proj.get('materials', [])]
+                log_list = [f"[{l.get('log_date')} {l['title']}]: {l['content']}" for l in proj.get('logs', [])]
+                item_list = [f"- {'[X]' if i['is_done'] else '[ ]'} {i['title']}" for i in db.get_items(page_id)]
+                
+                context_text = f"""PROJE ADI: {page_title}
+DURUM: {det.get('status')}
+KONSEPT & AMAÇ:
+{det.get('concept', '')}
+
+TEKNİK ŞARTNAME & ÖZELLİKLER:
+{det.get('specs', '')}
+
+AŞAMALAR (YOL HARİTASI):
+{chr(10).join(m_list)}
+
+MALZEME & BİLEŞENLER (BOM):
+{chr(10).join(bom_list)}
+
+GÖREVLER & MADDELER:
+{chr(10).join(item_list)}
+
+GÜNLÜK GİRİŞLERİ:
+{chr(10).join(log_list)}"""
+            elif p_type == 'checklist':
+                items = db.get_items(page_id)
+                item_str = "\n".join([f"- {'[Tamam]' if it['is_done'] else '[Bekliyor]'} {it['title']} ({it.get('quantity','')}, {it.get('price','')})" for it in items])
+                context_text = f"LİSTE ADI: {page_title}\nMADDELER:\n{item_str}"
+            elif p_type == 'finance':
+                entries = db.get_finance_entries(page_id)
+                f_str = "\n".join([f"- {e['entry_type'].upper()}: {e['title']} {e.get('amount')} TL (Ödendi: {e.get('is_paid')})" for e in entries])
+                context_text = f"FİNANS TABLOSU: {page_title}\nKALEMLER:\n{f_str}"
+            else:
+                context_text = f"NOT BAŞLIĞI: {page_title}\nİÇERİK:\n{page.get('content', '')}"
+
+    system_instruction = "Sen TincNote kurumsal ekosisteminde çalışan kıdemli bir Mühendislik ve Verimlilik Asistanısın (TincAI). Yanıtlarını temiz, profesyonel, maddeler halinde ve Türkçe Markdown formatında sun."
+
+    if action == 'summarize':
+        prompt = f"Aşağıdaki proje/not içeriğini yönetici özeti şeklinde analiz et. Temel hedefi, ulaşılan aşamayı ve kritik kazanımları 3-4 vurucu maddede özetle:\n\n{context_text}"
+    elif action == 'evaluate':
+        prompt = f"Aşağıdaki projeyi/notu mühendislik, maliyet, zamanlama ve uygulanabilirlik açısından acımasızca ve objektif olarak değerlendir. Olası darboğazları (riskleri) ve güçlü yönleri sırala:\n\n{context_text}"
+    elif action == 'missing_audit':
+        prompt = f"Aşağıdaki projeyi/notu derinlemesine incele. Gözden kaçmış olabilecek eksik malzemeleri, yapılmamış güvenlik/test adımlarını ve unutulmuş maddeleri tespit et ve öner:\n\n{context_text}"
+    elif action == 'suggest_next':
+        prompt = f"Aşağıdaki projenin/notun mevcut durumuna göre derhal atılması gereken en öncelikli 3 sonraki adımı belirle ve eylem planı çıkar:\n\n{context_text}"
+    else:
+        prompt = f"{custom_prompt}\n\nİlgili İçerik Bağlamı:\n{context_text}"
+
+    # API Anahtarını al (Settings veya ortam değişkeni)
+    api_key = db.get_setting('ai_api_key') or os.environ.get('GEMINI_API_KEY') or os.environ.get('OPENAI_API_KEY')
+    provider = db.get_setting('ai_provider', 'gemini')
+    model = db.get_setting('ai_model', 'gemini-2.0-flash')
+
+    if not api_key:
+        fallback_reply = f"""### 💡 TincAI Analizi (Yerel Önizleme)
+*Henüz bir AI API Anahtarı tanımlanmadı. Ayarlar sayfasından Gemini veya OpenAI API anahtarınızı kaydederek tam canlı zekayı aktifleştirebilirsiniz.*
+
+**İçerik:** {page_title}
+**Ön Değerlendirme:**
+- Sistem bağlamı başarıyla okundu ({len(context_text)} karakter).
+- İşlem: `{action}` talebi alındı.
+- API anahtarınızı `Ayarlar > Yapay Zeka (AI)` sekmesinden tanımladığınızda, doğrudan Google Gemini veya OpenAI modeli üzerinden anlık analizler çalışacaktır.
+"""
+        return jsonify({"ok": True, "reply": fallback_reply, "live": False})
+
+    # Gemini REST API Çağrısı
+    try:
+        import urllib.request
+        import urllib.error
+
+        if provider == 'gemini' or 'gemini' in model.lower():
+            api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            payload = {
+                "contents": [{"parts": [{"text": f"{system_instruction}\n\n{prompt}"}]}],
+                "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1500}
+            }
+            req = urllib.request.Request(
+                api_url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                res_json = json.loads(resp.read().decode('utf-8'))
+                reply = res_json['candidates'][0]['content']['parts'][0]['text']
+                return jsonify({"ok": True, "reply": reply, "live": True})
+        else:
+            api_url = "https://api.openai.com/v1/chat/completions"
+            payload = {
+                "model": model or "gpt-4o-mini",
+                "messages": [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.4
+            }
+            req = urllib.request.Request(
+                api_url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
+            )
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                res_json = json.loads(resp.read().decode('utf-8'))
+                reply = res_json['choices'][0]['message']['content']
+                return jsonify({"ok": True, "reply": reply, "live": True})
+    except Exception as e:
+        return jsonify({
+            "ok": True,
+            "reply": f"⚠️ **AI İletişim Hatası:** `{str(e)}`\n\nLütfen API anahtarınızın geçerliliğini ve internet bağlantısını kontrol edin.",
+            "live": False
+        })
 
 

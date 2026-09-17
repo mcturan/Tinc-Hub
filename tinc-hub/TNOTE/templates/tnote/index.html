@@ -74,10 +74,11 @@
         <div class="sidebar-categories" id="sidebar-categories">
             {% for cat in categories %}
             <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}">
-                <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" title="{{ cat.name }}" onclick="toggleCategoryGroup({{ cat.id }})">
+                <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" title="{{ cat.name }}" onclick="toggleCategoryGroup({{ cat.id }})" style="border-left: 3px solid {{ cat.color or '#0284c7' }};">
                     <div class="category-title-area">
                         <span class="drag-handle cat-drag-handle" title="Kategoriyi taşımak için sürükleyin" onclick="event.stopPropagation()">⋮</span>
                         <span class="cat-chevron" id="cat-chevron-{{ cat.id }}">▾</span>
+                        <span class="cat-color-dot" style="background-color: {{ cat.color or '#0284c7' }};"></span>
                         <span class="cat-icon-span" style="font-size:0.9rem;" title="{{ cat.name }}">{{ cat.icon }}</span>
                         <span class="category-title-text" title="{{ cat.name }}">{{ cat.name }}</span>
                     </div>
@@ -189,6 +190,9 @@
             </div>
 
             <div class="header-actions" id="page-header-actions">
+                <button class="btn btn-sm btn-outline header-ai-btn" id="btn-header-ai" onclick="openAiAssistModal()" title="TincAI Asistanı">
+                    <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-zap"/></svg><span>✨ AI</span>
+                </button>
                 <button class="btn btn-sm btn-primary header-add-btn" id="btn-header-add" onclick="focusQuickAdd()" title="Ekle">
                     <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-plus"/></svg><span>Ekle</span>
                 </button>
@@ -211,6 +215,20 @@
                         </div>
                         <div class="dropdown-item" onclick="clearCompleted(); closeMoreActionsDropdown();">
                             <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-trash"/></svg></span> Tamamlananları Sil
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-item" onclick="openAiAssistModal(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon">✨</span> TincAI Asistanı
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-item" onclick="exportCurrentPage('md'); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon">📄</span> Dışa Aktar (.md)
+                        </div>
+                        <div class="dropdown-item" onclick="exportCurrentPage('txt'); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon">📝</span> Dışa Aktar (.txt)
+                        </div>
+                        <div class="dropdown-item" onclick="exportCurrentPage('json'); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon">💾</span> Dışa Aktar (.json)
                         </div>
                         <div class="dropdown-divider"></div>
                         <div class="dropdown-item" onclick="openEditCurrentPageModal(); closeMoreActionsDropdown();">
@@ -337,7 +355,7 @@
                         <div class="section-box-header">
                             <span class="section-box-title">
                                 <svg class="svg-icon svg-icon-sm" style="color:var(--accent);"><use href="#i-edit"/></svg>
-                                <span>Hızlı Karalama &amp; Not</span>
+                                <span>Hızlı Notlar</span>
                             </span>
                             <button class="btn-icon-subtle" onclick="loadQuickTasksPage()" title="Tüm Hızlı Notları Gör">
                                 <svg class="svg-icon svg-icon-xs"><use href="#i-zap"/></svg>
@@ -613,6 +631,7 @@
                     <button class="project-tab-btn active" id="tab-btn-concept" onclick="switchProjectTab('concept')">💡 Fikir & Çizimler</button>
                     <button class="project-tab-btn" id="tab-btn-bom" onclick="switchProjectTab('bom')">🧰 Malzemeler (BOM)</button>
                     <button class="project-tab-btn" id="tab-btn-logs" onclick="switchProjectTab('logs')">🛠️ Günlük</button>
+                    <button class="project-tab-btn" id="tab-btn-notes" onclick="switchProjectTab('notes')">📋 Görev &amp; Not Maddeleri</button>
                 </div>
 
                 <!-- Tab 1: Fikir & Çizimler -->
@@ -704,6 +723,27 @@
 
                         <div class="log-timeline-container" id="project-logs-container">
                             <!-- JS ile günlük kartları doldurulur -->
+                        </div>
+                <!-- Tab 4: Görev & Not Maddeleri -->
+                <div id="ptab-notes" class="project-tab-pane" style="display:none;">
+                    <div class="project-subcard">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <div>
+                                <strong style="font-size:0.95rem;">📋 Proje Görev ve Not Maddeleri</strong>
+                                <span style="font-size:0.78rem; color:var(--muted); margin-left:8px;">Proje adımlarını, yapılacakları ve hızlı maddeleri takip edin</span>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button class="btn btn-sm btn-outline" onclick="openModal('modal-bulk-add')">📋 Toplu Ekle</button>
+                            </div>
+                        </div>
+
+                        <form id="project-add-item-form" class="item-input-bar" onsubmit="event.preventDefault(); addProjectItem();" style="margin-bottom:12px; display:flex; gap:8px;">
+                            <input type="text" id="project-item-title-input" class="form-control" placeholder="Yeni proje görevi veya not maddesi yazın (Enter)..." style="flex:1;">
+                            <button type="submit" class="btn btn-sm btn-primary">➕ Ekle</button>
+                        </form>
+
+                        <div class="item-list" id="project-items-list" style="display:flex; flex-direction:column; gap:4px; min-height:80px;">
+                            <!-- JS ile proje checklist maddeleri doldurulur -->
                         </div>
                     </div>
                 </div>
@@ -912,11 +952,57 @@
             </div>
             <div class="form-group">
                 <label>İkon (Emoji)</label>
-                <input type="text" id="new-cat-icon" class="form-control" value="📁">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="text" id="new-cat-icon" class="form-control" value="📁" style="width:70px; text-align:center; font-size:1.2rem;">
+                    <span style="font-size:0.75rem; color:var(--muted);">Aşağıdan seçin veya özel emoji yazın:</span>
+                </div>
+                <div class="emoji-picker-grid">
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📁', this)">📁</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📂', this)">📂</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📑', this)">📑</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📝', this)">📝</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📋', this)">📋</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🛒', this)">🛒</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '💳', this)">💳</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '💰', this)">💰</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🔬', this)">🔬</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '⚡', this)">⚡</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🚀', this)">🚀</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🎯', this)">🎯</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📌', this)">📌</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🔧', this)">🔧</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '💡', this)">💡</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🏷️', this)">🏷️</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📊', this)">📊</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '💻', this)">💻</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🌐', this)">🌐</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📚', this)">📚</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🔑', this)">🔑</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🛡️', this)">🛡️</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '⚙️', this)">⚙️</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📦', this)">📦</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🏠', this)">🏠</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '☕', this)">☕</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '⭐', this)">⭐</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🔍', this)">🔍</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '📡', this)">📡</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-cat-icon', '🛠️', this)">🛠️</span>
+                </div>
             </div>
             <div class="form-group">
-                <label>Renk</label>
-                <input type="color" id="new-cat-color" value="#3b82f6" style="height:40px; border:1px solid var(--border); border-radius:6px; width:100%; cursor:pointer;">
+                <label>Kategori Rengi</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="color" id="new-cat-color" value="#0284c7" style="height:36px; width:50px; border:1px solid var(--border); border-radius:6px; cursor:pointer;">
+                    <div class="color-picker-palette" style="display:flex; gap:6px;">
+                        <span class="color-swatch" style="background:#0284c7; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block; border:2px solid transparent;" onclick="selectPickerColor('new-cat-color', '#0284c7', this)" title="Mavi"></span>
+                        <span class="color-swatch" style="background:#059669; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block; border:2px solid transparent;" onclick="selectPickerColor('new-cat-color', '#059669', this)" title="Zümrüt"></span>
+                        <span class="color-swatch" style="background:#d97706; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block; border:2px solid transparent;" onclick="selectPickerColor('new-cat-color', '#d97706', this)" title="Amber"></span>
+                        <span class="color-swatch" style="background:#dc2626; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block; border:2px solid transparent;" onclick="selectPickerColor('new-cat-color', '#dc2626', this)" title="Kırmızı"></span>
+                        <span class="color-swatch" style="background:#7c3aed; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block; border:2px solid transparent;" onclick="selectPickerColor('new-cat-color', '#7c3aed', this)" title="Mor"></span>
+                        <span class="color-swatch" style="background:#475569; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block; border:2px solid transparent;" onclick="selectPickerColor('new-cat-color', '#475569', this)" title="Arduvaz"></span>
+                        <span class="color-swatch" style="background:#0891b2; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block; border:2px solid transparent;" onclick="selectPickerColor('new-cat-color', '#0891b2', this)" title="Camgöbeği"></span>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="modal-footer">
@@ -957,7 +1043,40 @@
             </div>
             <div class="form-group">
                 <label>İkon (Emoji)</label>
-                <input type="text" id="new-page-icon" class="form-control" value="📝">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="text" id="new-page-icon" class="form-control" value="📝" style="width:70px; text-align:center; font-size:1.2rem;">
+                    <span style="font-size:0.75rem; color:var(--muted);">Aşağıdan seçin veya özel emoji yazın:</span>
+                </div>
+                <div class="emoji-picker-grid">
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '📝', this)">📝</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🛒', this)">🛒</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '💳', this)">💳</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🔬', this)">🔬</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '📋', this)">📋</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '📁', this)">📁</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '📂', this)">📂</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '⚡', this)">⚡</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🚀', this)">🚀</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🎯', this)">🎯</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '📌', this)">📌</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🔧', this)">🔧</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '💡', this)">💡</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🏷️', this)">🏷️</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '📊', this)">📊</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '💻', this)">💻</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🌐', this)">🌐</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '📚', this)">📚</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🔑', this)">🔑</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🛡️', this)">🛡️</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '⚙️', this)">⚙️</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '📦', this)">📦</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🏠', this)">🏠</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '☕', this)">☕</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '⭐', this)">⭐</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🔍', this)">🔍</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '📡', this)">📡</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('new-page-icon', '🛠️', this)">🛠️</span>
+                </div>
             </div>
         </div>
         <div class="modal-footer">
@@ -1728,6 +1847,79 @@
                 <button type="submit" class="btn btn-primary" style="width:100%;">Hesap Oluştur</button>
             </form>
             {% endif %}
+        </div>
+    </div>
+<!-- Modal: Hızlı Not Detayı -->
+<div class="tnote-modal-backdrop" id="modal-quicknote-detail">
+    <div class="tnote-modal" style="max-width:480px;">
+        <div class="modal-header">
+            <span>📝 Hızlı Not</span>
+            <button class="btn-icon" onclick="closeModal('modal-quicknote-detail')">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="qn-detail-id">
+            <div style="font-size:0.75rem; color:var(--muted); margin-bottom:8px;" id="qn-detail-date"></div>
+            <textarea id="qn-detail-content" class="form-control" rows="5" style="font-size:0.9rem; line-height:1.5;"></textarea>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:space-between;">
+            <button class="btn btn-danger btn-sm" onclick="deleteCurrentDetailQuickNote()">🗑️ Sil</button>
+            <div style="display:flex; gap:6px;">
+                <button class="btn btn-sm btn-outline" onclick="copyDetailQuickNote()">📋 Kopyala</button>
+                <button class="btn btn-sm btn-outline" onclick="transferDetailQuickNote()">📁 Sayfaya Aktar</button>
+                <button class="btn btn-sm btn-primary" onclick="saveDetailQuickNote()">💾 Kaydet</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: TincAI Asistanı -->
+<div class="tnote-modal-backdrop" id="modal-ai-assist">
+    <div class="tnote-modal" style="max-width: 680px; width:92%;">
+        <div class="modal-header" style="background: linear-gradient(135deg, rgba(2,132,199,0.08), rgba(99,102,241,0.06)); border-bottom:1px solid var(--border);">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:1.2rem;">✨</span>
+                <div>
+                    <strong style="font-size:0.95rem;">TincAI Mühendislik &amp; Proje Asistanı</strong>
+                    <div style="font-size:0.72rem; color:var(--muted);" id="ai-modal-context-label">Aktif Sayfa: -</div>
+                </div>
+            </div>
+            <button class="btn-icon" onclick="closeModal('modal-ai-assist')">✕</button>
+        </div>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:12px; padding:16px;">
+            <!-- Hızlı Eylemler (Şablon Komutlar) -->
+            <div>
+                <label style="font-size:0.78rem; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:6px; display:block;">Hızlı Eylemler &amp; Şablonlar</label>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button class="btn btn-sm btn-outline ai-quick-action-btn" onclick="runAiAction('summarize')">📋 Projeyi / Notu Özetle</button>
+                    <button class="btn btn-sm btn-outline ai-quick-action-btn" onclick="runAiAction('evaluate')">⚖️ Gidişatı &amp; Riskleri Değerlendir</button>
+                    <button class="btn btn-sm btn-outline ai-quick-action-btn" onclick="runAiAction('missing_audit')">🔍 Eksik Malzeme &amp; Adım Bul</button>
+                    <button class="btn btn-sm btn-outline ai-quick-action-btn" onclick="runAiAction('suggest_next')">🚀 Sonraki Adımları Öner</button>
+                </div>
+            </div>
+
+            <!-- Özel Prompt Girişi -->
+            <div>
+                <label style="font-size:0.78rem; font-weight:700; color:var(--muted); text-transform:uppercase; margin-bottom:4px; display:block;">Özel Talimat / Soru Yazın</label>
+                <div style="display:flex; gap:6px;">
+                    <input type="text" id="ai-custom-prompt" class="form-control" placeholder="Örn: Bu projedeki anten kablosu RG58 mi olmalı RG213 mü?" onkeydown="if(event.key==='Enter') runAiAction('custom')">
+                    <button class="btn btn-sm btn-primary" onclick="runAiAction('custom')" style="white-space:nowrap;">Gönder ➔</button>
+                </div>
+            </div>
+
+            <!-- AI Çıktı / Yanıt Alanı -->
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <label style="font-size:0.78rem; font-weight:700; color:var(--muted); text-transform:uppercase;">AI Yanıtı &amp; Öneriler</label>
+                    <button class="btn-icon-subtle" onclick="copyAiReply()" title="Yanıtı Kopyala"><svg class="svg-icon svg-icon-xs"><use href="#i-file-text"/></svg></button>
+                </div>
+                <div id="ai-response-box" style="min-height:160px; max-height:340px; overflow-y:auto; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px; font-size:0.85rem; line-height:1.5; color:var(--text); white-space:pre-wrap;">
+                    <span style="color:var(--muted);">Yukarıdaki hızlı eylemlerden birini seçin veya özel bir soru sorun.</span>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+            <a href="/notes/settings?tab=ai" style="font-size:0.78rem; color:var(--accent); text-decoration:none;">⚙️ API &amp; Model Ayarları</a>
+            <button class="btn btn-sm" onclick="closeModal('modal-ai-assist')">Kapat</button>
         </div>
     </div>
 </div>

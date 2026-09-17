@@ -2526,8 +2526,9 @@ def get_unified_tasks(notebook_id: int = None):
     # Checklist maddelerini ekle
     for it in items:
         title = it["title"]
-        cat_name = it["category_name"] or ""
-        is_quick = ("Hızlı Notlar" in cat_name)
+        cat_name = (it["category_name"] or "").lower()
+        page_title = (it["page_title"] or "").lower()
+        is_quick = ("hızlı" in cat_name or "hizli" in cat_name or "hızlı" in page_title or "hizli" in page_title)
         due_urgency = 2.5 if is_quick else 6
         due_badge = "⚡ Hızlı Görev" if is_quick else (it["page_title"] or "Liste")
 
@@ -2667,12 +2668,14 @@ def add_quick_task(title: str, notebook_id: int = None):
     with _lock:
         conn = get_conn()
         cur = conn.cursor()
-        nb_id = int(notebook_id or 1)
+        nb_id = int(notebook_id or get_active_notebook_id() or 1)
 
         # 1. Kategori bul veya oluştur
         cur.execute("""
             SELECT id FROM categories
-            WHERE notebook_id = ? AND (name = 'Hızlı Notlar ve Görevler' OR name LIKE '%Hızlı Notlar%')
+            WHERE notebook_id = ? AND (
+                LOWER(name) LIKE '%hızlı%' OR LOWER(name) LIKE '%hizli%'
+            )
             LIMIT 1
         """, (nb_id,))
         cat_row = cur.fetchone()
@@ -2681,14 +2684,16 @@ def add_quick_task(title: str, notebook_id: int = None):
         else:
             cur.execute("""
                 INSERT INTO categories (notebook_id, name, icon, color, sort_order)
-                VALUES (?, 'Hızlı Notlar ve Görevler', '⚡', '#f59e0b', 0)
+                VALUES (?, 'Hızlı Notlar & Görevler', '⚡', '#0284c7', 0)
             """, (nb_id,))
             cat_id = cur.lastrowid
 
         # 2. Sayfa bul veya oluştur
         cur.execute("""
             SELECT id FROM pages
-            WHERE category_id = ? AND (title = 'Hızlı Görevler' OR title LIKE '%Hızlı%')
+            WHERE category_id = ? AND (
+                LOWER(title) LIKE '%hızlı%' OR LOWER(title) LIKE '%hizli%'
+            )
             LIMIT 1
         """, (cat_id,))
         page_row = cur.fetchone()

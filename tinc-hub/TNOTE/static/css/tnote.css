@@ -3200,12 +3200,18 @@ body, .tnote-container {
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    padding: 4px 8px;
+    padding: 5px 8px;
     background: var(--surface2, #f8fafc);
     border: 1px solid var(--border, #e2e8f0);
     border-radius: 6px;
     font-size: 0.78rem;
     color: var(--text, #0f172a);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.ov-quicknote-row:hover {
+    background: #f0f9ff;
+    border-color: #bae6fd;
 }
 .ov-quicknote-text {
     flex: 1;
@@ -3225,5 +3231,84 @@ body, .tnote-container {
     color: #dc2626;
     background: #fee2e2;
 }
+
+/* Category Color Indicator Dot */
+.cat-color-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+
+/* Visual Emoji Picker Grid */
+.emoji-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 3px;
+    margin-top: 6px;
+    max-height: 110px;
+    overflow-y: auto;
+    padding: 6px;
+    background: var(--surface2, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 6px;
+}
+.emoji-btn {
+    font-size: 1.15rem;
+    height: 30px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s;
+    user-select: none;
+}
+.emoji-btn:hover {
+    background: #e2e8f0;
+    border-color: var(--border, #cbd5e1);
+    transform: scale(1.15);
+}
+.emoji-btn.active {
+    background: #e0f2fe;
+    border-color: #0284c7;
+}
+
+/* Color Swatches Palette */
+.color-picker-palette .color-swatch {
+    transition: transform 0.12s, box-shadow 0.12s;
+}
+.color-picker-palette .color-swatch:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--accent, #0284c7);
+}
+
+/* AI Header & Quick Actions */
+.header-ai-btn {
+    border-color: #0284c7;
+    color: #0284c7;
+    font-weight: 600;
+}
+.header-ai-btn:hover {
+    background: #f0f9ff;
+}
+.ai-quick-action-btn {
+    font-size: 0.78rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border, #cbd5e1);
+    background: var(--surface, #ffffff);
+    transition: all 0.15s;
+}
+.ai-quick-action-btn:hover {
+    border-color: var(--accent, #0284c7);
+    color: var(--accent, #0284c7);
+    background: #f0f9ff;
+}
+
 
 

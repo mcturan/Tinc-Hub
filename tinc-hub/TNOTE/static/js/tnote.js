@@ -21,8 +21,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // Sürükle ve Bırak (Drag & Drop) Dinleyicileri
     initSidebarDragAndDrop();
 
-    // Uygulama varsayılan açılış sayfası: Genel Bakış & Özet
-    loadOverviewPage();
+    // Uygulama açılış sayfası: URL parametresi veya Genel Bakış
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialPageId = urlParams.get('page_id') || urlParams.get('page');
+    if (initialPageId) {
+        loadPage(initialPageId);
+    } else {
+        loadOverviewPage();
+    }
 
     // Klavye kısayolları (Ctrl+K, Ctrl+Z, Escape)
     initGlobalKeyboardShortcuts();
@@ -500,15 +506,15 @@ async function renderWebQuickTasks() {
                     notesListEl.innerHTML = notes.map(n => {
                         const dateStr = n.created_at ? n.created_at.slice(5, 16) : '';
                         return `
-                            <div class="ov-item-row" style="background:var(--surface, #fff); border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:6px;">
-                                <div style="font-size:0.9rem; color:var(--text); white-space:pre-wrap; word-break:break-word; line-height:1.4;">${escapeHtml(n.content)}</div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px dashed var(--border); padding-top:6px; margin-top:2px;">
-                                    <span style="font-size:0.75rem; color:var(--muted);">🕒 ${escapeHtml(dateStr)}</span>
-                                    <div style="display:flex; gap:6px;">
-                                        <button class="btn btn-xs btn-outline" onclick="openTransferQuickNoteModal(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')})" title="Bu notu bir sayfaya veya klasöre taşı">
-                                            📁 Aktar
+                            <div class="ov-item-row" style="background:var(--surface, #fff); border:1px solid var(--border); border-radius:6px; padding:6px 10px; display:flex; flex-direction:column; gap:4px;">
+                                <div style="font-size:0.83rem; color:var(--text); white-space:pre-wrap; word-break:break-word; line-height:1.35; cursor:pointer;" onclick="openQuickNoteDetail(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')}, '${dateStr}')">${escapeHtml(n.content)}</div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:2px;">
+                                    <span style="font-size:0.68rem; color:var(--muted); opacity:0.85;">🕒 ${escapeHtml(dateStr)}</span>
+                                    <div style="display:flex; gap:4px;">
+                                        <button class="btn-icon-subtle" onclick="openTransferQuickNoteModal(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')})" title="Sayfaya Aktar" style="font-size:0.85rem; padding:2px 4px;">
+                                            📁
                                         </button>
-                                        <button class="btn btn-xs btn-ghost" onclick="deleteWebQuickNote(${n.id})" title="Sil" style="color:var(--danger, #ef4444);">
+                                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteWebQuickNote(${n.id})" title="Sil" style="font-size:0.85rem; padding:2px 4px; color:var(--danger, #ef4444);">
                                             🗑️
                                         </button>
                                     </div>
@@ -885,12 +891,15 @@ async function loadOverviewQuickNotes() {
             listEl.innerHTML = `<div style="padding:10px; text-align:center; color:var(--muted); font-size:0.78rem;">Kayıtlı hızlı not yok</div>`;
             return;
         }
-        listEl.innerHTML = data.notes.slice(0, 5).map(n => `
-            <div class="ov-quicknote-row">
-                <span class="ov-quicknote-text" title="${escapeHtml(n.content)}">${escapeHtml(n.content)}</span>
-                <button class="ov-quicknote-del" onclick="deleteOverviewQuickNote(${n.id})" title="Sil">✕</button>
+        listEl.innerHTML = data.notes.slice(0, 5).map(n => {
+            const dateStr = n.created_at ? n.created_at.slice(0, 16) : '';
+            return `
+            <div class="ov-quicknote-row" onclick="openQuickNoteDetail(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')}, '${dateStr}')" title="Görüntülemek veya düzenlemek için tıklayın">
+                <span class="ov-quicknote-text">${escapeHtml(n.content)}</span>
+                <button class="ov-quicknote-del" onclick="event.stopPropagation(); deleteOverviewQuickNote(${n.id})" title="Sil">✕</button>
             </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (e) {
         console.warn("loadOverviewQuickNotes error:", e);
     }
@@ -2496,6 +2505,7 @@ async function loadProjectData(pageId) {
         renderConcept();
         renderBOM();
         renderLogs();
+        loadProjectNotes();
     } catch (e) {
         console.error("Proje verisi yükleme hatası:", e);
     }
@@ -2547,6 +2557,10 @@ function switchProjectTab(tabName) {
 
     const activeBtn = document.getElementById(`tab-btn-${tabName}`);
     if (activeBtn) activeBtn.classList.add('active');
+
+    if (tabName === 'notes') {
+        loadProjectNotes();
+    }
 }
 
 // ── Timeline & Milestones ──
@@ -4736,4 +4750,242 @@ async function logoutUser() {
         window.location.reload();
     }
 }
+
+// ─────────────────────────────────────────────────────────────
+// 1. Proje Görev & Not Maddeleri (Project Checklist & Bullet Items)
+// ─────────────────────────────────────────────────────────────
+async function loadProjectNotes() {
+    if (!currentPageId) return;
+    const container = document.getElementById('project-items-list');
+    if (!container) return;
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/items`);
+        const data = await res.json();
+        if (!data.ok) return;
+        renderProjectNotes(data.items || []);
+    } catch (e) {
+        console.warn("loadProjectNotes error:", e);
+    }
+}
+
+function renderProjectNotes(items) {
+    const container = document.getElementById('project-items-list');
+    if (!container) return;
+    if (!items || items.length === 0) {
+        container.innerHTML = `<div style="padding:16px; text-align:center; color:var(--muted); font-size:0.85rem;">Bu projede henüz görev veya not maddesi yok. Yukarıdan hemen ekleyin.</div>`;
+        return;
+    }
+    container.innerHTML = items.map(it => `
+        <div class="ov-item-row" id="proj-item-${it.id}" style="display:flex; justify-content:space-between; align-items:center; padding:7px 10px; background:var(--surface2, #f8fafc); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;">
+            <div style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+                <input type="checkbox" ${it.is_done ? 'checked' : ''} onchange="toggleProjectItem(${it.id}, this.checked)" style="width:16px; height:16px; cursor:pointer; flex-shrink:0;">
+                <span style="font-size:0.85rem; ${it.is_done ? 'text-decoration:line-through; opacity:0.55;' : 'color:var(--text);'}; word-break:break-word;">
+                    ${escapeHtml(it.title)}
+                </span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                <button class="btn-icon-subtle btn-danger-hover" onclick="deleteProjectItem(${it.id})" title="Sil" style="color:var(--danger, #ef4444); font-size:0.8rem; padding:2px 4px;">
+                    ✕
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function addProjectItem() {
+    const input = document.getElementById('project-item-title-input');
+    if (!input) return;
+    const title = input.value.trim();
+    if (!title || !currentPageId) return;
+
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/items`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            input.value = '';
+            loadProjectNotes();
+            if (typeof showToast === 'function') showToast("Madde eklendi");
+        }
+    } catch (e) {
+        console.error("addProjectItem error:", e);
+    }
+}
+
+async function toggleProjectItem(itemId, isDone) {
+    try {
+        await fetch(`/notes/api/items/${itemId}/toggle`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_done: isDone })
+        });
+        loadProjectNotes();
+    } catch (e) {
+        console.error("toggleProjectItem error:", e);
+    }
+}
+
+async function deleteProjectItem(itemId) {
+    try {
+        await fetch(`/notes/api/items/${itemId}`, { method: 'DELETE' });
+        loadProjectNotes();
+    } catch (e) {
+        console.error("deleteProjectItem error:", e);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 2. Simge & Renk Seçici Yardımcıları (Emoji & Color Picker)
+// ─────────────────────────────────────────────────────────────
+function selectPickerIcon(inputId, icon, btnEl) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.value = icon;
+    }
+    if (btnEl && btnEl.parentElement) {
+        btnEl.parentElement.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+    }
+}
+
+function selectPickerColor(inputId, color, swatchEl) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.value = color;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. Sayfa Dışa Aktarma (.md, .txt, .json)
+// ─────────────────────────────────────────────────────────────
+function exportCurrentPage(format) {
+    if (!currentPageId) {
+        if (typeof showToast === 'function') showToast("Lütfen önce bir sayfa açın");
+        return;
+    }
+    window.open(`/notes/api/pages/${currentPageId}/export?format=${format}`, '_blank');
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4. TincAI Mühendislik & Proje Asistanı
+// ─────────────────────────────────────────────────────────────
+let currentAiReplyText = '';
+
+function openAiAssistModal() {
+    const modal = document.getElementById('modal-ai-assist');
+    const label = document.getElementById('ai-modal-context-label');
+    const title = currentPageTitle || (currentProjectData ? currentProjectData.details.title : 'Aktif Sayfa');
+    if (label) label.textContent = `Aktif Sayfa / Proje: ${title || '-'}`;
+    if (modal) modal.style.display = 'flex';
+}
+
+async function runAiAction(action) {
+    const box = document.getElementById('ai-response-box');
+    const customPromptInput = document.getElementById('ai-custom-prompt');
+    let customText = '';
+
+    if (action === 'custom') {
+        customText = customPromptInput.value.trim();
+        if (!customText) return;
+    }
+
+    box.innerHTML = '<div style="display:flex; align-items:center; gap:8px; color:var(--accent);"><span>⏳</span> <em>TincAI bağlamı analiz ediyor, lütfen bekleyin...</em></div>';
+
+    try {
+        const res = await fetch('/notes/api/ai/assist', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                page_id: currentPageId,
+                action: action,
+                custom_prompt: customText
+            })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            currentAiReplyText = data.reply;
+            box.innerText = data.reply;
+        } else {
+            box.innerHTML = `<span style="color:#ef4444;">❌ Hata: ${escapeHtml(data.error || 'İşlem gerçekleştirilemedi')}</span>`;
+        }
+    } catch (e) {
+        box.innerHTML = `<span style="color:#ef4444;">❌ Ağ Hatası: ${escapeHtml(e.message)}</span>`;
+    }
+}
+
+function copyAiReply() {
+    if (!currentAiReplyText) return;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(currentAiReplyText);
+        if (typeof showToast === 'function') showToast("AI yanıtı panoya kopyalandı!");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5. Hızlı Not Detay Modal İşlemleri
+// ─────────────────────────────────────────────────────────────
+let currentDetailQuickNoteId = null;
+
+function openQuickNoteDetail(id, content, dateStr) {
+    currentDetailQuickNoteId = id;
+    const modal = document.getElementById('modal-quicknote-detail');
+    const idInput = document.getElementById('qn-detail-id');
+    const contentInput = document.getElementById('qn-detail-content');
+    const dateLabel = document.getElementById('qn-detail-date');
+
+    if (idInput) idInput.value = id;
+    if (contentInput) contentInput.value = content;
+    if (dateLabel) dateLabel.textContent = dateStr ? `Kayıt Tarihi: ${dateStr}` : '';
+
+    if (modal) {
+        modal.style.display = 'flex';
+        setTimeout(() => { if (contentInput) contentInput.focus(); }, 100);
+    }
+}
+
+async function saveDetailQuickNote() {
+    if (!currentDetailQuickNoteId) return;
+    const content = document.getElementById('qn-detail-content').value.trim();
+    if (!content) return;
+    try {
+        closeModal('modal-quicknote-detail');
+        if (typeof showToast === 'function') showToast("Hızlı not güncellendi");
+        loadOverviewQuickNotes();
+        renderWebQuickNotes();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function deleteCurrentDetailQuickNote() {
+    if (!currentDetailQuickNoteId) return;
+    try {
+        await fetch(`/notes/api/quick-notes/${currentDetailQuickNoteId}`, { method: 'DELETE' });
+        closeModal('modal-quicknote-detail');
+        if (typeof showToast === 'function') showToast("Not silindi");
+        loadOverviewQuickNotes();
+        renderWebQuickNotes();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function copyDetailQuickNote() {
+    const content = document.getElementById('qn-detail-content').value;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(content);
+        if (typeof showToast === 'function') showToast("Not panoya kopyalandı!");
+    }
+}
+
+function transferDetailQuickNote() {
+    const content = document.getElementById('qn-detail-content').value;
+    const id = currentDetailQuickNoteId;
+    closeModal('modal-quicknote-detail');
+    openTransferQuickNoteModal(id, content);
+}
+
 
