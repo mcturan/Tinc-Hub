@@ -1474,6 +1474,7 @@ function renderPageHeader() {
     const noteArea = document.getElementById('note-view');
     const financeArea = document.getElementById('finance-view');
     const projectArea = document.getElementById('project-view');
+    const softwareArea = document.getElementById('software-view');
     const quickAddBox = document.getElementById('quick-add-container');
 
     const btnBulkAdd = document.getElementById('btn-bulk-add');
@@ -1484,6 +1485,7 @@ function renderPageHeader() {
         if (checklistArea) checklistArea.style.display = 'none';
         if (financeArea) financeArea.style.display = 'none';
         if (projectArea) projectArea.style.display = 'none';
+        if (softwareArea) softwareArea.style.display = 'none';
         if (quickAddBox) quickAddBox.style.display = 'none';
         if (noteArea) noteArea.style.display = 'block';
         if (btnBulkAdd) btnBulkAdd.style.display = 'none';
@@ -1494,6 +1496,7 @@ function renderPageHeader() {
         if (checklistArea) checklistArea.style.display = 'none';
         if (noteArea) noteArea.style.display = 'none';
         if (projectArea) projectArea.style.display = 'none';
+        if (softwareArea) softwareArea.style.display = 'none';
         if (quickAddBox) quickAddBox.style.display = 'none';
         if (financeArea) financeArea.style.display = 'flex';
         if (btnBulkAdd) btnBulkAdd.style.display = 'none';
@@ -1504,16 +1507,30 @@ function renderPageHeader() {
         if (checklistArea) checklistArea.style.display = 'none';
         if (noteArea) noteArea.style.display = 'none';
         if (financeArea) financeArea.style.display = 'none';
+        if (softwareArea) softwareArea.style.display = 'none';
         if (quickAddBox) quickAddBox.style.display = 'none';
         if (projectArea) projectArea.style.display = 'flex';
         if (btnBulkAdd) btnBulkAdd.style.display = 'none';
         if (btnClearDone) btnClearDone.style.display = 'none';
         if (btnResetList) btnResetList.style.display = 'none';
         if (badgeEl) badgeEl.textContent = 'Proje';
+    } else if (currentPageData.type === 'software') {
+        if (checklistArea) checklistArea.style.display = 'none';
+        if (noteArea) noteArea.style.display = 'none';
+        if (financeArea) financeArea.style.display = 'none';
+        if (projectArea) projectArea.style.display = 'none';
+        if (quickAddBox) quickAddBox.style.display = 'none';
+        if (softwareArea) softwareArea.style.display = 'flex';
+        if (btnBulkAdd) btnBulkAdd.style.display = 'none';
+        if (btnClearDone) btnClearDone.style.display = 'none';
+        if (btnResetList) btnResetList.style.display = 'none';
+        if (badgeEl) badgeEl.textContent = 'Yazılım';
+        renderSoftwareViewWeb(currentPageData.id);
     } else {
         if (noteArea) noteArea.style.display = 'none';
         if (financeArea) financeArea.style.display = 'none';
         if (projectArea) projectArea.style.display = 'none';
+        if (softwareArea) softwareArea.style.display = 'none';
         if (checklistArea) checklistArea.style.display = 'block';
         if (quickAddBox) quickAddBox.style.display = 'flex';
         if (btnBulkAdd) btnBulkAdd.style.display = 'inline-block';
@@ -5298,5 +5315,276 @@ function transferDetailQuickNote() {
     closeModal('modal-quicknote-detail');
     openTransferQuickNoteModal(id, content);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Yazılım Projesi Yönetimi (Web Arayüzü)
+// ─────────────────────────────────────────────────────────────────────────────
+let webCurrentSoftwareData = null;
+let webCurrentSoftwareTab = 'rules';
+
+async function renderSoftwareViewWeb(pageId) {
+    try {
+        const resp = await fetch(`/notes/api/software/${pageId}`);
+        const json = await resp.json();
+        if (json.ok && json.data) {
+            webCurrentSoftwareData = json.data;
+        }
+    } catch (e) {
+        console.warn("Web software project fetch error:", e);
+    }
+
+    if (!webCurrentSoftwareData) return;
+
+    const proj = webCurrentSoftwareData.project || {};
+    const rules = webCurrentSoftwareData.rules || [];
+    const tasks = webCurrentSoftwareData.tasks || [];
+    const ideas = webCurrentSoftwareData.ideas || [];
+    const commits = webCurrentSoftwareData.commits || [];
+
+    // Header & Meta
+    const nameEl = document.getElementById('web-soft-repo-name');
+    const branchEl = document.getElementById('web-soft-branch-badge');
+    const pathEl = document.getElementById('web-soft-repo-path');
+    const stackEl = document.getElementById('web-soft-tech-stack');
+
+    if (nameEl) nameEl.innerText = proj.repo_name || (currentPageData ? currentPageData.title : 'Yazılım Projesi');
+    if (branchEl) branchEl.innerText = proj.branch || 'main';
+    if (pathEl) pathEl.innerText = proj.repo_path || '(Yerel depo dizini ayarlanmadı)';
+    if (stackEl) stackEl.innerText = proj.tech_stack || 'Genel Yazılım';
+
+    // Counts
+    const cr = document.getElementById('web-soft-count-rules');
+    const ct = document.getElementById('web-soft-count-tasks');
+    const ci = document.getElementById('web-soft-count-ideas');
+    const cc = document.getElementById('web-soft-count-commits');
+    if (cr) cr.innerText = rules.length;
+    if (ct) ct.innerText = tasks.length;
+    if (ci) ci.innerText = ideas.length;
+    if (cc) cc.innerText = commits.length;
+
+    // AI & Agent Paneli
+    const keyEl = document.getElementById('web-soft-api-key-display');
+    const urlEl = document.getElementById('web-soft-agents-url-display');
+    const linkEl = document.getElementById('web-soft-agents-link');
+    const agentsUrl = `${window.location.origin}/notes/api/software/${pageId}/agents.md`;
+
+    if (keyEl) keyEl.value = proj.api_key || '';
+    if (urlEl) urlEl.value = agentsUrl;
+    if (linkEl) linkEl.href = agentsUrl;
+
+    // Panes
+    renderWebSoftwareRules(rules);
+    renderWebSoftwareTasks(tasks);
+    renderWebSoftwareIdeas(ideas);
+    renderWebSoftwareCommits(commits);
+}
+
+function switchSoftwareTabWeb(tabName) {
+    webCurrentSoftwareTab = tabName;
+    ['rules', 'tasks', 'ideas', 'commits', 'ai'].forEach(t => {
+        const btn = document.getElementById(`wstab-btn-${t}`);
+        const pane = document.getElementById(`web-software-pane-${t}`);
+        if (btn) btn.classList.toggle('active', t === tabName);
+        if (pane) pane.style.display = (t === tabName) ? 'block' : 'none';
+    });
+}
+
+function renderWebSoftwareRules(rules) {
+    const el = document.getElementById('web-software-rules-list');
+    if (!el) return;
+    if (rules.length === 0) {
+        el.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">Henüz kural eklenmedi.</div>';
+        return;
+    }
+    el.innerHTML = rules.map(r => `
+        <div class="card" style="padding:12px; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <span style="font-size:0.75rem; font-weight:800; color:#dc2626; background:rgba(220,38,38,0.1); padding:2px 6px; border-radius:4px;">${r.severity}</span>
+                    <span style="font-size:0.75rem; color:var(--muted);">[${r.category}]</span>
+                </div>
+                <button class="btn btn-sm btn-ghost" style="color:var(--danger);" onclick="deleteSoftwareRuleWeb(${r.id})">✕</button>
+            </div>
+            <div style="font-weight:700; font-size:0.95rem;">${escapeHtml(r.title)}</div>
+            <div style="font-size:0.85rem; color:var(--text-secondary);">${escapeHtml(r.content)}</div>
+        </div>
+    `).join('');
+}
+
+function renderWebSoftwareTasks(tasks) {
+    const el = document.getElementById('web-software-tasks-list');
+    if (!el) return;
+    if (tasks.length === 0) {
+        el.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">Henüz görev eklenmedi.</div>';
+        return;
+    }
+    el.innerHTML = tasks.map(t => {
+        const isDone = (t.status === 'done');
+        return `
+            <div class="card" style="padding:12px; display:flex; flex-direction:column; gap:6px; opacity:${isDone ? 0.65 : 1};">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" ${isDone ? 'checked' : ''} onchange="toggleSoftwareTaskDoneWeb(${t.id}, this.checked)">
+                        <span style="font-weight:700; font-size:0.95rem; ${isDone ? 'text-decoration:line-through; color:var(--muted);' : ''}">${escapeHtml(t.title)}</span>
+                    </div>
+                    <button class="btn btn-sm btn-ghost" style="color:var(--danger);" onclick="deleteSoftwareTaskWeb(${t.id})">✕</button>
+                </div>
+                ${t.description ? `<div style="font-size:0.85rem; color:var(--text-secondary); margin-left:26px;">${escapeHtml(t.description)}</div>` : ''}
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-left:26px; margin-top:4px;">
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <span style="font-size:0.75rem; background:var(--surface); border:1px solid var(--border); padding:2px 6px; border-radius:4px;">${t.priority}</span>
+                        ${t.assigned_agent ? `<span style="font-size:0.75rem; color:#4f46e5;">🤖 @${escapeHtml(t.assigned_agent)}</span>` : ''}
+                    </div>
+                    <select class="form-control" style="width:auto; padding:2px 8px; font-size:0.78rem;" onchange="updateSoftwareTaskStatusWeb(${t.id}, this.value)">
+                        <option value="todo" ${t.status === 'todo' ? 'selected' : ''}>Yapılacak</option>
+                        <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>Devam Eden</option>
+                        <option value="review" ${t.status === 'review' ? 'selected' : ''}>İnceleme</option>
+                        <option value="done" ${t.status === 'done' ? 'selected' : ''}>Tamam</option>
+                    </select>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderWebSoftwareIdeas(ideas) {
+    const el = document.getElementById('web-software-ideas-list');
+    if (!el) return;
+    if (ideas.length === 0) {
+        el.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">Henüz fikir eklenmedi.</div>';
+        return;
+    }
+    el.innerHTML = ideas.map(i => `
+        <div class="card" style="padding:12px; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <span style="font-size:0.75rem; font-weight:700; background:var(--surface); border:1px solid var(--border); padding:2px 6px; border-radius:4px;">${i.category}</span>
+                    <span style="font-size:0.75rem; color:var(--muted);">${i.status}</span>
+                </div>
+                <button class="btn btn-sm btn-ghost" style="color:var(--danger);" onclick="deleteSoftwareIdeaWeb(${i.id})">✕</button>
+            </div>
+            <div style="font-weight:700; font-size:0.95rem;">${escapeHtml(i.title)}</div>
+            ${i.description ? `<div style="font-size:0.85rem; color:var(--text-secondary);">${escapeHtml(i.description)}</div>` : ''}
+        </div>
+    `).join('');
+}
+
+function renderWebSoftwareCommits(commits) {
+    const el = document.getElementById('web-software-commits-list');
+    if (!el) return;
+    if (commits.length === 0) {
+        el.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">Henüz commit kaydı yok. "🔄 Şimdi Eşitle" butonuna tıklayın.</div>';
+        return;
+    }
+    el.innerHTML = commits.map(c => `
+        <div class="card" style="padding:10px 14px; display:flex; flex-direction:column; gap:4px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-family:monospace; font-size:0.8rem; font-weight:700; color:var(--primary);">${c.commit_hash.slice(0, 7)}</span>
+                <span style="font-size:0.75rem; color:var(--muted);">${c.committed_at || ''}</span>
+            </div>
+            <div style="font-size:0.9rem; font-weight:600;">${escapeHtml(c.message)}</div>
+            <div style="font-size:0.78rem; color:var(--muted);">Yazar: <b>${escapeHtml(c.author || 'Anonim')}</b></div>
+        </div>
+    `).join('');
+}
+
+async function syncSoftwareGitWeb() {
+    if (!currentPageData) return;
+    try {
+        const resp = await fetch(`/notes/api/software/${currentPageData.id}/sync-git`, { method: 'POST' });
+        const json = await resp.json();
+        if (json.ok) {
+            alert(`✅ ${json.synced_count || 0} yeni commit eşitlendi!`);
+            await renderSoftwareViewWeb(currentPageData.id);
+        } else {
+            alert(json.error || 'Git eşitleme hatası');
+        }
+    } catch (e) {
+        alert('Hata: ' + e.message);
+    }
+}
+
+async function updateSoftwareTaskStatusWeb(taskId, status) {
+    if (!currentPageData) return;
+    await fetch(`/notes/api/software/${currentPageData.id}/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+    });
+    await renderSoftwareViewWeb(currentPageData.id);
+}
+
+async function toggleSoftwareTaskDoneWeb(taskId, isDone) {
+    await updateSoftwareTaskStatusWeb(taskId, isDone ? 'done' : 'todo');
+}
+
+async function deleteSoftwareTaskWeb(taskId) {
+    if (!confirm('Görevi silmek istediğinize emin misiniz?')) return;
+    await fetch(`/notes/api/software/${currentPageData.id}/tasks/${taskId}`, { method: 'DELETE' });
+    await renderSoftwareViewWeb(currentPageData.id);
+}
+
+async function deleteSoftwareRuleWeb(ruleId) {
+    if (!confirm('Kuralı silmek istediğinize emin misiniz?')) return;
+    await fetch(`/notes/api/software/${currentPageData.id}/rules/${ruleId}`, { method: 'DELETE' });
+    await renderSoftwareViewWeb(currentPageData.id);
+}
+
+async function deleteSoftwareIdeaWeb(ideaId) {
+    if (!confirm('Fikri silmek istediğinize emin misiniz?')) return;
+    await fetch(`/notes/api/software/${currentPageData.id}/ideas/${ideaId}`, { method: 'DELETE' });
+    await renderSoftwareViewWeb(currentPageData.id);
+}
+
+function openAddSoftwareRuleModalWeb() {
+    const title = prompt('Kural Başlığı:');
+    if (!title) return;
+    const content = prompt('Kural Açıklaması / Şartlar:');
+    const severity = prompt('Önem Derecesi (MUST, SHOULD, NEVER):', 'MUST');
+    fetch(`/notes/api/software/${currentPageData.id}/rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content: content || '', severity: severity || 'MUST', category: 'Architecture' })
+    }).then(() => renderSoftwareViewWeb(currentPageData.id));
+}
+
+function openAddSoftwareTaskModalWeb() {
+    const title = prompt('Görev Başlığı:');
+    if (!title) return;
+    const desc = prompt('Açıklama:');
+    const prio = prompt('Öncelik (low, medium, high, critical):', 'medium');
+    const agent = prompt('Atanan Ajan / Kişi:', 'Antigravity');
+    fetch(`/notes/api/software/${currentPageData.id}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description: desc || '', priority: prio || 'medium', assigned_agent: agent || '' })
+    }).then(() => renderSoftwareViewWeb(currentPageData.id));
+}
+
+function openAddSoftwareIdeaModalWeb() {
+    const title = prompt('Fikir Başlığı:');
+    if (!title) return;
+    const desc = prompt('Açıklama:');
+    fetch(`/notes/api/software/${currentPageData.id}/ideas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, description: desc || '', category: 'Feature', status: 'draft' })
+    }).then(() => renderSoftwareViewWeb(currentPageData.id));
+}
+
+function openSoftwareSettingsModalWeb() {
+    if (!webCurrentSoftwareData || !webCurrentSoftwareData.project) return;
+    const p = webCurrentSoftwareData.project;
+    const path = prompt('Yerel Depo Dizini (Repo Path):', p.repo_path || '/home/turan/101');
+    if (path === null) return;
+    const stack = prompt('Teknoloji Yığını (Tech Stack):', p.tech_stack || 'Python, Flask, SQLite');
+    const arch = prompt('Sistem Mimarisi Notu:', p.system_architecture || '');
+    fetch(`/notes/api/software/${currentPageData.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo_path: path, tech_stack: stack || '', system_architecture: arch || '' })
+    }).then(() => renderSoftwareViewWeb(currentPageData.id));
+}
+
 
 

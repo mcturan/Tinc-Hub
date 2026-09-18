@@ -1743,4 +1743,255 @@ GÜNLÜK GİRİŞLERİ:
             "live": False
         })
 
+# ─────────────────────────────────────────────────────────────────────────────
+# REST API: Yazılım Projeleri (TincSync & AI / CLI Agent Entegrasyonlu)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _check_software_access(page_id: int):
+    """Kullanıcı oturumu veya proje API anahtarı (X-Agent-Key veya Bearer token) ile erişim doğrular."""
+    proj = db.get_software_project(page_id)
+    if not proj:
+        return False, None
+    
+    agent_key = request.headers.get("X-Agent-Key")
+    if not agent_key:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            agent_key = auth_header.replace("Bearer ", "").strip()
+            
+    if agent_key and proj.get("api_key") and agent_key == proj.get("api_key"):
+        return True, proj
+        
+    if session.get("authenticated") or get_current_user():
+        return True, proj
+        
+    tinc_pw = os.environ.get("TINC_HUB_PASSWORD", "").strip()
+    if tinc_pw and agent_key == tinc_pw:
+        return True, proj
+        
+    return False, None
+
+@tnote_bp.route('/api/software/<int:page_id>', methods=['GET'])
+def api_get_software_project(page_id):
+    allowed, proj = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    return jsonify({"ok": True, "data": db.get_software_project_full(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>', methods=['PUT'])
+def api_update_software_project(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    data = request.get_json(silent=True) or {}
+    updated = db.update_software_project(
+        page_id=page_id,
+        repo_name=data.get("repo_name"),
+        repo_path=data.get("repo_path"),
+        branch=data.get("branch"),
+        tech_stack=data.get("tech_stack"),
+        api_key=data.get("api_key"),
+        system_architecture=data.get("system_architecture")
+    )
+    return jsonify({"ok": True, "project": updated})
+
+@tnote_bp.route('/api/software/<int:page_id>/agents.md', methods=['GET'])
+def api_get_software_agents_md(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return "Unauthorized / Yetkisiz erişim", 401
+    md_content = db.generate_agents_markdown(page_id)
+    from flask import Response
+    return Response(md_content, mimetype='text/markdown; charset=utf-8', headers={
+        'Content-Disposition': 'inline; filename=AGENTS.md'
+    })
+
+@tnote_bp.route('/api/software/<int:page_id>/context', methods=['GET'])
+def api_get_software_context(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    return jsonify({"ok": True, "context": db.get_software_project_full(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/rules', methods=['GET'])
+def api_get_software_rules(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    cat = request.args.get("category")
+    return jsonify({"ok": True, "rules": db.get_software_rules(page_id, cat)})
+
+@tnote_bp.route('/api/software/<int:page_id>/rules', methods=['POST'])
+def api_add_software_rule(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "").strip()
+    content = data.get("content", "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "Kural başlığı gerekli"}), 400
+    rule_id = db.add_software_rule(
+        page_id=page_id,
+        title=title,
+        content=content,
+        category=data.get("category", "Architecture"),
+        severity=data.get("severity", "MUST"),
+        sort_order=data.get("sort_order", 0)
+    )
+    return jsonify({"ok": True, "id": rule_id, "rules": db.get_software_rules(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/rules/<int:rule_id>', methods=['DELETE'])
+def api_delete_software_rule(page_id, rule_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    db.delete_software_rule(rule_id)
+    return jsonify({"ok": True, "rules": db.get_software_rules(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/ideas', methods=['GET'])
+def api_get_software_ideas(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    status = request.args.get("status")
+    return jsonify({"ok": True, "ideas": db.get_software_ideas(page_id, status)})
+
+@tnote_bp.route('/api/software/<int:page_id>/ideas', methods=['POST'])
+def api_add_software_idea(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "Fikir başlığı gerekli"}), 400
+    idea_id = db.add_software_idea(
+        page_id=page_id,
+        title=title,
+        description=data.get("description", ""),
+        category=data.get("category", "Feature"),
+        status=data.get("status", "draft"),
+        author=data.get("author", "User")
+    )
+    return jsonify({"ok": True, "id": idea_id, "ideas": db.get_software_ideas(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/ideas/<int:idea_id>', methods=['PUT'])
+def api_update_software_idea(page_id, idea_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    data = request.get_json(silent=True) or {}
+    db.update_software_idea(
+        idea_id=idea_id,
+        title=data.get("title"),
+        description=data.get("description"),
+        category=data.get("category"),
+        status=data.get("status"),
+        author=data.get("author"),
+        sort_order=data.get("sort_order")
+    )
+    return jsonify({"ok": True, "ideas": db.get_software_ideas(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/ideas/<int:idea_id>', methods=['DELETE'])
+def api_delete_software_idea(page_id, idea_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    db.delete_software_idea(idea_id)
+    return jsonify({"ok": True, "ideas": db.get_software_ideas(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/tasks', methods=['GET'])
+def api_get_software_tasks(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    status = request.args.get("status")
+    return jsonify({"ok": True, "tasks": db.get_software_tasks(page_id, status)})
+
+@tnote_bp.route('/api/software/<int:page_id>/tasks', methods=['POST'])
+def api_add_software_task(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "").strip()
+    if not title:
+        return jsonify({"ok": False, "error": "Görev başlığı gerekli"}), 400
+    task_id = db.add_software_task(
+        page_id=page_id,
+        title=title,
+        description=data.get("description", ""),
+        status=data.get("status", "todo"),
+        priority=data.get("priority", "medium"),
+        assigned_agent=data.get("assigned_agent", ""),
+        commit_hash=data.get("commit_hash", "")
+    )
+    return jsonify({"ok": True, "id": task_id, "tasks": db.get_software_tasks(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/tasks/<int:task_id>', methods=['PUT'])
+def api_update_software_task(page_id, task_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    data = request.get_json(silent=True) or {}
+    db.update_software_task(
+        task_id=task_id,
+        title=data.get("title"),
+        description=data.get("description"),
+        status=data.get("status"),
+        priority=data.get("priority"),
+        assigned_agent=data.get("assigned_agent"),
+        commit_hash=data.get("commit_hash"),
+        sort_order=data.get("sort_order")
+    )
+    return jsonify({"ok": True, "tasks": db.get_software_tasks(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/tasks/<int:task_id>', methods=['DELETE'])
+def api_delete_software_task(page_id, task_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    db.delete_software_task(task_id)
+    return jsonify({"ok": True, "tasks": db.get_software_tasks(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/commits', methods=['GET'])
+def api_get_software_commits(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    limit = request.args.get("limit", 30, type=int)
+    return jsonify({"ok": True, "commits": db.get_software_commits(page_id, limit)})
+
+@tnote_bp.route('/api/software/<int:page_id>/commits', methods=['POST'])
+def api_add_software_commit(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    data = request.get_json(silent=True) or {}
+    commit_hash = data.get("commit_hash", "").strip()
+    message = data.get("message", "").strip()
+    if not commit_hash or not message:
+        return jsonify({"ok": False, "error": "Commit hash ve mesajı gereklidir"}), 400
+    cid = db.add_software_commit(
+        page_id=page_id,
+        commit_hash=commit_hash,
+        message=message,
+        author=data.get("author", ""),
+        committed_at=data.get("committed_at", datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+        branch=data.get("branch", "main")
+    )
+    return jsonify({"ok": True, "id": cid, "commits": db.get_software_commits(page_id)})
+
+@tnote_bp.route('/api/software/<int:page_id>/sync-git', methods=['POST'])
+def api_sync_software_git(page_id):
+    allowed, _ = _check_software_access(page_id)
+    if not allowed:
+        return jsonify({"ok": False, "error": "Yetkisiz erişim"}), 401
+    data = request.get_json(silent=True) or {}
+    repo_path = data.get("repo_path")
+    res = db.sync_git_commits(page_id, repo_path)
+    return jsonify(res)
+
+
 

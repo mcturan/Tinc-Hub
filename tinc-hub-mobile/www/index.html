@@ -128,7 +128,7 @@
                 </div>
 
                 <div style="display:flex; align-items:center; gap:8px;">
-                    <span id="page-view-icon" style="font-size:1.4rem;">📝</span>
+                    <span id="page-view-icon" style="font-size:1.4rem; cursor:pointer;" onclick="openEditCurrentPageModal()" title="Simgeyi veya Sayfayı Düzenle">📝</span>
                     <input type="text" id="page-view-title-input" class="page-title-input" placeholder="Sayfa Başlığı" onchange="updateCurrentPageTitle(this.value)">
                 </div>
 
@@ -305,6 +305,130 @@
                 <div id="project-pane-concept" class="project-tab-pane" style="display:none;">
                     <div class="note-editor-card">
                         <textarea id="project-concept-content" class="note-textarea" placeholder="Proje fikirleri, teknik gereksinimler ve şema notları..." oninput="autoSaveProjectConcept(this.value)"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Yazılım Projesi Görünümü (TincSync & AI / CLI Agent Entegrasyonlu) -->
+            <div id="page-software-container" style="display:none; flex-direction:column; gap:12px;">
+                <!-- Proje Üst Bilgi Kartı -->
+                <div class="project-header-box">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:1.5rem;">💻</span>
+                            <div>
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="font-weight:800; font-size:1.05rem;" id="soft-repo-name">Yazılım Projesi</span>
+                                    <span style="font-size:0.75rem; background:rgba(59,130,246,0.15); color:var(--primary); padding:2px 8px; border-radius:12px; font-weight:700;" id="soft-branch-badge">main</span>
+                                </div>
+                                <div style="font-size:0.75rem; color:var(--muted); font-family:monospace; margin-top:2px;" id="soft-repo-path">/home/turan/...</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn btn-secondary btn-xs" onclick="syncSoftwareGit()" title="Git deposundan son commitleri çek">
+                                🔄 Git Eşitle
+                            </button>
+                            <button class="btn btn-secondary btn-xs" onclick="openSoftwareSettingsModal()" title="Proje Ayarları">
+                                ⚙️ Ayarlar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Mini Stack & Architecture Bar -->
+                    <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+                        <span style="font-size:0.75rem; font-weight:700; color:var(--text-secondary);">Teknoloji:</span>
+                        <span id="soft-tech-stack" style="font-size:0.75rem; background:var(--surface); border:1px solid var(--border); padding:2px 8px; border-radius:6px;">Belirtilmedi</span>
+                    </div>
+                </div>
+
+                <!-- 5 Segmentli Sekme Butonları -->
+                <div class="project-tabs-nav" style="overflow-x:auto; white-space:nowrap; display:flex; gap:4px; padding-bottom:4px;">
+                    <button class="project-tab-btn active" id="stab-btn-rules" onclick="switchSoftwareTab('rules')">📜 Kanunlar (<span id="soft-count-rules">0</span>)</button>
+                    <button class="project-tab-btn" id="stab-btn-tasks" onclick="switchSoftwareTab('tasks')">☑️ İşler (<span id="soft-count-tasks">0</span>)</button>
+                    <button class="project-tab-btn" id="stab-btn-ideas" onclick="switchSoftwareTab('ideas')">💡 Fikirler (<span id="soft-count-ideas">0</span>)</button>
+                    <button class="project-tab-btn" id="stab-btn-commits" onclick="switchSoftwareTab('commits')">🔀 Commitler (<span id="soft-count-commits">0</span>)</button>
+                    <button class="project-tab-btn" id="stab-btn-ai" onclick="switchSoftwareTab('ai')">🤖 AI & Agent</button>
+                </div>
+
+                <!-- Sekme 1: 📜 Kanunlar (Architectural Rules & Invariants) -->
+                <div id="software-pane-rules" class="software-tab-pane">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.85rem; color:var(--text-secondary);">Mimari Kurallar & Kanunlar</span>
+                        <button class="btn btn-primary btn-xs" onclick="openAddSoftwareRuleModal()">➕ Kural Ekle</button>
+                    </div>
+                    <div id="software-rules-list" style="display:flex; flex-direction:column; gap:8px;">
+                        <!-- Dinamik Kanunlar -->
+                    </div>
+                </div>
+
+                <!-- Sekme 2: ☑️ İşler (Sprints & Tasks) -->
+                <div id="software-pane-tasks" class="software-tab-pane" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.85rem; color:var(--text-secondary);">Görevler & Sprint Maddeleri</span>
+                        <button class="btn btn-primary btn-xs" onclick="openAddSoftwareTaskModal()">➕ Görev Ekle</button>
+                    </div>
+                    <div id="software-tasks-list" style="display:flex; flex-direction:column; gap:8px;">
+                        <!-- Dinamik Görevler -->
+                    </div>
+                </div>
+
+                <!-- Sekme 3: 💡 Fikirler & RFCs -->
+                <div id="software-pane-ideas" class="software-tab-pane" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.85rem; color:var(--text-secondary);">Öneri & Fikir Havuzu</span>
+                        <button class="btn btn-primary btn-xs" onclick="openAddSoftwareIdeaModal()">➕ Fikir Ekle</button>
+                    </div>
+                    <div id="software-ideas-list" style="display:flex; flex-direction:column; gap:8px;">
+                        <!-- Dinamik Fikirler -->
+                    </div>
+                </div>
+
+                <!-- Sekme 4: 🔀 Commitler (TincSync / Git Geçmişi) -->
+                <div id="software-pane-commits" class="software-tab-pane" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-weight:700; font-size:0.85rem; color:var(--text-secondary);">Son Git Commitleri</span>
+                        <button class="btn btn-secondary btn-xs" onclick="syncSoftwareGit()">🔄 Şimdi Eşitle</button>
+                    </div>
+                    <div id="software-commits-list" style="display:flex; flex-direction:column; gap:8px;">
+                        <!-- Dinamik Commitler -->
+                    </div>
+                </div>
+
+                <!-- Sekme 5: 🤖 AI & Agent Bağlantısı -->
+                <div id="software-pane-ai" class="software-tab-pane" style="display:none;">
+                    <div style="background:var(--card-bg, #ffffff); border:1px solid var(--border); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:12px;">
+                        <div>
+                            <div style="font-weight:700; font-size:0.95rem;">🤖 CLI Agent Entegrasyonu (Antigravity, Cursor, Claude)</div>
+                            <div style="font-size:0.8rem; color:var(--muted); margin-top:2px;">
+                                CLI ajanlarınız bu API anahtarını kullanarak kuralları okuyabilir, mimariyi inceleyebilir ve görevleri güncelleyebilir.
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="font-size:0.75rem;">Proje Agent API Anahtarı (X-Agent-Key)</label>
+                            <div style="display:flex; gap:6px;">
+                                <input type="text" id="soft-api-key-display" class="input-text" readonly style="font-family:monospace; font-size:0.85rem;">
+                                <button class="btn btn-secondary btn-sm" onclick="copySoftwareApiKey()">Kopyala</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom:0;">
+                            <label class="form-label" style="font-size:0.75rem;">AGENTS.md İndirme / Okuma Bağlantısı</label>
+                            <div style="display:flex; gap:6px;">
+                                <input type="text" id="soft-agents-url-display" class="input-text" readonly style="font-family:monospace; font-size:0.8rem;">
+                                <button class="btn btn-secondary btn-sm" onclick="copySoftwareAgentsUrl()">Kopyala</button>
+                            </div>
+                        </div>
+
+                        <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px; font-family:monospace; font-size:0.75rem; overflow-x:auto;">
+                            <div style="color:var(--muted); margin-bottom:4px;"># CLI Ajanı (Antigravity vb.) için örnek curl komutu:</div>
+                            <code id="soft-curl-example">curl -H "X-Agent-Key: YOUR_KEY" http://127.0.0.1:9013/notes/api/software/PAGE_ID/agents.md</code>
+                        </div>
+
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-primary btn-sm" onclick="openAgentsMarkdownModal()">📄 AGENTS.md Önizle</button>
+                            <button class="btn btn-secondary btn-sm" onclick="syncSoftwareGit()">🔄 Git Senkronize Et</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -615,15 +739,57 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Kategori Adı</label>
-                <input type="text" id="new-cat-name" class="input-text" placeholder="Örn: Market, Fırın, Teknoloji...">
+                <input type="text" id="new-cat-name" class="input-text" placeholder="Örn: Market, Projeler, İş...">
             </div>
             <div class="form-group">
                 <label class="form-label">İkon (Emoji)</label>
-                <input type="text" id="new-cat-icon" class="input-text" value="📁" style="width:80px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <span id="new-cat-icon-preview" style="font-size:1.6rem; cursor:pointer; background:var(--surface); border:1px solid var(--border); border-radius:8px; width:44px; height:44px; display:flex; align-items:center; justify-content:center;" onclick="openIconPicker('new-cat-icon', 'new-cat-icon-preview')">📁</span>
+                    <input type="text" id="new-cat-icon" class="input-text" value="📁" style="width:70px; text-align:center;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="openIconPicker('new-cat-icon', 'new-cat-icon-preview')">Seç</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Renk</label>
+                <input type="color" id="new-cat-color" class="input-text" style="height:40px; padding:2px; cursor:pointer;" value="#3b82f6">
             </div>
             <div style="display:flex; gap:8px; margin-top:12px;">
                 <button class="btn btn-primary" style="flex:1;" onclick="submitCreateCategory()">Oluştur</button>
                 <button class="btn btn-secondary" onclick="closeModal('modal-add-category')">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kategori Düzenle Modal -->
+    <div id="modal-edit-category" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">📁 Kategoriyi Düzenle</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-edit-category')">✕</button>
+            </div>
+            <input type="hidden" id="edit-cat-id">
+            <div class="form-group">
+                <label class="form-label">Kategori Adı</label>
+                <input type="text" id="edit-cat-name" class="input-text">
+            </div>
+            <div class="form-group">
+                <label class="form-label">İkon (Emoji)</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <span id="edit-cat-icon-preview" style="font-size:1.6rem; cursor:pointer; background:var(--surface); border:1px solid var(--border); border-radius:8px; width:44px; height:44px; display:flex; align-items:center; justify-content:center;" onclick="openIconPicker('edit-cat-icon', 'edit-cat-icon-preview')">📁</span>
+                    <input type="text" id="edit-cat-icon" class="input-text" value="📁" style="width:70px; text-align:center;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="openIconPicker('edit-cat-icon', 'edit-cat-icon-preview')">Seç</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Renk</label>
+                <input type="color" id="edit-cat-color" class="input-text" style="height:40px; padding:2px; cursor:pointer;" value="#3b82f6">
+            </div>
+            <div style="display:flex; justify-content:space-between; gap:8px; margin-top:16px;">
+                <button class="btn btn-danger btn-sm" onclick="submitDeleteCategoryFromModal()">🗑️ Sil</button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-secondary" onclick="closeModal('modal-edit-category')">İptal</button>
+                    <button class="btn btn-primary" onclick="submitEditCategory()">Kaydet</button>
+                </div>
             </div>
         </div>
     </div>
@@ -645,6 +811,9 @@
                     <button type="button" class="btn btn-secondary" id="btn-type-notes" onclick="selectNewPageType('notes')">
                         📝 Not
                     </button>
+                    <button type="button" class="btn btn-secondary" id="btn-type-software" onclick="selectNewPageType('software')">
+                        💻 Yazılım Projesi
+                    </button>
                     <button type="button" class="btn btn-secondary" id="btn-type-finance" onclick="selectNewPageType('finance')">
                         💳 Finans & Fatura
                     </button>
@@ -655,11 +824,265 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Başlık</label>
-                <input type="text" id="new-page-title" class="input-text" placeholder="Örn: Haftalık Alışveriş, Toplantı Notu...">
+                <input type="text" id="new-page-title" class="input-text" placeholder="Örn: TincSync Projesi, Alışveriş...">
+            </div>
+            <div class="form-group">
+                <label class="form-label">İkon (Emoji)</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <span id="new-page-icon-preview" style="font-size:1.6rem; cursor:pointer; background:var(--surface); border:1px solid var(--border); border-radius:8px; width:44px; height:44px; display:flex; align-items:center; justify-content:center;" onclick="openIconPicker('new-page-icon', 'new-page-icon-preview')">📝</span>
+                    <input type="text" id="new-page-icon" class="input-text" value="📝" style="width:70px; text-align:center;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="openIconPicker('new-page-icon', 'new-page-icon-preview')">Seç</button>
+                </div>
             </div>
             <div style="display:flex; gap:8px; margin-top:12px;">
                 <button class="btn btn-primary" style="flex:1;" onclick="submitCreatePage()">Oluştur</button>
                 <button class="btn btn-secondary" onclick="closeModal('modal-add-page')">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sayfa Düzenle Modal -->
+    <div id="modal-edit-page" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">📄 Sayfayı / Listeyi Düzenle</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-edit-page')">✕</button>
+            </div>
+            <input type="hidden" id="edit-page-id">
+            <div class="form-group">
+                <label class="form-label">Bağlı Kategori</label>
+                <select id="edit-page-cat-select" class="input-text">
+                    <!-- Dinamik kategoriler -->
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Başlık</label>
+                <input type="text" id="edit-page-title" class="input-text">
+            </div>
+            <div class="form-group">
+                <label class="form-label">İkon (Emoji)</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <span id="edit-page-icon-preview" style="font-size:1.6rem; cursor:pointer; background:var(--surface); border:1px solid var(--border); border-radius:8px; width:44px; height:44px; display:flex; align-items:center; justify-content:center;" onclick="openIconPicker('edit-page-icon', 'edit-page-icon-preview')">📝</span>
+                    <input type="text" id="edit-page-icon" class="input-text" value="📝" style="width:70px; text-align:center;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="openIconPicker('edit-page-icon', 'edit-page-icon-preview')">Seç</button>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; gap:8px; margin-top:16px;">
+                <button class="btn btn-danger btn-sm" onclick="submitDeletePageFromModal()">🗑️ Sil</button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-secondary" onclick="closeModal('modal-edit-page')">İptal</button>
+                    <button class="btn btn-primary" onclick="submitEditPageModal()">Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reusable İkon / Emoji Seçici Modal -->
+    <div id="modal-icon-picker" class="modal-overlay">
+        <div class="modal-card" style="max-height:85vh; max-width:400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">🎨 Simge / İkon Seç</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-icon-picker')">✕</button>
+            </div>
+            <div style="display:flex; gap:4px; margin-bottom:10px; overflow-x:auto; padding-bottom:4px;">
+                <button class="btn btn-xs btn-secondary active" id="ipick-tab-all" onclick="filterIconPicker('all')">Tümü</button>
+                <button class="btn btn-xs btn-secondary" id="ipick-tab-genel" onclick="filterIconPicker('genel')">📁 Genel</button>
+                <button class="btn btn-xs btn-secondary" id="ipick-tab-soft" onclick="filterIconPicker('soft')">💻 Yazılım</button>
+                <button class="btn btn-xs btn-secondary" id="ipick-tab-notes" onclick="filterIconPicker('notes')">📝 Not/İş</button>
+                <button class="btn btn-xs btn-secondary" id="ipick-tab-life" onclick="filterIconPicker('life')">🏠 Yaşam</button>
+            </div>
+            <div id="icon-picker-grid" style="display:grid; grid-template-columns:repeat(6, 1fr); gap:8px; max-height:260px; overflow-y:auto; padding:4px;">
+                <!-- Dinamik Emojiler -->
+            </div>
+            <div style="margin-top:12px; display:flex; gap:8px;">
+                <input type="text" id="icon-picker-custom-input" class="input-text" placeholder="Özel emoji yaz..." style="font-size:1.1rem; text-align:center;">
+                <button class="btn btn-primary" onclick="applyCustomPickerIcon()">Seç</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Yazılım Projesi Ayarları Modal -->
+    <div id="modal-software-settings" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">⚙️ Proje ve Git Ayarları</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-software-settings')">✕</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Depo Adı</label>
+                <input type="text" id="soft-set-repo-name" class="input-text" placeholder="Örn: tinc-hub">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Yerel Depo Dizini (Repo Path)</label>
+                <input type="text" id="soft-set-repo-path" class="input-text" placeholder="/home/turan/101">
+                <div style="display:flex; gap:4px; margin-top:4px; flex-wrap:wrap;">
+                    <span style="font-size:0.7rem; color:var(--muted);">Hızlı Yol:</span>
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="document.getElementById('soft-set-repo-path').value='/home/turan/101'">/home/turan/101</button>
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="document.getElementById('soft-set-repo-path').value='/home/turan/firinna-pos'">/home/turan/firinna-pos</button>
+                    <button type="button" class="btn btn-xs btn-ghost" onclick="document.getElementById('soft-set-repo-path').value='/home/turan/aprs'">/home/turan/aprs</button>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Dal (Branch)</label>
+                <input type="text" id="soft-set-branch" class="input-text" value="main">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Teknoloji Yığını (Tech Stack)</label>
+                <input type="text" id="soft-set-tech-stack" class="input-text" placeholder="Python, Flask, React, SQLite...">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Sistem Mimarisi ve Açıklama</label>
+                <textarea id="soft-set-architecture" class="note-textarea" style="height:90px;" placeholder="Mimari kurallar, servisler, portlar..."></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Agent API Anahtarı</label>
+                <div style="display:flex; gap:6px;">
+                    <input type="text" id="soft-set-api-key" class="input-text" style="font-family:monospace; font-size:0.85rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="regenerateSoftwareApiKey()">Yenile</button>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button class="btn btn-primary" style="flex:1;" onclick="submitSaveSoftwareSettings()">Kaydet</button>
+                <button class="btn btn-secondary" onclick="closeModal('modal-software-settings')">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kanun / Kural Ekle Modal -->
+    <div id="modal-add-software-rule" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">📜 Yeni Mimari Kanun / Kural</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-add-software-rule')">✕</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Kural Başlığı</label>
+                <input type="text" id="soft-rule-title" class="input-text" placeholder="Örn: Üretimde Doğrudan Commit Yasaktır">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Açıklama / Şartlar</label>
+                <textarea id="soft-rule-content" class="note-textarea" style="height:80px;" placeholder="Tüm değişiklikler önce yerelde test edilmeli..."></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div class="form-group">
+                    <label class="form-label">Kategori</label>
+                    <select id="soft-rule-category" class="input-text">
+                        <option value="Architecture">🏗️ Mimari</option>
+                        <option value="CodeStyle">🎨 Kod Standardı</option>
+                        <option value="Security">🔒 Güvenlik</option>
+                        <option value="UI/UX">✨ UI / UX</option>
+                        <option value="Database">🗄️ Veritabanı</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Önem Derecesi</label>
+                    <select id="soft-rule-severity" class="input-text">
+                        <option value="MUST">🔴 MUST (Zorunlu)</option>
+                        <option value="SHOULD">🟡 SHOULD (Önemli)</option>
+                        <option value="NEVER">⛔ NEVER (Asla)</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button class="btn btn-primary" style="flex:1;" onclick="submitAddSoftwareRule()">Kuralı Ekle</button>
+                <button class="btn btn-secondary" onclick="closeModal('modal-add-software-rule')">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Görev / İş Ekle Modal -->
+    <div id="modal-add-software-task" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">☑️ Yeni Görev / Sprint Maddesi</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-add-software-task')">✕</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Görev Başlığı</label>
+                <input type="text" id="soft-task-title" class="input-text" placeholder="Örn: Mobil arayüzü güncelle">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Açıklama</label>
+                <textarea id="soft-task-desc" class="note-textarea" style="height:70px;" placeholder="Detaylar, kabul kriterleri..."></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div class="form-group">
+                    <label class="form-label">Öncelik</label>
+                    <select id="soft-task-priority" class="input-text">
+                        <option value="critical">🔥 Kritik</option>
+                        <option value="high">🔴 Yüksek</option>
+                        <option value="medium" selected>🟡 Orta</option>
+                        <option value="low">🟢 Düşük</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Atanan Ajan / Kişi</label>
+                    <input type="text" id="soft-task-agent" class="input-text" placeholder="Antigravity, Ben, Claude...">
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button class="btn btn-primary" style="flex:1;" onclick="submitAddSoftwareTask()">Görevi Ekle</button>
+                <button class="btn btn-secondary" onclick="closeModal('modal-add-software-task')">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fikir Ekle Modal -->
+    <div id="modal-add-software-idea" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">💡 Yeni Fikir / RFC</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-add-software-idea')">✕</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Fikir Başlığı</label>
+                <input type="text" id="soft-idea-title" class="input-text" placeholder="Örn: Canlı Log Streaming">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Açıklama / Gerekçe</label>
+                <textarea id="soft-idea-desc" class="note-textarea" style="height:80px;" placeholder="Bu özellik neden gerekli?..."></textarea>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <div class="form-group">
+                    <label class="form-label">Kategori</label>
+                    <select id="soft-idea-category" class="input-text">
+                        <option value="Feature">✨ Yeni Özellik (Feature)</option>
+                        <option value="Refactor">🔨 Refactor</option>
+                        <option value="Performance">⚡ Performans</option>
+                        <option value="UX">🎨 Tasarım / UX</option>
+                        <option value="AI">🤖 Yapay Zeka / Agent</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Durum</label>
+                    <select id="soft-idea-status" class="input-text">
+                        <option value="draft">📝 Taslak</option>
+                        <option value="approved">✅ Onaylandı</option>
+                        <option value="in_progress">⏳ Geliştiriliyor</option>
+                        <option value="done">🎉 Tamamlandı</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+                <button class="btn btn-primary" style="flex:1;" onclick="submitAddSoftwareIdea()">Fikri Ekle</button>
+                <button class="btn btn-secondary" onclick="closeModal('modal-add-software-idea')">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AGENTS.md Görüntüleme Modal -->
+    <div id="modal-software-agents-view" class="modal-overlay">
+        <div class="modal-card" style="max-height:85vh; max-width:650px;">
+            <div class="modal-header">
+                <h3 class="modal-title">📄 AGENTS.md Önizleme</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-software-agents-view')">✕</button>
+            </div>
+            <div style="background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px; max-height:400px; overflow-y:auto;">
+                <pre id="soft-agents-md-text" style="font-family:monospace; font-size:0.8rem; white-space:pre-wrap; word-break:break-word; margin:0;"></pre>
+            </div>
+            <div style="display:flex; justify-content:space-between; gap:8px; margin-top:12px;">
+                <button class="btn btn-primary btn-sm" onclick="copySoftwareAgentsMdText()">📋 Tümünü Kopyala</button>
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-software-agents-view')">Kapat</button>
             </div>
         </div>
     </div>

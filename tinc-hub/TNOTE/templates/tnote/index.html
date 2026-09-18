@@ -770,6 +770,108 @@
             </div>
         </div>
 
+        <!-- Yazılım Projesi Görünümü (TincSync & AI / CLI Agent Entegrasyonlu) -->
+        <div id="software-view" style="display:none; flex-direction:column; gap:14px;">
+            <div class="project-header-card">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:1.6rem;">💻</span>
+                        <div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-weight:700; font-size:1.1rem;" id="web-soft-repo-name">Yazılım Projesi</span>
+                                <span style="font-size:0.75rem; background:rgba(59,130,246,0.15); color:var(--primary); padding:2px 8px; border-radius:12px; font-weight:700;" id="web-soft-branch-badge">main</span>
+                            </div>
+                            <div style="font-size:0.75rem; color:var(--muted); font-family:monospace; margin-top:2px;" id="web-soft-repo-path">/home/turan/...</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn btn-sm btn-secondary" onclick="syncSoftwareGitWeb()" title="Git commitlerini eşitle">
+                            🔄 Git Eşitle
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="openSoftwareSettingsModalWeb()" title="Proje Ayarları">
+                            ⚙️ Ayarlar
+                        </button>
+                    </div>
+                </div>
+                <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
+                    <span style="font-size:0.75rem; font-weight:700; color:var(--text-secondary);">Teknoloji:</span>
+                    <span id="web-soft-tech-stack" style="font-size:0.75rem; background:var(--surface); border:1px solid var(--border); padding:2px 8px; border-radius:6px;">Belirtilmedi</span>
+                </div>
+            </div>
+
+            <div class="project-tabs-nav" style="display:flex; gap:4px; overflow-x:auto;">
+                <button class="project-tab-btn active" id="wstab-btn-rules" onclick="switchSoftwareTabWeb('rules')">📜 Kanunlar (<span id="web-soft-count-rules">0</span>)</button>
+                <button class="project-tab-btn" id="wstab-btn-tasks" onclick="switchSoftwareTabWeb('tasks')">☑️ İşler (<span id="web-soft-count-tasks">0</span>)</button>
+                <button class="project-tab-btn" id="wstab-btn-ideas" onclick="switchSoftwareTabWeb('ideas')">💡 Fikirler (<span id="web-soft-count-ideas">0</span>)</button>
+                <button class="project-tab-btn" id="wstab-btn-commits" onclick="switchSoftwareTabWeb('commits')">🔀 Commitler (<span id="web-soft-count-commits">0</span>)</button>
+                <button class="project-tab-btn" id="wstab-btn-ai" onclick="switchSoftwareTabWeb('ai')">🤖 AI & Agent</button>
+            </div>
+
+            <!-- Pane: Rules -->
+            <div id="web-software-pane-rules" class="software-tab-pane">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:700; font-size:0.9rem;">Mimari Kurallar & Değişmezler</span>
+                    <button class="btn btn-sm btn-primary" onclick="openAddSoftwareRuleModalWeb()">➕ Kural Ekle</button>
+                </div>
+                <div id="web-software-rules-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+
+            <!-- Pane: Tasks -->
+            <div id="web-software-pane-tasks" class="software-tab-pane" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:700; font-size:0.9rem;">Görevler & Sprint Maddeleri</span>
+                    <button class="btn btn-sm btn-primary" onclick="openAddSoftwareTaskModalWeb()">➕ Görev Ekle</button>
+                </div>
+                <div id="web-software-tasks-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+
+            <!-- Pane: Ideas -->
+            <div id="web-software-pane-ideas" class="software-tab-pane" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:700; font-size:0.9rem;">Fikir ve Öneri Havuzu</span>
+                    <button class="btn btn-sm btn-primary" onclick="openAddSoftwareIdeaModalWeb()">➕ Fikir Ekle</button>
+                </div>
+                <div id="web-software-ideas-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+
+            <!-- Pane: Commits -->
+            <div id="web-software-pane-commits" class="software-tab-pane" style="display:none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:700; font-size:0.9rem;">Son Git Commitleri (TincSync)</span>
+                    <button class="btn btn-sm btn-secondary" onclick="syncSoftwareGitWeb()">🔄 Şimdi Eşitle</button>
+                </div>
+                <div id="web-software-commits-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+
+            <!-- Pane: AI & Agent -->
+            <div id="web-software-pane-ai" class="software-tab-pane" style="display:none;">
+                <div class="card" style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+                    <div style="font-weight:700; font-size:1rem;">🤖 CLI Agent API & AGENTS.md Entegrasyonu</div>
+                    <div style="font-size:0.85rem; color:var(--muted);">
+                        CLI ajanları (Antigravity CLI, Cursor, Claude vb.) projenizin mimari kurallarını ve görevlerini bu API ile otomatik olarak okur.
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Agent API Anahtarı (X-Agent-Key):</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="web-soft-api-key-display" class="form-control" readonly style="font-family:monospace;">
+                            <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('web-soft-api-key-display').value); alert('API Anahtarı kopyalandı!');">Kopyala</button>
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>AGENTS.md İndirme URL:</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="web-soft-agents-url-display" class="form-control" readonly style="font-family:monospace;">
+                            <button class="btn btn-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('web-soft-agents-url-display').value); alert('URL kopyalandı!');">Kopyala</button>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <a id="web-soft-agents-link" href="#" target="_blank" class="btn btn-primary btn-sm">📄 AGENTS.md Aç / İndir</a>
+                        <button class="btn btn-secondary btn-sm" onclick="syncSoftwareGitWeb()">🔄 Git Senkronize Et</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Not / Serbest Metin Görünümü (Modern Markdown Editor) -->
         <div id="note-view" class="note-editor-area" style="display:none;">
             <div class="note-toolbar">
@@ -1055,6 +1157,7 @@
                 <label>Sayfa Tipi</label>
                 <select id="new-page-type" class="form-control">
                     <option value="checklist">🛒 Kontrol Listesi</option>
+                    <option value="software">💻 Yazılım Projesi (TincSync & AI)</option>
                     <option value="finance">💳 Finans & Fatura</option>
                     <option value="project">🔬 Proje Atölyesi</option>
                     <option value="notes">📝 Not</option>

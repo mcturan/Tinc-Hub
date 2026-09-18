@@ -750,15 +750,25 @@ async function reloadDrawerNavigation() {
         const catPages = allPages.filter(p => p.category_id == cat.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
         const isOpen = openCategoryIds.has(cat.id);
 
-        let pagesHtml = catPages.map(page => `
-            <div class="drawer-page-item ${activePageId == page.id && activeView === 'page' ? 'active' : ''}" onclick="openPage(${page.id})">
-                <span style="display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis;">
-                    <span>${page.icon || (page.type === 'checklist' ? '🛒' : '📝')}</span>
-                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(page.title)}</span>
-                </span>
-                <span style="font-size:0.7rem; color:var(--muted);">${page.type === 'checklist' ? 'Liste' : 'Not'}</span>
-            </div>
-        `).join('');
+        let pagesHtml = catPages.map(page => {
+            const pageDefIcon = page.type === 'checklist' ? '🛒' :
+                                page.type === 'software' ? '💻' :
+                                page.type === 'project' ? '🔬' :
+                                page.type === 'finance' ? '💳' : '📝';
+            const pageTypeLabel = page.type === 'checklist' ? 'Liste' :
+                                  page.type === 'software' ? 'Yazılım' :
+                                  page.type === 'project' ? 'Proje' :
+                                  page.type === 'finance' ? 'Finans' : 'Not';
+            return `
+                <div class="drawer-page-item ${activePageId == page.id && activeView === 'page' ? 'active' : ''}" onclick="openPage(${page.id})">
+                    <span style="display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis;">
+                        <span>${page.icon || pageDefIcon}</span>
+                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(page.title)}</span>
+                    </span>
+                    <span style="font-size:0.7rem; color:var(--muted);">${pageTypeLabel}</span>
+                </div>
+            `;
+        }).join('');
 
         pagesHtml += `
             <div class="drawer-add-page-btn" onclick="openAddPageModal(${cat.id})">
@@ -774,9 +784,12 @@ async function reloadDrawerNavigation() {
                         <span>${cat.icon || '📁'}</span>
                         <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(cat.name)}</span>
                     </div>
-                    <span style="font-size:0.75rem; color:var(--muted); background:var(--surface); padding:2px 6px; border-radius:10px; font-weight:700;">
-                        ${catPages.length}
-                    </span>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <button type="button" class="btn btn-ghost btn-xs" style="padding:2px 5px; font-size:0.75rem; color:var(--muted);" title="Kategoriyi Düzenle" onclick="event.stopPropagation(); openEditCategoryModal(${cat.id})">✏️</button>
+                        <span style="font-size:0.75rem; color:var(--muted); background:var(--surface); padding:2px 6px; border-radius:10px; font-weight:700;">
+                            ${catPages.length}
+                        </span>
+                    </div>
                 </div>
                 <div class="drawer-cat-pages">
                     ${pagesHtml}
@@ -881,6 +894,10 @@ function handleTopAddClick() {
         } else if (activePageObj.type === 'project') {
             if (currentProjectTab === 'materials') openAddMaterialModal();
             else openAddMilestoneModal();
+        } else if (activePageObj.type === 'software') {
+            if (currentSoftwareTab === 'tasks') openAddSoftwareTaskModal();
+            else if (currentSoftwareTab === 'ideas') openAddSoftwareIdeaModal();
+            else openAddSoftwareRuleModal();
         } else {
             const textarea = document.getElementById('page-note-content');
             if (textarea) textarea.focus();
@@ -911,6 +928,7 @@ async function renderActivePage() {
     const catName = cat ? cat.name : 'Genel';
 
     const defaultIcon = page.type === 'checklist' ? '🛒' :
+                        page.type === 'software' ? '💻' :
                         page.type === 'finance' ? '💳' :
                         page.type === 'project' ? '🔬' : '📝';
 
@@ -926,6 +944,7 @@ async function renderActivePage() {
     const isNotes = (page.type === 'notes' || page.type === 'note');
     const isFinance = (page.type === 'finance');
     const isProject = (page.type === 'project');
+    const isSoftware = (page.type === 'software');
 
     document.getElementById('page-progress-wrap').style.display = isChecklist ? 'flex' : 'none';
     document.getElementById('page-quick-add-box').style.display = isChecklist ? 'flex' : 'none';
@@ -933,6 +952,8 @@ async function renderActivePage() {
     document.getElementById('page-note-container').style.display = isNotes ? 'block' : 'none';
     document.getElementById('page-finance-container').style.display = isFinance ? 'flex' : 'none';
     document.getElementById('page-project-container').style.display = isProject ? 'flex' : 'none';
+    const softContainer = document.getElementById('page-software-container');
+    if (softContainer) softContainer.style.display = isSoftware ? 'flex' : 'none';
 
     if (isChecklist) {
         await renderChecklistItems(page.id);
@@ -941,6 +962,8 @@ async function renderActivePage() {
         await renderFinancePage(page.id);
     } else if (isProject) {
         await renderProjectPage(page.id);
+    } else if (isSoftware) {
+        await renderSoftwarePage(page.id);
     } else {
         document.getElementById('page-note-content').value = page.content || '';
         fetchPageDetailsFromServer(page.id);
@@ -2226,12 +2249,21 @@ async function submitCreateNotebook() {
 }
 
 function openAddCategoryModal() {
+    const nameInput = document.getElementById('new-cat-name');
+    const iconInput = document.getElementById('new-cat-icon');
+    const iconPreview = document.getElementById('new-cat-icon-preview');
+    const colorInput = document.getElementById('new-cat-color');
+    if (nameInput) nameInput.value = '';
+    if (iconInput) iconInput.value = '📁';
+    if (iconPreview) iconPreview.innerText = '📁';
+    if (colorInput) colorInput.value = '#3b82f6';
     openModal('modal-add-category');
 }
 
 async function submitCreateCategory() {
     const nameInput = document.getElementById('new-cat-name');
     const iconInput = document.getElementById('new-cat-icon');
+    const colorInput = document.getElementById('new-cat-color');
     const name = nameInput ? nameInput.value.trim() : '';
     if (!name) {
         alert('Lütfen kategori adı yazın.');
@@ -2243,6 +2275,7 @@ async function submitCreateCategory() {
         notebook_id: activeNotebookId,
         name: name,
         icon: (iconInput ? iconInput.value.trim() : '') || '📁',
+        color: (colorInput ? colorInput.value : '') || '#3b82f6',
         sort_order: 99
     };
 
@@ -2256,9 +2289,82 @@ async function submitCreateCategory() {
     window.appSync.syncNow();
 }
 
+async function openEditCategoryModal(catId) {
+    const cat = await window.appStorage.get('categories', catId);
+    if (!cat) return;
+
+    document.getElementById('edit-cat-id').value = cat.id;
+    document.getElementById('edit-cat-name').value = cat.name || '';
+    document.getElementById('edit-cat-icon').value = cat.icon || '📁';
+    document.getElementById('edit-cat-color').value = cat.color || '#3b82f6';
+    const preview = document.getElementById('edit-cat-icon-preview');
+    if (preview) preview.innerText = cat.icon || '📁';
+
+    openModal('modal-edit-category');
+}
+
+async function submitEditCategory() {
+    const catId = parseInt(document.getElementById('edit-cat-id').value, 10);
+    const name = document.getElementById('edit-cat-name').value.trim();
+    const icon = document.getElementById('edit-cat-icon').value.trim() || '📁';
+    const color = document.getElementById('edit-cat-color').value || '#3b82f6';
+
+    if (!name || !catId) {
+        alert('Lütfen kategori adı yazın.');
+        return;
+    }
+
+    const cat = await window.appStorage.get('categories', catId);
+    if (!cat) return;
+
+    cat.name = name;
+    cat.icon = icon;
+    cat.color = color;
+
+    await window.appStorage.saveCategory(cat);
+    closeModal('modal-edit-category');
+
+    await reloadDrawerNavigation();
+    if (activePageObj && activePageObj.category_id === catId) {
+        await renderActivePage();
+    }
+    window.appSync.syncNow();
+    showMobileToast('Kategori güncellendi');
+}
+
+async function submitDeleteCategoryFromModal() {
+    const catId = parseInt(document.getElementById('edit-cat-id').value, 10);
+    if (!catId) return;
+    const cat = await window.appStorage.get('categories', catId);
+    if (!cat) return;
+
+    const pages = await window.appStorage.getPages(catId);
+    if (pages.length > 0) {
+        if (!confirm(`"${cat.name}" kategorisi içinde ${pages.length} sayfa var. Kategoriyi ve içindeki sayfaları silmek istediğinize emin misiniz?`)) return;
+    } else {
+        if (!confirm(`"${cat.name}" kategorisini silmek istediğinize emin misiniz?`)) return;
+    }
+
+    await window.appStorage.deleteCategory(catId);
+    for (const p of pages) {
+        await window.appStorage.deletePage(p.id);
+    }
+    closeModal('modal-edit-category');
+
+    await reloadDrawerNavigation();
+    if (activePageObj && activePageObj.category_id === catId) {
+        await openOverviewView();
+    }
+    window.appSync.syncNow();
+    showMobileToast('Kategori silindi');
+}
+
 function openAddPageModal(catId) {
     const catInput = document.getElementById('new-page-cat-id');
     if (catInput) catInput.value = catId || '';
+    const titleInput = document.getElementById('new-page-title');
+    if (titleInput) titleInput.value = '';
+    selectNewPageType('checklist');
     openModal('modal-add-page');
 }
 
@@ -2266,18 +2372,36 @@ function selectNewPageType(type) {
     newPageType = type;
     const btnCheck = document.getElementById('btn-type-checklist');
     const btnNotes = document.getElementById('btn-type-notes');
+    const btnSoft = document.getElementById('btn-type-software');
     const btnFin = document.getElementById('btn-type-finance');
     const btnProj = document.getElementById('btn-type-project');
 
     if (btnCheck) btnCheck.classList.toggle('active', type === 'checklist');
     if (btnNotes) btnNotes.classList.toggle('active', type === 'notes');
+    if (btnSoft) btnSoft.classList.toggle('active', type === 'software');
     if (btnFin) btnFin.classList.toggle('active', type === 'finance');
     if (btnProj) btnProj.classList.toggle('active', type === 'project');
+
+    const typeIcons = {
+        checklist: '🛒',
+        notes: '📝',
+        software: '💻',
+        finance: '💳',
+        project: '🔬'
+    };
+
+    const iconInput = document.getElementById('new-page-icon');
+    const preview = document.getElementById('new-page-icon-preview');
+    if (iconInput && typeIcons[type]) {
+        iconInput.value = typeIcons[type];
+        if (preview) preview.innerText = typeIcons[type];
+    }
 }
 
 async function submitCreatePage() {
     const titleInput = document.getElementById('new-page-title');
     const catInput = document.getElementById('new-page-cat-id');
+    const iconInput = document.getElementById('new-page-icon');
     const title = titleInput ? titleInput.value.trim() : '';
 
     if (!title) {
@@ -2303,16 +2427,19 @@ async function submitCreatePage() {
     const typeIcons = {
         checklist: '🛒',
         notes: '📝',
+        software: '💻',
         finance: '💳',
         project: '🔬'
     };
+
+    const chosenIcon = (iconInput ? iconInput.value.trim() : '') || typeIcons[newPageType] || '📝';
 
     const newPage = {
         id: Date.now(),
         category_id: catId,
         title: title,
         type: newPageType,
-        icon: typeIcons[newPageType] || '📝',
+        icon: chosenIcon,
         content: '',
         sort_order: 99
     };
@@ -2326,6 +2453,152 @@ async function submitCreatePage() {
     await reloadDrawerNavigation();
     await openPage(newPage.id);
     window.appSync.syncNow();
+}
+
+function openPageOptionsModal() {
+    openEditCurrentPageModal();
+}
+
+async function openEditCurrentPageModal() {
+    if (!activePageId) return;
+    await openEditPageModal(activePageId);
+}
+
+async function openEditPageModal(pageId) {
+    const page = await window.appStorage.getPage(pageId);
+    if (!page) return;
+
+    document.getElementById('edit-page-id').value = page.id;
+    document.getElementById('edit-page-title').value = page.title || '';
+    document.getElementById('edit-page-icon').value = page.icon || '📝';
+    const preview = document.getElementById('edit-page-icon-preview');
+    if (preview) preview.innerText = page.icon || '📝';
+
+    const catSelect = document.getElementById('edit-page-cat-select');
+    if (catSelect) {
+        const cats = await window.appStorage.getCategories(activeNotebookId);
+        catSelect.innerHTML = cats.map(c => `
+            <option value="${c.id}" ${c.id == page.category_id ? 'selected' : ''}>${c.icon || '📁'} ${escapeHtml(c.name)}</option>
+        `).join('');
+    }
+
+    openModal('modal-edit-page');
+}
+
+async function submitEditPageModal() {
+    const pageId = parseInt(document.getElementById('edit-page-id').value, 10);
+    const title = document.getElementById('edit-page-title').value.trim();
+    const icon = document.getElementById('edit-page-icon').value.trim() || '📝';
+    const catSelect = document.getElementById('edit-page-cat-select');
+    const catId = catSelect ? parseInt(catSelect.value, 10) : null;
+
+    if (!title || !pageId) {
+        alert('Lütfen başlık yazın.');
+        return;
+    }
+
+    const page = await window.appStorage.getPage(pageId);
+    if (!page) return;
+
+    page.title = title;
+    page.icon = icon;
+    if (catId) page.category_id = catId;
+
+    await window.appStorage.savePage(page);
+    closeModal('modal-edit-page');
+
+    await reloadDrawerNavigation();
+    if (activePageId === pageId) {
+        await renderActivePage();
+    }
+    window.appSync.syncNow();
+    showMobileToast('Sayfa güncellendi');
+}
+
+async function submitDeletePageFromModal() {
+    const pageId = parseInt(document.getElementById('edit-page-id').value, 10);
+    if (!pageId) return;
+    const page = await window.appStorage.getPage(pageId);
+    if (!page) return;
+
+    if (!confirm(`"${page.title}" sayfasını silmek istediğinize emin misiniz?`)) return;
+
+    await window.appStorage.deletePage(pageId);
+    closeModal('modal-edit-page');
+
+    await reloadDrawerNavigation();
+    await openOverviewView();
+    window.appSync.syncNow();
+    showMobileToast('Sayfa silindi');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reusable İkon / Emoji Seçici
+// ─────────────────────────────────────────────────────────────────────────────
+let currentIconTargetInputId = null;
+let currentIconPreviewElId = null;
+
+const ICON_PICKER_SETS = {
+    genel: ['📁', '📂', '⭐', '📌', '🔖', '🏷️', '🎯', '✨', '🔥', '⚡', '💎', '🌟', '💼', '🗂️', '🔔', '📢', '🎁', '🏆'],
+    soft: ['💻', '🖥️', '🚀', '⚙️', '🔧', '🛠️', '📦', '🤖', '🌐', '🔒', '🔀', '🗄️', '📱', '🐛', '⚡', '💾', '🔌', '📡', '🕹️', '🛡️', '🧪', '🔑', '🧬'],
+    notes: ['📝', '📋', '📓', '📖', '💡', '🧠', '🗓️', '⏰', '📊', '📈', '✅', '📜', '📑', '🖋️', '🔍', '📚', '🎯', '🧾', '✏️', '📌'],
+    life: ['🏠', '🛒', '💰', '💳', '🍔', '☕', '🚗', '🏥', '✈️', '🎨', '🎵', '🏃', '🍕', '🍳', '💊', '🏖️', '🚲', '⚽', '🌿', '🌱']
+};
+
+function openIconPicker(targetInputId, previewElId) {
+    currentIconTargetInputId = targetInputId;
+    currentIconPreviewElId = previewElId;
+    filterIconPicker('all');
+    openModal('modal-icon-picker');
+}
+
+function filterIconPicker(category) {
+    ['all', 'genel', 'soft', 'notes', 'life'].forEach(c => {
+        const btn = document.getElementById(`ipick-tab-${c}`);
+        if (btn) btn.classList.toggle('active', c === category);
+    });
+
+    const grid = document.getElementById('icon-picker-grid');
+    if (!grid) return;
+
+    let emojis = [];
+    if (category === 'all') {
+        emojis = Array.from(new Set([
+            ...ICON_PICKER_SETS.genel,
+            ...ICON_PICKER_SETS.soft,
+            ...ICON_PICKER_SETS.notes,
+            ...ICON_PICKER_SETS.life
+        ]));
+    } else {
+        emojis = ICON_PICKER_SETS[category] || [];
+    }
+
+    grid.innerHTML = emojis.map(em => `
+        <button type="button" class="btn btn-ghost" style="font-size:1.6rem; padding:6px; border-radius:8px; display:flex; align-items:center; justify-content:center; border:1px solid var(--border);" onclick="selectIconFromPicker('${em}')">
+            ${em}
+        </button>
+    `).join('');
+}
+
+function selectIconFromPicker(emoji) {
+    if (currentIconTargetInputId) {
+        const inp = document.getElementById(currentIconTargetInputId);
+        if (inp) inp.value = emoji;
+    }
+    if (currentIconPreviewElId) {
+        const prev = document.getElementById(currentIconPreviewElId);
+        if (prev) prev.innerText = emoji;
+    }
+    closeModal('modal-icon-picker');
+}
+
+function applyCustomPickerIcon() {
+    const customInp = document.getElementById('icon-picker-custom-input');
+    const val = customInp ? customInp.value.trim() : '';
+    if (val) {
+        selectIconFromPicker(val);
+        customInp.value = '';
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2728,4 +3001,649 @@ function showMobileToast(msg) {
     t.textContent = msg;
     t.style.opacity = '1';
     setTimeout(() => { t.style.opacity = '0'; }, 2600);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Yazılım Projesi Yönetimi (TincSync & AI / CLI Agent Entegrasyonlu)
+// ─────────────────────────────────────────────────────────────────────────────
+let currentSoftwareTab = 'rules';
+let currentSoftwareData = null;
+
+async function renderSoftwarePage(pageId) {
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${pageId}`, {
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || ''
+            }
+        });
+        const json = await resp.json();
+        if (json.ok && json.data) {
+            currentSoftwareData = json.data;
+        }
+    } catch (e) {
+        console.warn("Software project fetch error:", e);
+    }
+
+    if (!currentSoftwareData) {
+        currentSoftwareData = {
+            project: {
+                page_id: pageId,
+                repo_name: activePageObj ? activePageObj.title : 'Yazılım Projesi',
+                repo_path: '/home/turan/101',
+                branch: 'main',
+                tech_stack: 'Python, Flask, SQLite',
+                api_key: 'tn_agent_offline',
+                system_architecture: ''
+            },
+            rules: [],
+            tasks: [],
+            ideas: [],
+            commits: []
+        };
+    }
+
+    const proj = currentSoftwareData.project || {};
+    const rules = currentSoftwareData.rules || [];
+    const tasks = currentSoftwareData.tasks || [];
+    const ideas = currentSoftwareData.ideas || [];
+    const commits = currentSoftwareData.commits || [];
+
+    // Header & Meta
+    const repoNameEl = document.getElementById('soft-repo-name');
+    const branchEl = document.getElementById('soft-branch-badge');
+    const repoPathEl = document.getElementById('soft-repo-path');
+    const stackEl = document.getElementById('soft-tech-stack');
+
+    if (repoNameEl) repoNameEl.innerText = proj.repo_name || activePageObj.title;
+    if (branchEl) branchEl.innerText = proj.branch || 'main';
+    if (repoPathEl) repoPathEl.innerText = proj.repo_path || '(Yerel depo dizini ayarlanmadı)';
+    if (stackEl) stackEl.innerText = proj.tech_stack || 'Genel Yazılım';
+
+    // Counts
+    const cRules = document.getElementById('soft-count-rules');
+    const cTasks = document.getElementById('soft-count-tasks');
+    const cIdeas = document.getElementById('soft-count-ideas');
+    const cCommits = document.getElementById('soft-count-commits');
+    if (cRules) cRules.innerText = rules.length;
+    if (cTasks) cTasks.innerText = tasks.length;
+    if (cIdeas) cIdeas.innerText = ideas.length;
+    if (cCommits) cCommits.innerText = commits.length;
+
+    // AI & Agent Paneli
+    const apiKeyDisp = document.getElementById('soft-api-key-display');
+    const agentsUrlDisp = document.getElementById('soft-agents-url-display');
+    const curlCode = document.getElementById('soft-curl-example');
+
+    const agentsUrl = `${sUrl}/notes/api/software/${pageId}/agents.md`;
+    if (apiKeyDisp) apiKeyDisp.value = proj.api_key || '';
+    if (agentsUrlDisp) agentsUrlDisp.value = agentsUrl;
+    if (curlCode) {
+        curlCode.innerText = `curl -H "X-Agent-Key: ${proj.api_key}" ${agentsUrl}`;
+    }
+
+    // Render Tab Panes
+    renderSoftwareRulesList(rules);
+    renderSoftwareTasksList(tasks);
+    renderSoftwareIdeasList(ideas);
+    renderSoftwareCommitsList(commits);
+}
+
+function switchSoftwareTab(tabName) {
+    currentSoftwareTab = tabName;
+    ['rules', 'tasks', 'ideas', 'commits', 'ai'].forEach(t => {
+        const btn = document.getElementById(`stab-btn-${t}`);
+        const pane = document.getElementById(`software-pane-${t}`);
+        if (btn) btn.classList.toggle('active', t === tabName);
+        if (pane) pane.style.display = (t === tabName) ? 'block' : 'none';
+    });
+}
+
+function renderSoftwareRulesList(rules) {
+    const listEl = document.getElementById('software-rules-list');
+    if (!listEl) return;
+
+    if (rules.length === 0) {
+        listEl.innerHTML = `
+            <div style="text-align:center; padding:24px 8px; color:var(--muted); font-size:0.85rem; background:var(--surface); border-radius:8px;">
+                📜 Henüz mimari kanun veya kural eklenmedi.<br>
+                Ajanların ve geliştiricilerin uyması gereken kuralları ekleyin.
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = rules.map(r => {
+        let badgeColor = '#dc2626';
+        let badgeBg = 'rgba(220,38,38,0.12)';
+        if (r.severity === 'SHOULD') {
+            badgeColor = '#d97706';
+            badgeBg = 'rgba(217,119,6,0.12)';
+        } else if (r.severity === 'NEVER') {
+            badgeColor = '#7f1d1d';
+            badgeBg = 'rgba(127,29,29,0.18)';
+        }
+
+        return `
+            <div style="background:var(--card-bg, #ffffff); border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:0.7rem; font-weight:800; color:${badgeColor}; background:${badgeBg}; padding:2px 6px; border-radius:4px;">
+                            ${r.severity}
+                        </span>
+                        <span style="font-size:0.75rem; color:var(--muted); font-weight:700;">
+                            [${r.category || 'Architecture'}]
+                        </span>
+                    </div>
+                    <button class="btn btn-ghost btn-xs" style="color:var(--danger); padding:2px 6px;" onclick="deleteSoftwareRule(${r.id})">✕</button>
+                </div>
+                <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">${escapeHtml(r.title)}</div>
+                <div style="font-size:0.82rem; color:var(--text-secondary); line-height:1.4;">${escapeHtml(r.content)}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSoftwareTasksList(tasks) {
+    const listEl = document.getElementById('software-tasks-list');
+    if (!listEl) return;
+
+    if (tasks.length === 0) {
+        listEl.innerHTML = `
+            <div style="text-align:center; padding:24px 8px; color:var(--muted); font-size:0.85rem; background:var(--surface); border-radius:8px;">
+                ☑️ Aktif görev veya sprint maddesi bulunmuyor.<br>
+                Yeni bir görev ekleyerek CLI ajanı veya kendiniz için atama yapabilirsiniz.
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = tasks.map(t => {
+        let prioBadge = '🟢 Düşük';
+        if (t.priority === 'critical') prioBadge = '🔥 Kritik';
+        else if (t.priority === 'high') prioBadge = '🔴 Yüksek';
+        else if (t.priority === 'medium') prioBadge = '🟡 Orta';
+
+        const isDone = (t.status === 'done');
+
+        return `
+            <div style="background:var(--card-bg, #ffffff); border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:6px; opacity:${isDone ? 0.65 : 1};">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div style="display:flex; align-items:center; gap:6px; flex:1;">
+                        <input type="checkbox" ${isDone ? 'checked' : ''} onchange="toggleSoftwareTaskDone(${t.id}, this.checked)" style="width:18px; height:18px; cursor:pointer;">
+                        <span style="font-weight:700; font-size:0.92rem; ${isDone ? 'text-decoration:line-through; color:var(--muted);' : ''}">
+                            ${escapeHtml(t.title)}
+                        </span>
+                    </div>
+                    <button class="btn btn-ghost btn-xs" style="color:var(--danger); padding:2px 6px;" onclick="deleteSoftwareTask(${t.id})">✕</button>
+                </div>
+                ${t.description ? `<div style="font-size:0.82rem; color:var(--text-secondary); margin-left:24px;">${escapeHtml(t.description)}</div>` : ''}
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-left:24px; margin-top:4px; flex-wrap:wrap; gap:6px;">
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <span style="font-size:0.7rem; background:var(--surface); border:1px solid var(--border); padding:2px 6px; border-radius:6px; font-weight:700;">
+                            ${prioBadge}
+                        </span>
+                        ${t.assigned_agent ? `<span style="font-size:0.7rem; background:rgba(99,102,241,0.12); color:#4f46e5; padding:2px 6px; border-radius:6px; font-weight:700;">🤖 @${escapeHtml(t.assigned_agent)}</span>` : ''}
+                        ${t.commit_hash ? `<span style="font-size:0.7rem; font-family:monospace; background:var(--surface); padding:2px 4px; border-radius:4px;">#${t.commit_hash.slice(0, 7)}</span>` : ''}
+                    </div>
+                    <select class="input-text" style="padding:2px 6px; font-size:0.75rem; width:auto;" onchange="updateSoftwareTaskStatus(${t.id}, this.value)">
+                        <option value="todo" ${t.status === 'todo' ? 'selected' : ''}>📋 Yapılacak</option>
+                        <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>⏳ Devam Eden</option>
+                        <option value="review" ${t.status === 'review' ? 'selected' : ''}>🔍 İnceleme</option>
+                        <option value="done" ${t.status === 'done' ? 'selected' : ''}>✅ Tamam</option>
+                    </select>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSoftwareIdeasList(ideas) {
+    const listEl = document.getElementById('software-ideas-list');
+    if (!listEl) return;
+
+    if (ideas.length === 0) {
+        listEl.innerHTML = `
+            <div style="text-align:center; padding:24px 8px; color:var(--muted); font-size:0.85rem; background:var(--surface); border-radius:8px;">
+                💡 Henüz bir geliştirme fikri veya RFC kaydedilmedi.<br>
+                Aklınıza gelen mimari ve özellik fikirlerini buraya ekleyin.
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = ideas.map(i => {
+        let statusBadge = '📝 Taslak';
+        if (i.status === 'approved') statusBadge = '✅ Onaylandı';
+        else if (i.status === 'in_progress') statusBadge = '⏳ Geliştiriliyor';
+        else if (i.status === 'done') statusBadge = '🎉 Tamamlandı';
+        else if (i.status === 'rejected') statusBadge = '❌ Reddedildi';
+
+        return `
+            <div style="background:var(--card-bg, #ffffff); border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <span style="font-size:0.75rem; font-weight:700; background:var(--surface); border:1px solid var(--border); padding:2px 6px; border-radius:6px;">
+                            ${i.category || 'Feature'}
+                        </span>
+                        <span style="font-size:0.75rem; color:var(--muted);">${statusBadge}</span>
+                    </div>
+                    <button class="btn btn-ghost btn-xs" style="color:var(--danger); padding:2px 6px;" onclick="deleteSoftwareIdea(${i.id})">✕</button>
+                </div>
+                <div style="font-weight:700; font-size:0.92rem;">${escapeHtml(i.title)}</div>
+                ${i.description ? `<div style="font-size:0.82rem; color:var(--text-secondary); line-height:1.4;">${escapeHtml(i.description)}</div>` : ''}
+                <div style="display:flex; justify-content:flex-end; margin-top:4px;">
+                    <select class="input-text" style="padding:2px 6px; font-size:0.75rem; width:auto;" onchange="updateSoftwareIdeaStatus(${i.id}, this.value)">
+                        <option value="draft" ${i.status === 'draft' ? 'selected' : ''}>📝 Taslak</option>
+                        <option value="approved" ${i.status === 'approved' ? 'selected' : ''}>✅ Onaylandı</option>
+                        <option value="in_progress" ${i.status === 'in_progress' ? 'selected' : ''}>⏳ Geliştiriliyor</option>
+                        <option value="done" ${i.status === 'done' ? 'selected' : ''}>🎉 Tamamlandı</option>
+                        <option value="rejected" ${i.status === 'rejected' ? 'selected' : ''}>❌ Reddedildi</option>
+                    </select>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSoftwareCommitsList(commits) {
+    const listEl = document.getElementById('software-commits-list');
+    if (!listEl) return;
+
+    if (commits.length === 0) {
+        listEl.innerHTML = `
+            <div style="text-align:center; padding:24px 8px; color:var(--muted); font-size:0.85rem; background:var(--surface); border-radius:8px;">
+                🔀 Henüz commit kaydı yok.<br>
+                Yukarıdaki "🔄 Git Eşitle" butonuna basarak yerel depodan commitleri çekebilirsiniz.
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = commits.map(c => `
+        <div style="background:var(--card-bg, #ffffff); border:1px solid var(--border); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:4px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-family:monospace; font-size:0.75rem; background:var(--surface); padding:2px 6px; border-radius:4px; font-weight:700; color:var(--primary);">
+                    ${c.commit_hash.slice(0, 7)}
+                </span>
+                <span style="font-size:0.72rem; color:var(--muted);">
+                    ${c.committed_at ? c.committed_at.slice(0, 16) : ''}
+                </span>
+            </div>
+            <div style="font-size:0.85rem; font-weight:600; color:var(--text-primary); line-height:1.3;">
+                ${escapeHtml(c.message)}
+            </div>
+            <div style="font-size:0.75rem; color:var(--muted);">
+                Yazar: <b>${escapeHtml(c.author || 'Anonim')}</b>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function syncSoftwareGit() {
+    showMobileToast("Git deposundan commitler çekiliyor...");
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${activePageId}/sync-git`, {
+            method: 'POST',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || '',
+                'Content-Type': 'application/json'
+            }
+        });
+        const json = await resp.json();
+        if (json.ok) {
+            showMobileToast(`✅ ${json.synced_count || 0} yeni commit eşitlendi!`);
+            await renderSoftwarePage(activePageId);
+        } else {
+            alert(json.error || 'Git eşitleme başarısız oldu');
+        }
+    } catch (e) {
+        showMobileToast("Git eşitleme hatası: " + e.message);
+    }
+}
+
+async function openSoftwareSettingsModal() {
+    if (!currentSoftwareData) return;
+    const proj = currentSoftwareData.project || {};
+
+    document.getElementById('soft-set-repo-name').value = proj.repo_name || activePageObj.title || '';
+    document.getElementById('soft-set-repo-path').value = proj.repo_path || '';
+    document.getElementById('soft-set-branch').value = proj.branch || 'main';
+    document.getElementById('soft-set-tech-stack').value = proj.tech_stack || '';
+    document.getElementById('soft-set-architecture').value = proj.system_architecture || '';
+    document.getElementById('soft-set-api-key').value = proj.api_key || '';
+
+    openModal('modal-software-settings');
+}
+
+async function submitSaveSoftwareSettings() {
+    const repo_name = document.getElementById('soft-set-repo-name').value.trim();
+    const repo_path = document.getElementById('soft-set-repo-path').value.trim();
+    const branch = document.getElementById('soft-set-branch').value.trim() || 'main';
+    const tech_stack = document.getElementById('soft-set-tech-stack').value.trim();
+    const system_architecture = document.getElementById('soft-set-architecture').value.trim();
+    const api_key = document.getElementById('soft-set-api-key').value.trim();
+
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${activePageId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || '',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                repo_name, repo_path, branch, tech_stack, system_architecture, api_key
+            })
+        });
+        const json = await resp.json();
+        if (json.ok) {
+            closeModal('modal-software-settings');
+            showMobileToast('Proje ayarları kaydedildi');
+            await renderSoftwarePage(activePageId);
+        } else {
+            alert(json.error || 'Kaydetme hatası');
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+function regenerateSoftwareApiKey() {
+    const rand = 'tn_agent_' + Math.random().toString(36).substring(2, 14);
+    document.getElementById('soft-set-api-key').value = rand;
+}
+
+function openAddSoftwareRuleModal() {
+    document.getElementById('soft-rule-title').value = '';
+    document.getElementById('soft-rule-content').value = '';
+    openModal('modal-add-software-rule');
+}
+
+async function submitAddSoftwareRule() {
+    const title = document.getElementById('soft-rule-title').value.trim();
+    const content = document.getElementById('soft-rule-content').value.trim();
+    const category = document.getElementById('soft-rule-category').value;
+    const severity = document.getElementById('soft-rule-severity').value;
+
+    if (!title) {
+        alert('Lütfen kural başlığı yazın.');
+        return;
+    }
+
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${activePageId}/rules`, {
+            method: 'POST',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || '',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title, content, category, severity })
+        });
+        const json = await resp.json();
+        if (json.ok) {
+            closeModal('modal-add-software-rule');
+            showMobileToast('Kural eklendi');
+            await renderSoftwarePage(activePageId);
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+async function deleteSoftwareRule(ruleId) {
+    if (!confirm('Bu kuralı silmek istediğinize emin misiniz?')) return;
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${activePageId}/rules/${ruleId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || ''
+            }
+        });
+        const json = await resp.json();
+        if (json.ok) {
+            showMobileToast('Kural silindi');
+            await renderSoftwarePage(activePageId);
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+function openAddSoftwareTaskModal() {
+    document.getElementById('soft-task-title').value = '';
+    document.getElementById('soft-task-desc').value = '';
+    document.getElementById('soft-task-agent').value = '';
+    openModal('modal-add-software-task');
+}
+
+async function submitAddSoftwareTask() {
+    const title = document.getElementById('soft-task-title').value.trim();
+    const description = document.getElementById('soft-task-desc').value.trim();
+    const priority = document.getElementById('soft-task-priority').value;
+    const assigned_agent = document.getElementById('soft-task-agent').value.trim();
+
+    if (!title) {
+        alert('Lütfen görev başlığı yazın.');
+        return;
+    }
+
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${activePageId}/tasks`, {
+            method: 'POST',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || '',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title, description, priority, assigned_agent, status: 'todo' })
+        });
+        const json = await resp.json();
+        if (json.ok) {
+            closeModal('modal-add-software-task');
+            showMobileToast('Görev eklendi');
+            await renderSoftwarePage(activePageId);
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+async function updateSoftwareTaskStatus(taskId, status) {
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        await fetch(`${sUrl}/notes/api/software/${activePageId}/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || '',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status })
+        });
+        await renderSoftwarePage(activePageId);
+    } catch (e) {
+        console.warn("Task status update error:", e);
+    }
+}
+
+async function toggleSoftwareTaskDone(taskId, isDone) {
+    await updateSoftwareTaskStatus(taskId, isDone ? 'done' : 'todo');
+}
+
+async function deleteSoftwareTask(taskId) {
+    if (!confirm('Bu görevi silmek istediğinize emin misiniz?')) return;
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${activePageId}/tasks/${taskId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || ''
+            }
+        });
+        const json = await resp.json();
+        if (json.ok) {
+            showMobileToast('Görev silindi');
+            await renderSoftwarePage(activePageId);
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+function openAddSoftwareIdeaModal() {
+    document.getElementById('soft-idea-title').value = '';
+    document.getElementById('soft-idea-desc').value = '';
+    openModal('modal-add-software-idea');
+}
+
+async function submitAddSoftwareIdea() {
+    const title = document.getElementById('soft-idea-title').value.trim();
+    const description = document.getElementById('soft-idea-desc').value.trim();
+    const category = document.getElementById('soft-idea-category').value;
+    const status = document.getElementById('soft-idea-status').value;
+
+    if (!title) {
+        alert('Lütfen fikir başlığı yazın.');
+        return;
+    }
+
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${activePageId}/ideas`, {
+            method: 'POST',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || '',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ title, description, category, status })
+        });
+        const json = await resp.json();
+        if (json.ok) {
+            closeModal('modal-add-software-idea');
+            showMobileToast('Fikir eklendi');
+            await renderSoftwarePage(activePageId);
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+async function updateSoftwareIdeaStatus(ideaId, status) {
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        await fetch(`${sUrl}/notes/api/software/${activePageId}/ideas/${ideaId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || '',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status })
+        });
+        await renderSoftwarePage(activePageId);
+    } catch (e) {
+        console.warn("Idea status update error:", e);
+    }
+}
+
+async function deleteSoftwareIdea(ideaId) {
+    if (!confirm('Bu fikri silmek istediğinize emin misiniz?')) return;
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${activePageId}/ideas/${ideaId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || ''
+            }
+        });
+        const json = await resp.json();
+        if (json.ok) {
+            showMobileToast('Fikir silindi');
+            await renderSoftwarePage(activePageId);
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+async function openAgentsMarkdownModal() {
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+
+    try {
+        const resp = await fetch(`${sUrl}/notes/api/software/${activePageId}/agents.md`, {
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'X-Auth-Token': token || ''
+            }
+        });
+        const mdText = await resp.text();
+        const preEl = document.getElementById('soft-agents-md-text');
+        if (preEl) preEl.innerText = mdText;
+        openModal('modal-software-agents-view');
+    } catch (e) {
+        showMobileToast('AGENTS.md yüklenemedi: ' + e.message);
+    }
+}
+
+function copySoftwareAgentsMdText() {
+    const preEl = document.getElementById('soft-agents-md-text');
+    if (preEl && preEl.innerText) {
+        navigator.clipboard.writeText(preEl.innerText).then(() => {
+            showMobileToast('AGENTS.md panoya kopyalandı!');
+        });
+    }
+}
+
+function copySoftwareApiKey() {
+    const el = document.getElementById('soft-api-key-display');
+    if (el && el.value) {
+        navigator.clipboard.writeText(el.value).then(() => {
+            showMobileToast('API Anahtarı kopyalandı!');
+        });
+    }
+}
+
+function copySoftwareAgentsUrl() {
+    const el = document.getElementById('soft-agents-url-display');
+    if (el && el.value) {
+        navigator.clipboard.writeText(el.value).then(() => {
+            showMobileToast('AGENTS.md bağlantısı kopyalandı!');
+        });
+    }
 }

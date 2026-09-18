@@ -222,6 +222,71 @@ def init_db():
                 FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE
             );
 
+            -- Yazılım Projeleri Yönetimi (TincSync & AI / CLI Agent Entegrasyonlu)
+            CREATE TABLE IF NOT EXISTS software_projects (
+                page_id INTEGER PRIMARY KEY,
+                repo_name TEXT DEFAULT '',
+                repo_path TEXT DEFAULT '',
+                branch TEXT DEFAULT 'main',
+                tech_stack TEXT DEFAULT '',
+                api_key TEXT DEFAULT '',
+                system_architecture TEXT DEFAULT '',
+                updated_at TEXT DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS software_rules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                category TEXT DEFAULT 'Architecture', -- 'Architecture', 'UI/UX', 'CodeStyle', 'Security', 'Database'
+                severity TEXT DEFAULT 'MUST',          -- 'MUST', 'SHOULD', 'NEVER'
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS software_ideas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                category TEXT DEFAULT 'Feature',       -- 'Feature', 'Refactor', 'Performance', 'UX', 'AI'
+                status TEXT DEFAULT 'draft',           -- 'draft', 'approved', 'in_progress', 'done', 'rejected'
+                author TEXT DEFAULT 'User',
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS software_tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                status TEXT DEFAULT 'todo',            -- 'todo', 'in_progress', 'review', 'done'
+                priority TEXT DEFAULT 'medium',        -- 'low', 'medium', 'high', 'critical'
+                assigned_agent TEXT DEFAULT '',        -- 'Human', 'Antigravity-CLI', 'Claude', etc.
+                commit_hash TEXT DEFAULT '',
+                sort_order INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS software_commits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_id INTEGER NOT NULL,
+                commit_hash TEXT NOT NULL,
+                message TEXT NOT NULL,
+                author TEXT DEFAULT '',
+                committed_at TEXT DEFAULT '',
+                branch TEXT DEFAULT 'main',
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE
+            );
+
             -- Şifre & Kimlik Kasası (Kişisel, Aile, İş)
             CREATE TABLE IF NOT EXISTS vault_entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -275,6 +340,10 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_proj_mile_page ON project_milestones(page_id);
             CREATE INDEX IF NOT EXISTS idx_proj_mat_page ON project_materials(page_id);
             CREATE INDEX IF NOT EXISTS idx_proj_logs_page ON project_logs(page_id);
+            CREATE INDEX IF NOT EXISTS idx_soft_rules_page ON software_rules(page_id);
+            CREATE INDEX IF NOT EXISTS idx_soft_ideas_page ON software_ideas(page_id);
+            CREATE INDEX IF NOT EXISTS idx_soft_tasks_page ON software_tasks(page_id);
+            CREATE INDEX IF NOT EXISTS idx_soft_commits_page ON software_commits(page_id);
             CREATE INDEX IF NOT EXISTS idx_vault_scope ON vault_entries(scope);
             CREATE INDEX IF NOT EXISTS idx_vault_cat ON vault_entries(category);
             CREATE INDEX IF NOT EXISTS idx_vault_profile ON vault_entries(profile_name);
@@ -3019,6 +3088,376 @@ def import_notebook_data(data, user_id=1):
     conn.close()
 
     return {"ok": True, "notebook_id": new_nb_id}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Yazılım Projeleri Yönetimi (TincSync & AI / CLI Agent Entegrasyonlu)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def get_software_project(page_id: int):
+    """Belirtilen sayfa için yazılım projesi ayarlarını döner, yoksa varsayılan oluşturur."""
+    import uuid
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM software_projects WHERE page_id = ?", (page_id,))
+    row = cur.fetchone()
+    if not row:
+        api_key = f"tn_agent_{uuid.uuid4().hex[:12]}"
+        cur.execute("SELECT title FROM pages WHERE id = ?", (page_id,))
+        p = cur.fetchone()
+        repo_name = p["title"] if p else "project"
+        cur.execute("""
+            INSERT INTO software_projects (page_id, repo_name, repo_path, branch, tech_stack, api_key, system_architecture)
+            VALUES (?, ?, '', 'main', '', ?, '')
+        """, (page_id, repo_name, api_key))
+        conn.commit()
+        cur.execute("SELECT * FROM software_projects WHERE page_id = ?", (page_id,))
+        row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else {}
+
+def update_software_project(page_id: int, repo_name=None, repo_path=None, branch=None, tech_stack=None, api_key=None, system_architecture=None):
+    """Yazılım projesi yapılandırmasını günceller."""
+    conn = get_conn()
+    cur = conn.cursor()
+    updates = []
+    params = []
+    if repo_name is not None:
+        updates.append("repo_name = ?")
+        params.append(repo_name.strip())
+    if repo_path is not None:
+        updates.append("repo_path = ?")
+        params.append(repo_path.strip())
+    if branch is not None:
+        updates.append("branch = ?")
+        params.append(branch.strip())
+    if tech_stack is not None:
+        updates.append("tech_stack = ?")
+        params.append(tech_stack.strip())
+    if api_key is not None:
+        updates.append("api_key = ?")
+        params.append(api_key.strip())
+    if system_architecture is not None:
+        updates.append("system_architecture = ?")
+        params.append(system_architecture)
+    updates.append("updated_at = datetime('now', 'localtime')")
+    
+    if updates:
+        params.append(page_id)
+        cur.execute(f"UPDATE software_projects SET {', '.join(updates)} WHERE page_id = ?", params)
+        conn.commit()
+    conn.close()
+    return get_software_project(page_id)
+
+def get_software_rules(page_id: int, category: str = None):
+    conn = get_conn()
+    cur = conn.cursor()
+    if category:
+        cur.execute("SELECT * FROM software_rules WHERE page_id = ? AND category = ? ORDER BY sort_order ASC, id ASC", (page_id, category))
+    else:
+        cur.execute("SELECT * FROM software_rules WHERE page_id = ? ORDER BY sort_order ASC, id ASC", (page_id,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def add_software_rule(page_id: int, title: str, content: str, category: str = 'Architecture', severity: str = 'MUST', sort_order: int = 0):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO software_rules (page_id, title, content, category, severity, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (page_id, title.strip(), content.strip(), category.strip(), severity.strip(), sort_order))
+    rule_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return rule_id
+
+def delete_software_rule(rule_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM software_rules WHERE id = ?", (rule_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+def get_software_ideas(page_id: int, status: str = None):
+    conn = get_conn()
+    cur = conn.cursor()
+    if status:
+        cur.execute("SELECT * FROM software_ideas WHERE page_id = ? AND status = ? ORDER BY sort_order ASC, id DESC", (page_id, status))
+    else:
+        cur.execute("SELECT * FROM software_ideas WHERE page_id = ? ORDER BY sort_order ASC, id DESC", (page_id,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def add_software_idea(page_id: int, title: str, description: str = '', category: str = 'Feature', status: str = 'draft', author: str = 'User', sort_order: int = 0):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO software_ideas (page_id, title, description, category, status, author, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (page_id, title.strip(), description.strip(), category.strip(), status.strip(), author.strip(), sort_order))
+    idea_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return idea_id
+
+def update_software_idea(idea_id: int, title: str = None, description: str = None, category: str = None, status: str = None, author: str = None, sort_order: int = None):
+    conn = get_conn()
+    cur = conn.cursor()
+    updates = []
+    params = []
+    if title is not None:
+        updates.append("title = ?")
+        params.append(title.strip())
+    if description is not None:
+        updates.append("description = ?")
+        params.append(description.strip())
+    if category is not None:
+        updates.append("category = ?")
+        params.append(category.strip())
+    if status is not None:
+        updates.append("status = ?")
+        params.append(status.strip())
+    if author is not None:
+        updates.append("author = ?")
+        params.append(author.strip())
+    if sort_order is not None:
+        updates.append("sort_order = ?")
+        params.append(sort_order)
+    if updates:
+        params.append(idea_id)
+        cur.execute(f"UPDATE software_ideas SET {', '.join(updates)} WHERE id = ?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+def delete_software_idea(idea_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM software_ideas WHERE id = ?", (idea_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+def get_software_tasks(page_id: int, status: str = None):
+    conn = get_conn()
+    cur = conn.cursor()
+    if status:
+        cur.execute("SELECT * FROM software_tasks WHERE page_id = ? AND status = ? ORDER BY sort_order ASC, id DESC", (page_id, status))
+    else:
+        cur.execute("SELECT * FROM software_tasks WHERE page_id = ? ORDER BY sort_order ASC, id DESC", (page_id,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def add_software_task(page_id: int, title: str, description: str = '', status: str = 'todo', priority: str = 'medium', assigned_agent: str = '', commit_hash: str = '', sort_order: int = 0):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO software_tasks (page_id, title, description, status, priority, assigned_agent, commit_hash, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (page_id, title.strip(), description.strip(), status.strip(), priority.strip(), assigned_agent.strip(), commit_hash.strip(), sort_order))
+    task_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return task_id
+
+def update_software_task(task_id: int, title: str = None, description: str = None, status: str = None, priority: str = None, assigned_agent: str = None, commit_hash: str = None, sort_order: int = None):
+    conn = get_conn()
+    cur = conn.cursor()
+    updates = []
+    params = []
+    if title is not None:
+        updates.append("title = ?")
+        params.append(title.strip())
+    if description is not None:
+        updates.append("description = ?")
+        params.append(description.strip())
+    if status is not None:
+        updates.append("status = ?")
+        params.append(status.strip())
+    if priority is not None:
+        updates.append("priority = ?")
+        params.append(priority.strip())
+    if assigned_agent is not None:
+        updates.append("assigned_agent = ?")
+        params.append(assigned_agent.strip())
+    if commit_hash is not None:
+        updates.append("commit_hash = ?")
+        params.append(commit_hash.strip())
+    if sort_order is not None:
+        updates.append("sort_order = ?")
+        params.append(sort_order)
+    updates.append("updated_at = datetime('now', 'localtime')")
+    if updates:
+        params.append(task_id)
+        cur.execute(f"UPDATE software_tasks SET {', '.join(updates)} WHERE id = ?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+def delete_software_task(task_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM software_tasks WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+def get_software_commits(page_id: int, limit: int = 30):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM software_commits WHERE page_id = ? ORDER BY committed_at DESC, id DESC LIMIT ?", (page_id, limit))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def add_software_commit(page_id: int, commit_hash: str, message: str, author: str = '', committed_at: str = '', branch: str = 'main'):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO software_commits (page_id, commit_hash, message, author, committed_at, branch)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (page_id, commit_hash.strip(), message.strip(), author.strip(), committed_at.strip(), branch.strip()))
+    commit_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return commit_id
+
+def sync_git_commits(page_id: int, repo_path: str = None):
+    """Yerel git deposundan (TincSync veya yerel repo) commit geçmişini çeker ve veritabanına işler."""
+    import subprocess
+    proj = get_software_project(page_id)
+    target_path = repo_path or proj.get("repo_path", "").strip()
+    if not target_path or not os.path.isdir(target_path):
+        return {"ok": False, "error": f"Depo dizini bulunamadı: '{target_path}'"}
+    
+    branch = proj.get("branch", "main") or "HEAD"
+    try:
+        cmd = ["git", "-C", target_path, "log", "-n", "30", "--pretty=format:%H|||%an|||%ad|||%s", "--date=iso"]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=10)
+        if result.returncode != 0:
+            return {"ok": False, "error": result.stderr.strip() or "Git log alınamadı"}
+        
+        lines = [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
+        synced_count = 0
+        conn = get_conn()
+        cur = conn.cursor()
+        
+        for line in lines:
+            parts = line.split("|||")
+            if len(parts) >= 4:
+                chash, author, cdate, msg = parts[0], parts[1], parts[2], parts[3]
+                cur.execute("SELECT id FROM software_commits WHERE page_id = ? AND commit_hash = ?", (page_id, chash))
+                if not cur.fetchone():
+                    cur.execute("""
+                        INSERT INTO software_commits (page_id, commit_hash, message, author, committed_at, branch)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (page_id, chash, msg, author, cdate, branch))
+                    synced_count += 1
+        conn.commit()
+        conn.close()
+        return {"ok": True, "synced_count": synced_count, "commits": get_software_commits(page_id, 30)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+def generate_agents_markdown(page_id: int):
+    """CLI Ajanları (Antigravity CLI, Cursor, Claude vb.) için AGENTS.md formatında proje talimatı oluşturur."""
+    proj = get_software_project(page_id)
+    page = get_page(page_id) or {}
+    rules = get_software_rules(page_id)
+    ideas = get_software_ideas(page_id)
+    tasks = get_software_tasks(page_id)
+    commits = get_software_commits(page_id, limit=10)
+    
+    md = []
+    title = page.get("title", proj.get("repo_name", "Software Project"))
+    md.append(f"# Project Guidelines & Context: {title}")
+    md.append(f"> Auto-generated from TincNote Software Project on {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
+    
+    md.append("## 📌 Project Overview")
+    md.append(f"- **Repository:** `{proj.get('repo_name') or 'N/A'}` (Branch: `{proj.get('branch', 'main')}`)")
+    md.append(f"- **Local Path:** `{proj.get('repo_path') or 'N/A'}`")
+    md.append(f"- **Tech Stack:** {proj.get('tech_stack') or 'Not specified'}")
+    md.append("")
+    
+    if proj.get("system_architecture"):
+        md.append("## 🏗️ System Architecture & Invariants")
+        md.append(proj.get("system_architecture"))
+        md.append("")
+        
+    md.append("## 📜 Rules & Laws (Kanunlar)")
+    if rules:
+        must_rules = [r for r in rules if r.get("severity") == "MUST"]
+        should_rules = [r for r in rules if r.get("severity") == "SHOULD"]
+        never_rules = [r for r in rules if r.get("severity") == "NEVER"]
+        other_rules = [r for r in rules if r.get("severity") not in ("MUST", "SHOULD", "NEVER")]
+        
+        if must_rules:
+            md.append("### 🔴 MUST (Kesinlikle Uyulması Gerekenler):")
+            for r in must_rules:
+                md.append(f"- **[{r['category']}] {r['title']}**: {r['content']}")
+            md.append("")
+        if should_rules:
+            md.append("### 🟡 SHOULD (Tavsiye Edilen / Önemli Standartlar):")
+            for r in should_rules:
+                md.append(f"- **[{r['category']}] {r['title']}**: {r['content']}")
+            md.append("")
+        if never_rules:
+            md.append("### ⛔ NEVER (Asla Yapılmaması Gerekenler):")
+            for r in never_rules:
+                md.append(f"- **[{r['category']}] {r['title']}**: {r['content']}")
+            md.append("")
+        if other_rules:
+            md.append("### ℹ️ Diğer Standartlar:")
+            for r in other_rules:
+                md.append(f"- **[{r['category']}] {r['title']}**: {r['content']}")
+            md.append("")
+    else:
+        md.append("*No architectural rules defined yet.*\n")
+        
+    md.append("## ☑️ Tasks & Sprints (İşler)")
+    if tasks:
+        for t in tasks:
+            status_icon = "✅" if t.get("status") == "done" else ("⏳" if t.get("status") == "in_progress" else "📋")
+            agent_str = f" [@{t['assigned_agent']}]" if t.get("assigned_agent") else ""
+            prio_str = f" [{t['priority'].upper()}]" if t.get("priority") else ""
+            desc_str = f" - {t['description']}" if t.get("description") else ""
+            commit_str = f" (commit: `{t['commit_hash'][:7]}`)" if t.get("commit_hash") else ""
+            md.append(f"- {status_icon} **{t['title']}**{prio_str}{agent_str}{desc_str}{commit_str}")
+        md.append("")
+    else:
+        md.append("*No active tasks.*\n")
+        
+    md.append("## 💡 Ideas & Proposals (Fikirler)")
+    if ideas:
+        for i in ideas:
+            md.append(f"- **[{i.get('status', 'draft').upper()}] {i['title']}** ({i.get('category', 'Feature')}): {i.get('description', '')}")
+        md.append("")
+    else:
+        md.append("*No ideas logged yet.*\n")
+        
+    md.append("## 🔀 Recent Commits")
+    if commits:
+        for c in commits:
+            short_hash = c.get("commit_hash", "")[:7]
+            md.append(f"- `{short_hash}` - {c.get('message', '')} ({c.get('author', '')} on {c.get('committed_at', '')})")
+        md.append("")
+    else:
+        md.append("*No commits recorded.*\n")
+        
+    return "\n".join(md)
+
+def get_software_project_full(page_id: int):
+    """Bir yazılım projesinin tüm bölümlerini tek seferde döndürür."""
+    return {
+        "project": get_software_project(page_id),
+        "rules": get_software_rules(page_id),
+        "ideas": get_software_ideas(page_id),
+        "tasks": get_software_tasks(page_id),
+        "commits": get_software_commits(page_id, 30)
+    }
 
 # Modül yüklendiğinde tabloların varlığını otomatik güvenceye al
 try:
