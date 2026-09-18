@@ -1083,6 +1083,16 @@ body, .tnote-container, input, textarea, select, button {
     opacity: 0.72;
 }
 
+.completed-accordion-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+}
+.completed-accordion-header:hover {
+    background: var(--surface3, #e2e8f0) !important;
+    border-color: #cbd5e1 !important;
+}
+
 .item-left {
     display: flex;
     align-items: center;

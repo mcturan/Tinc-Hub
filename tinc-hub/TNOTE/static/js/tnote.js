@@ -679,22 +679,31 @@ async function renderWebQuickTasks() {
 
         // A) Doğrudan Hızlı Görevler Listesi
         if (directListEl) {
+            const activeDirect = directTasks.filter(t => !t.is_done);
+            const completedDirect = directTasks.filter(t => t.is_done);
+
             if (directTasks.length === 0) {
                 directListEl.innerHTML = `<div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Görev yok</div>`;
             } else {
-                directListEl.innerHTML = directTasks.map(t => `
-                    <div class="ov-item-row" id="web-unified-task-${t.id}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;">
-                        <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
-                            <input type="checkbox" ${t.is_done ? 'checked' : ''} onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;">
-                            <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
+                let html = '';
+                if (activeDirect.length === 0) {
+                    html += `<div style="padding:14px; text-align:center; color:var(--muted); font-size:0.82rem;">Tüm aktif görevler tamamlandı 🎉</div>`;
+                } else {
+                    html += activeDirect.map(t => renderWebDirectTaskRow(t)).join('');
+                }
+
+                if (completedDirect.length > 0) {
+                    html += `
+                        <div class="completed-accordion-header" onclick="toggleWebCompletedTasks()" style="margin-top:10px; cursor:pointer; user-select:none; display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:var(--surface2, #f1f5f9); border:1px solid var(--border); border-radius:6px; font-size:0.78rem; font-weight:700; color:var(--muted);">
+                            <span>${window.showWebCompletedTasks ? '▾' : '▸'} ${completedDirect.length} Tamamlanan Görev</span>
+                            <span style="font-size:0.72rem; opacity:0.8;">${window.showWebCompletedTasks ? 'Gizle' : 'Göster'}</span>
                         </div>
-                        <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-                            <span style="background:#e0f2fe; color:#0284c7; font-size:0.70rem; font-weight:600; padding:2px 6px; border-radius:4px;">Hızlı</span>
-                            <button class="btn-icon-subtle" onclick="editUnifiedTask('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
-                            <button class="btn-icon-subtle btn-danger-hover" onclick="deleteUnifiedTask('${t.type}', ${t.raw_id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
+                        <div id="web-completed-direct-list" style="display:${window.showWebCompletedTasks ? 'block' : 'none'}; margin-top:4px;">
+                            ${completedDirect.map(t => renderWebDirectTaskRow(t)).join('')}
                         </div>
-                    </div>
-                `).join('');
+                    `;
+                }
+                directListEl.innerHTML = html;
             }
         }
 
@@ -717,13 +726,12 @@ async function renderWebQuickTasks() {
                     return `
                         <div class="ov-item-row" id="web-unified-task-${t.id}" onclick="loadPage(${t.page_id})" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" title="${escapeHtml(t.page_title)} sayfasına git">
                             <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
-                                <input type="checkbox" ${t.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;">
+                                <input type="checkbox" ${t.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;" title="${t.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                                 <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
                             </div>
                             <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                                 ${t.due_badge ? `<span style="background:${badgeBg}; color:${badgeColor}; font-size:0.70rem; font-weight:600; padding:2px 6px; border-radius:4px;">${escapeHtml(t.due_badge)}</span>` : ''}
                                 <span class="ov-page-tag" onclick="event.stopPropagation(); loadPage(${t.page_id})" title="${escapeHtml(t.page_title)} sayfasına git">${escapeHtml(t.page_title)}</span>
-                                <button class="btn-icon-subtle" onclick="event.stopPropagation(); editUnifiedTask('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
                                 <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteUnifiedTask('${t.type}', ${t.raw_id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                             </div>
                         </div>
@@ -734,6 +742,36 @@ async function renderWebQuickTasks() {
     } catch (e) {
         console.error("renderWebQuickTasks error:", e);
     }
+}
+
+window.showWebCompletedTasks = false;
+
+function toggleWebCompletedTasks() {
+    window.showWebCompletedTasks = !window.showWebCompletedTasks;
+    const container = document.getElementById('web-completed-direct-list');
+    const header = document.querySelector('.completed-accordion-header span');
+    if (container) {
+        container.style.display = window.showWebCompletedTasks ? 'block' : 'none';
+    }
+    if (header) {
+        const count = container ? container.querySelectorAll('.ov-item-row').length : 0;
+        header.innerHTML = `${window.showWebCompletedTasks ? '▾' : '▸'} ${count} Tamamlanan Görev`;
+    }
+}
+
+function renderWebDirectTaskRow(t) {
+    return `
+        <div class="ov-item-row" id="web-unified-task-${t.id}" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" onclick="editUnifiedTask('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenlemek için tıklayın">
+            <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+                <input type="checkbox" ${t.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;" title="${t.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
+                <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
+            </div>
+            <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                <span style="background:#e0f2fe; color:#0284c7; font-size:0.70rem; font-weight:600; padding:2px 6px; border-radius:4px;">Hızlı</span>
+                <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteUnifiedTask('${t.type}', ${t.raw_id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
+            </div>
+        </div>
+    `;
 }
 
 async function addWebQuickNote() {
@@ -1599,7 +1637,10 @@ function renderChecklist() {
         return;
     }
 
-    filtered.forEach(item => {
+    const pendingItems = filtered.filter(item => !item.is_done);
+    const doneItems = filtered.filter(item => item.is_done);
+
+    function createItemElement(item) {
         const li = document.createElement('li');
         li.className = `item-card ${item.is_done ? 'done' : ''}`;
         li.dataset.itemId = item.id;
@@ -1611,17 +1652,16 @@ function renderChecklist() {
             metaHtml += `<span class="tag-reminder">${item.remind_at.substring(5, 16)}</span>`;
         }
         if (item.url) {
-            metaHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="tag-link">Link</a>`;
+            metaHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="tag-link" onclick="event.stopPropagation()">Link</a>`;
         }
 
         let actionsHtml = `
-            <button class="btn-icon-subtle" title="Maddeyi Düzenle" onclick="openEditItemModal(${item.id})"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
-            <button class="btn-icon-subtle" title="Hatırlatıcı Kur" onclick="openReminderModalById(${item.id})"><svg class="svg-icon svg-icon-xs"><use href="#i-clock"/></svg></button>
+            <button class="btn-icon-subtle" title="Hatırlatıcı Kur" onclick="event.stopPropagation(); openReminderModalById(${item.id})"><svg class="svg-icon svg-icon-xs"><use href="#i-clock"/></svg></button>
         `;
         if (item.url) {
-            actionsHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="btn-icon-subtle" title="Web Linkini Aç"><svg class="svg-icon svg-icon-xs"><use href="#i-file-text"/></svg></a>`;
+            actionsHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="btn-icon-subtle" title="Web Linkini Aç" onclick="event.stopPropagation()"><svg class="svg-icon svg-icon-xs"><use href="#i-file-text"/></svg></a>`;
         }
-        actionsHtml += `<button class="btn-icon-subtle btn-danger-hover" title="Maddeyi Sil" onclick="deleteItem(${item.id})"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>`;
+        actionsHtml += `<button class="btn-icon-subtle btn-danger-hover" title="Maddeyi Sil" onclick="event.stopPropagation(); deleteItem(${item.id})"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>`;
 
         const thumbHtml = item.image_url ? `<img src="${sanitizeUrl(item.image_url)}" class="item-thumb" alt="thumb">` : '';
 
@@ -1694,9 +1734,9 @@ function renderChecklist() {
         li.innerHTML = `
             <div class="item-left">
                 <span class="drag-handle item-drag-handle" title="Maddeyi taşımak için sürükleyin" onclick="event.stopPropagation()">⋮⋮</span>
-                <input type="checkbox" class="item-checkbox" ${item.is_done ? 'checked' : ''} onchange="toggleItemDone(${item.id}, this.checked)">
+                <input type="checkbox" class="item-checkbox" ${item.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleItemDone(${item.id}, this.checked)">
                 ${thumbHtml}
-                <div class="item-content">
+                <div class="item-content" onclick="openEditItemModal(${item.id})" style="cursor:pointer;" title="Düzenlemek için tıklayın">
                     <div class="item-title">${escapeHtml(item.title)}</div>
                     ${metaHtml ? `<div class="item-meta">${metaHtml}</div>` : ''}
                 </div>
@@ -1705,8 +1745,35 @@ function renderChecklist() {
                 ${actionsHtml}
             </div>
         `;
-        listEl.appendChild(li);
+        return li;
+    }
+
+    // Aktif maddeleri ekle
+    pendingItems.forEach(item => {
+        listEl.appendChild(createItemElement(item));
     });
+
+    // Tamamlanan maddeleri akordeon içine ekle
+    if (doneItems.length > 0) {
+        const accHeader = document.createElement('li');
+        accHeader.className = 'completed-accordion-header';
+        accHeader.style.cssText = 'list-style:none; margin:14px 0 6px; padding:8px 12px; background:var(--surface2, #f1f5f9); border:1px solid var(--border, #e2e8f0); border-radius:6px; display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; font-weight:700; color:var(--muted); cursor:pointer; user-select:none;';
+        accHeader.innerHTML = `
+            <span>${window.showWebPageCompleted ? '▾' : '▸'} ${doneItems.length} Tamamlanan Görev</span>
+            <span style="font-size:0.72rem; opacity:0.8;">${window.showWebPageCompleted ? 'Gizle' : 'Göster'}</span>
+        `;
+        accHeader.onclick = () => {
+            window.showWebPageCompleted = !window.showWebPageCompleted;
+            renderChecklist();
+        };
+        listEl.appendChild(accHeader);
+
+        if (window.showWebPageCompleted) {
+            doneItems.forEach(item => {
+                listEl.appendChild(createItemElement(item));
+            });
+        }
+    }
 }
 
 function renderMarkdownToHtml(md) {
