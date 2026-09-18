@@ -1512,8 +1512,34 @@ async function loadPage(pageId) {
         currentItems = data.items || [];
 
         renderPageHeader();
+
+        const lockedView = document.getElementById('note-locked-view');
+        const unlockedWrap = document.getElementById('note-unlocked-content-wrap');
+
+        if (data.requires_unlock) {
+            if (lockedView) lockedView.style.display = 'block';
+            if (unlockedWrap) unlockedWrap.style.display = 'none';
+            const checklistArea = document.getElementById('checklist-view');
+            const noteArea = document.getElementById('note-view');
+            const financeArea = document.getElementById('finance-view');
+            const projectArea = document.getElementById('project-view');
+            const softwareArea = document.getElementById('software-view');
+            if (checklistArea) checklistArea.style.display = 'none';
+            if (financeArea) financeArea.style.display = 'none';
+            if (projectArea) projectArea.style.display = 'none';
+            if (softwareArea) softwareArea.style.display = 'none';
+            if (noteArea) noteArea.style.display = 'block';
+            const pinInp = document.getElementById('locked-page-pin-input');
+            if (pinInp) { pinInp.value = ''; pinInp.focus(); }
+            return;
+        } else {
+            if (lockedView) lockedView.style.display = 'none';
+            if (unlockedWrap) unlockedWrap.style.display = 'block';
+        }
+
         if (currentPageData.type === 'notes') {
             renderNoteEditor();
+            loadAttachmentsList();
         } else if (currentPageData.type === 'finance') {
             loadFinanceData(currentFinancePeriod);
         } else if (currentPageData.type === 'project') {
@@ -1544,6 +1570,27 @@ function renderPageHeader() {
         } else {
             const svgHref = typeIcons[currentPageData.type] || '#i-file-text';
             iconEl.innerHTML = `<svg class="svg-icon svg-icon-md"><use href="${svgHref}"/></svg>`;
+        }
+    }
+
+    const pinBtn = document.getElementById('btn-header-pin');
+    if (pinBtn) {
+        if (currentPageData.is_pinned) {
+            pinBtn.style.color = 'var(--warning, #f59e0b)';
+            pinBtn.title = 'Sabitlendi (Kaldırmak için tıkla)';
+        } else {
+            pinBtn.style.color = '';
+            pinBtn.title = 'Başa Sabitle';
+        }
+    }
+    const lockBtn = document.getElementById('btn-header-lock');
+    if (lockBtn) {
+        if (currentPageData.is_locked) {
+            lockBtn.style.color = 'var(--danger, #ef4444)';
+            lockBtn.title = 'Kilitli (PIN korumalı)';
+        } else {
+            lockBtn.style.color = '';
+            lockBtn.title = 'Kilitle / PIN Belirle';
         }
     }
 
@@ -1797,16 +1844,52 @@ function renderMarkdownToHtml(md) {
 }
 
 function updateNoteStats() {
+    const editor = document.getElementById('note-rich-editor');
     const ta = document.getElementById('note-content-textarea');
-    const cntEl = document.getElementById('note-char-count');
-    if (!ta || !cntEl) return;
-    const len = ta.value.length;
-    const words = ta.value.trim() ? ta.value.trim().split(/\s+/).length : 0;
-    cntEl.textContent = `${len} karakter • ${words} kelime`;
+    const charEl = document.getElementById('note-char-count');
+    const wordEl = document.getElementById('note-word-count');
+    const goalStatusEl = document.getElementById('note-word-goal-status');
+    const goalWrapEl = document.getElementById('note-word-goal-progress-wrap');
+    const goalFillEl = document.getElementById('note-word-goal-progress-fill');
+    const goalPercentEl = document.getElementById('note-word-goal-percent');
+
+    const text = editor ? editor.innerText.trim() : (ta ? ta.value.trim() : '');
+    const len = text.length;
+    const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+
+    if (charEl) charEl.textContent = `${len} karakter`;
+    if (wordEl) wordEl.textContent = `${words} kelime`;
+
+    const target = (currentPageData && currentPageData.target_word_count) ? currentPageData.target_word_count : 0;
+    if (target > 0) {
+        const pct = Math.min(100, Math.round((words / target) * 100));
+        if (goalStatusEl) {
+            goalStatusEl.textContent = `🎯 ${words} / ${target} kelime (${pct >= 100 ? '🎉 Hedef Tamamlandı' : `%${pct}`})`;
+            goalStatusEl.style.color = pct >= 100 ? 'var(--success, #10b981)' : 'var(--primary, #3b82f6)';
+        }
+        if (goalWrapEl) goalWrapEl.style.display = 'flex';
+        if (goalFillEl) {
+            goalFillEl.style.width = `${pct}%`;
+            goalFillEl.style.backgroundColor = pct >= 100 ? 'var(--success, #10b981)' : 'var(--primary, #3b82f6)';
+        }
+        if (goalPercentEl) goalPercentEl.textContent = `%${pct}`;
+    } else {
+        if (goalStatusEl) {
+            goalStatusEl.textContent = '🎯 Hedef Belirle';
+            goalStatusEl.style.color = 'var(--primary, #3b82f6)';
+        }
+        if (goalWrapEl) goalWrapEl.style.display = 'none';
+    }
 }
 
 let noteAutoSaveTimer = null;
-function handleNoteInput() {
+
+function handleRichNoteInput() {
+    const editor = document.getElementById('note-rich-editor');
+    const ta = document.getElementById('note-content-textarea');
+    if (editor && ta) {
+        ta.value = editor.innerHTML;
+    }
     updateNoteStats();
     const statusEl = document.getElementById('note-save-status');
     if (statusEl) statusEl.textContent = "Kaydediliyor...";
@@ -1816,82 +1899,185 @@ function handleNoteInput() {
     }, 400);
 }
 
+function handleNoteInput() {
+    handleRichNoteInput();
+}
+
+function formatNoteText(command, value = null) {
+    const editor = document.getElementById('note-rich-editor');
+    if (!editor) return;
+    editor.focus();
+    document.execCommand(command, false, value);
+    handleRichNoteInput();
+}
+
+function insertNoteChecklist() {
+    const editor = document.getElementById('note-rich-editor');
+    if (!editor) return;
+    editor.focus();
+    const checkHtml = '<div style="margin:4px 0;"><label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" onclick="event.stopPropagation()"> <span>Yeni görev</span></label></div>';
+    document.execCommand('insertHTML', false, checkHtml);
+    handleRichNoteInput();
+}
+
+function insertNoteCode() {
+    const editor = document.getElementById('note-rich-editor');
+    if (!editor) return;
+    editor.focus();
+    const sel = window.getSelection();
+    const txt = sel && sel.rangeCount ? sel.getRangeAt(0).toString() : 'kod';
+    document.execCommand('insertHTML', false, `<code>${escapeHtml(txt)}</code>`);
+    handleRichNoteInput();
+}
+
 function insertMarkdownSyntax(before, after = '') {
-    const ta = document.getElementById('note-content-textarea');
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const val = ta.value;
-    const selected = val.substring(start, end);
-    const replacement = before + selected + after;
-    ta.value = val.substring(0, start) + replacement + val.substring(end);
-    ta.focus();
-    ta.selectionStart = start + before.length;
-    ta.selectionEnd = start + before.length + selected.length;
-    handleNoteInput();
+    // Geriye dönük uyumluluk: Doğrudan zengin metin komutlarına yönlendir
+    if (before === '**') formatNoteText('bold');
+    else if (before === '*') formatNoteText('italic');
+    else if (before === '# ') formatNoteText('formatBlock', 'h2');
+    else if (before === '## ') formatNoteText('formatBlock', 'h3');
+    else if (before === '- ') formatNoteText('insertUnorderedList');
+    else if (before.includes('[]')) insertNoteChecklist();
+    else if (before === '`') insertNoteCode();
+    else if (before === '> ') formatNoteText('formatBlock', 'blockquote');
+    else formatNoteText('bold');
 }
 
 function toggleNoteEditorMode(mode) {
-    const editBtn = document.getElementById('btn-note-mode-edit');
-    const prevBtn = document.getElementById('btn-note-mode-preview');
-    const ta = document.getElementById('note-content-textarea');
-    const prev = document.getElementById('note-markdown-preview');
-    if (!ta || !prev) return;
+    // Zengin metin editöründe her zaman canlı düzenleme aktiftir
+    const editor = document.getElementById('note-rich-editor');
+    if (editor) editor.focus();
+}
 
-    if (mode === 'preview') {
-        ta.style.display = 'none';
-        prev.style.display = 'block';
-        prev.innerHTML = renderMarkdownToHtml(ta.value);
-        if (editBtn) editBtn.classList.remove('active');
-        if (prevBtn) prevBtn.classList.add('active');
-    } else {
-        ta.style.display = 'block';
-        prev.style.display = 'none';
-        ta.focus();
-        if (editBtn) editBtn.classList.add('active');
-        if (prevBtn) prevBtn.classList.remove('active');
+async function triggerAiActionizeNote() {
+    const editor = document.getElementById('note-rich-editor');
+    if (!editor) return;
+    const text = editor.innerText.trim();
+    if (!text) {
+        showToast("Dönüştürülecek not metni boş!", "warning");
+        return;
+    }
+    showToast("🤖 AI notu analiz ediyor ve görevleri çıkarıyor...", "info");
+    try {
+        const res = await fetch('/notes/api/ai/actionize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: text})
+        });
+        const data = await res.json();
+        if (data.ok && data.tasks && data.tasks.length > 0) {
+            let tasksHtml = '<div style="margin-top:12px; padding:10px; background:rgba(59,130,246,0.06); border-radius:8px; border-left:3px solid #3b82f6;"><p style="font-weight:700; margin:0 0 6px 0;">☑️ AI Tarafından Çıkarılan Görevler:</p><ul style="margin:0; padding-left:20px;">';
+            data.tasks.forEach(t => {
+                tasksHtml += `<li>☐ ${escapeHtml(t.title)}</li>`;
+            });
+            tasksHtml += '</ul></div><br>';
+            editor.focus();
+            document.execCommand('insertHTML', false, tasksHtml);
+            handleRichNoteInput();
+            showToast(`✨ ${data.count} görev nota eklendi!`, "success");
+        } else {
+            showToast("Belirgin bir görev tespit edilemedi", "info");
+        }
+    } catch (e) {
+        showToast("AI isteği sırasında hata oluştu", "error");
     }
 }
 
-function toggleMoreActionsDropdown(event) {
-    if (event) event.stopPropagation();
-    const menu = document.getElementById('page-more-dropdown');
-    if (!menu) return;
-    const isShown = menu.style.display === 'flex';
-    menu.style.display = isShown ? 'none' : 'flex';
+function sanitizeRichHtml(html) {
+    if (!html || typeof html !== 'string') return '';
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const dangerousTags = ['script', 'iframe', 'object', 'embed', 'form', 'link', 'style'];
+        dangerousTags.forEach(tag => {
+            const elements = doc.querySelectorAll(tag);
+            elements.forEach(el => el.remove());
+        });
+        const allElements = doc.querySelectorAll('*');
+        allElements.forEach(el => {
+            const attrs = Array.from(el.attributes);
+            for (const attr of attrs) {
+                const name = attr.name.toLowerCase();
+                const val = (attr.value || '').trim().toLowerCase();
+                if (name.startsWith('on') || val.startsWith('javascript:') || val.startsWith('data:text/html')) {
+                    el.removeAttribute(attr.name);
+                }
+            }
+        });
+        return doc.body.innerHTML;
+    } catch (e) {
+        return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    }
 }
 
-function closeMoreActionsDropdown() {
-    const menu = document.getElementById('page-more-dropdown');
-    if (menu) menu.style.display = 'none';
+async function uploadPastedImage(blob, editor) {
+    if (!blob) return;
+    const formData = new FormData();
+    formData.append('image', blob, 'pasted_' + Date.now() + '.png');
+    showToast("📷 Görsel yükleniyor...", "info");
+    try {
+        const res = await fetch('/notes/api/upload_image', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.ok && data.url) {
+            editor.focus();
+            document.execCommand('insertHTML', false, `<p><img src="${data.url}" alt="Eklenen Görsel" style="max-width:100%; border-radius:8px; margin:8px 0;" /></p><p><br></p>`);
+            handleRichNoteInput();
+            showToast("📷 Görsel nota eklendi ✓", "success");
+        } else {
+            showToast("Görsel yüklenemedi", "error");
+        }
+    } catch (e) {
+        showToast("Görsel yükleme hatası", "error");
+    }
 }
 
-document.addEventListener('click', (e) => {
-    const container = document.querySelector('.action-dropdown-container');
-    if (container && !container.contains(e.target)) {
-        closeMoreActionsDropdown();
+function exportPageToPdf() {
+    if (!currentPageData) {
+        showToast("Yazdırılacak açık bir sayfa yok", "warning");
+        return;
     }
-});
-
-function focusQuickAdd() {
-    const quickInput = document.getElementById('quick-item-title');
-    if (quickInput) {
-        quickInput.focus();
-        quickInput.scrollIntoView({behavior: 'smooth', block: 'center'});
-    }
+    window.print();
 }
 
 function renderNoteEditor() {
+    const editor = document.getElementById('note-rich-editor');
     const textarea = document.getElementById('note-content-textarea');
-    if (textarea && currentPageData) {
+    if (editor && currentPageData) {
         const draft = localStorage.getItem(`tnote_draft_${currentPageId}`);
-        textarea.value = (draft !== null && draft !== undefined) ? draft : (currentPageData.content || '');
+        const rawContent = (draft !== null && draft !== undefined) ? draft : (currentPageData.content || '');
+        
+        // Eğer içerik markdown formatında ise HTML'e çevirip zengin göster
+        let htmlToRender = '';
+        if (rawContent && !rawContent.trim().startsWith('<') && (rawContent.includes('**') || rawContent.includes('#') || rawContent.includes('- ') || rawContent.includes('\n'))) {
+            htmlToRender = renderMarkdownToHtml(rawContent);
+        } else {
+            htmlToRender = rawContent || '';
+        }
+        editor.innerHTML = sanitizeRichHtml(htmlToRender);
+        if (textarea) textarea.value = editor.innerHTML;
         updateNoteStats();
-        toggleNoteEditorMode('edit');
         const statusEl = document.getElementById('note-save-status');
         if (statusEl) statusEl.textContent = "Kaydedildi ✓";
 
-        textarea.onblur = () => {
+        // Pano Görseli Yapıştırma Dinleyicisi
+        editor.onpaste = async (e) => {
+            const items = (e.clipboardData || window.clipboardData)?.items;
+            if (items) {
+                for (const item of items) {
+                    if (item.type.indexOf('image') === 0) {
+                        e.preventDefault();
+                        const blob = item.getAsFile();
+                        await uploadPastedImage(blob, editor);
+                        return;
+                    }
+                }
+            }
+        };
+
+        editor.onblur = () => {
             clearTimeout(noteAutoSaveTimer);
             saveNoteContent(true);
         };
@@ -1899,11 +2085,13 @@ function renderNoteEditor() {
 }
 
 async function saveNoteContent(isAutoSave = false) {
+    const editor = document.getElementById('note-rich-editor');
     const textarea = document.getElementById('note-content-textarea');
     const statusEl = document.getElementById('note-save-status');
-    if (!textarea || !currentPageId) return;
+    if (!editor || !currentPageId) return;
 
-    const content = textarea.value;
+    const content = editor.innerHTML;
+    if (textarea) textarea.value = content;
     try {
         localStorage.setItem(`tnote_draft_${currentPageId}`, content);
     } catch(e) {}
@@ -2207,12 +2395,49 @@ function openAddProjectModal() {
     openAddPageModal();
 }
 
+const ACADEMIC_THESIS_TEMPLATE = `<h2>🎓 Tez &amp; Ödev Çalışma Masası</h2>
+<p><b>Danışman / Öğretim Üyesi:</b> Prof. Dr. ...<br>
+<b>Ders / Anabilim Dalı:</b> ...<br>
+<b>Teslim Tarihi:</b> [Tarih Giriniz]<br>
+<b>Aşama:</b> 🟡 Literatür Taraması &amp; Hipotez Belirleme</p>
+<hr>
+<h3>📋 Tez &amp; Ödev Yol Haritası (Kontrol Listesi)</h3>
+<ul>
+  <li>☐ Konu tespiti, problem tanımı ve danışman onayı</li>
+  <li>☐ Literatür taraması (Yerli ve yabancı en az 15 makale incelemesi)</li>
+  <li>☐ Araştırma soruları, amaç ve metodoloji belirleme</li>
+  <li>☐ Veri toplama, anket, deney veya prototip kodlama</li>
+  <li>☐ Giriş ve Kuramsal Çerçeve taslağının yazımı</li>
+  <li>☐ Bulgular, İstatistiksel Analiz ve Tartışma yazımı</li>
+  <li>☐ Sonuç, Değerlendirme ve Gelecek Çalışmalar</li>
+  <li>☐ APA 7 / IEEE formatında kaynakça ve metin içi atıf kontrolü</li>
+  <li>☐ Danışman inceleme revizyonları ve Turnitin intihal raporu (&lt;%15)</li>
+  <li>☐ Ciltleme / PDF son teslimi ve jüri sunumu hazırlığı</li>
+</ul>
+<hr>
+<h3>📚 Kaynakça &amp; İncelenen Makaleler</h3>
+<ul>
+  <li>📖 <b>Referans 1:</b> Yazar, A. (2025). <i>"Makale Başlığı"</i>, Bilim Dergisi. [Not: Metot için temel referans]</li>
+  <li>📖 <b>Referans 2:</b> Smith, J. et al. (2024). <i>"Advanced Methodologies"</i>, IEEE Trans. [Not: İlgili çalışma]</li>
+</ul>
+<hr>
+<h3>📝 Araştırma Notları, Alıntılar &amp; Karalamalar</h3>
+<p>Laboratuvar notları, mülakat kayıtları, önemli formüller veya hocanın son geri bildirimlerini buraya yazabilirsiniz...</p>`;
+
 async function submitAddPage() {
     const catId = document.getElementById('new-page-cat').value;
     const title = document.getElementById('new-page-title').value.trim();
     const type = document.getElementById('new-page-type').value;
-    const icon = document.getElementById('new-page-icon').value.trim() || '📝';
+    let icon = document.getElementById('new-page-icon').value.trim() || '📝';
     if (!title || !catId) return;
+
+    let finalType = type;
+    let initialContent = '';
+    if (type === 'academic') {
+        finalType = 'notes';
+        initialContent = ACADEMIC_THESIS_TEMPLATE;
+        if (!icon || icon === '📝') icon = '🎓';
+    }
 
     const currentNbId = window.CURRENT_NOTEBOOK_ID || 1;
     const res = await fetch('/notes/api/pages', {
@@ -2221,17 +2446,84 @@ async function submitAddPage() {
         body: JSON.stringify({
             category_id: parseInt(catId), 
             title, 
-            type, 
+            type: finalType, 
             icon,
+            content: initialContent,
             notebook_id: currentNbId
         })
     });
     const data = await res.json();
     if (data.ok) {
         closeModal('modal-add-page');
-        window.location.href = `/notes?notebook_id=${currentNbId}`;
+        window.location.href = `/notes?notebook_id=${currentNbId}&page_id=${data.id}`;
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Geri Al (Undo / Ctrl+Z) Yöneticisi
+// ─────────────────────────────────────────────────────────────────────────────
+window._deletedHistoryStack = [];
+let undoToastTimer = null;
+
+function pushDeletedHistory(type, data, restoreFn) {
+    window._deletedHistoryStack.push({
+        type: type,
+        data: data,
+        restore: restoreFn,
+        timestamp: Date.now()
+    });
+    const label = (data.title || data.content || data.name || 'Öğe').substring(0, 24);
+    showUndoToast(`"${label}" silindi`, restoreFn);
+}
+
+function showUndoToast(msg, restoreFn) {
+    const toast = document.getElementById('undo-toast');
+    if (!toast) return;
+    toast.innerHTML = `
+        <span>🗑️ ${escapeHtml(msg)}</span>
+        <button class="undo-toast-btn" onclick="undoLastDelete()">↩️ Geri Al (Ctrl+Z)</button>
+    `;
+    toast.style.display = 'flex';
+    clearTimeout(undoToastTimer);
+    undoToastTimer = setTimeout(() => {
+        toast.style.display = 'none';
+    }, 7000);
+}
+
+function hideUndoToast() {
+    const toast = document.getElementById('undo-toast');
+    if (toast) toast.style.display = 'none';
+    clearTimeout(undoToastTimer);
+}
+
+function undoLastDelete() {
+    if (!window._deletedHistoryStack || window._deletedHistoryStack.length === 0) {
+        showToast("Geri alınacak silme işlemi yok", "info");
+        return;
+    }
+    const last = window._deletedHistoryStack.pop();
+    if (last && typeof last.restore === 'function') {
+        last.restore();
+        hideUndoToast();
+        showToast("Öğe geri yüklendi ✓", "success");
+    }
+}
+
+// Global Ctrl+Z dinleyicisi: aktif metin alanı dışındayken son silineni geri alır
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const active = document.activeElement;
+        const isEditing = active && (
+            active.tagName === 'INPUT' || 
+            active.tagName === 'TEXTAREA' || 
+            active.isContentEditable
+        );
+        if (!isEditing && window._deletedHistoryStack && window._deletedHistoryStack.length > 0) {
+            e.preventDefault();
+            undoLastDelete();
+        }
+    }
+});
 
 // Kategori Düzenleme & Silme
 function updateWebCatColorPreview(inputId, previewId) {
@@ -5726,6 +6018,619 @@ function openSoftwareSettingsModalWeb() {
         body: JSON.stringify({ repo_path: path, tech_stack: stack || '', system_architecture: arch || '' })
     }).then(() => renderSoftwareViewWeb(currentPageData.id));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POWER PACKS: Sabitleme (Pin), Sayfa Kilidi (PIN), Ekler, Hedef, Zaman Tüneli
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function toggleCurrentPagePin() {
+    if (!currentPageId) return;
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/pin`, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+            currentPageData.is_pinned = data.is_pinned;
+            renderPageHeader();
+            loadPagesList();
+            showUndoToast(data.is_pinned ? '📌 Sayfa başa sabitlendi' : '📌 Sabitleme kaldırıldı', null);
+        }
+    } catch (e) {
+        console.error("Pin hatası:", e);
+    }
+}
+
+function promptPageLock() {
+    if (!currentPageId) return;
+    const desc = document.getElementById('page-lock-modal-desc');
+    const removeBtn = document.getElementById('btn-page-unlock-remove');
+    const pinInp = document.getElementById('page-lock-modal-pin');
+    const errEl = document.getElementById('page-lock-modal-err');
+
+    if (errEl) errEl.style.display = 'none';
+    if (pinInp) pinInp.value = '';
+
+    if (currentPageData && currentPageData.is_locked) {
+        if (desc) desc.textContent = 'Bu sayfa kilitli. PIN değiştirebilir veya kilidi tamamen kaldırabilirsiniz:';
+        if (removeBtn) removeBtn.style.display = 'block';
+    } else {
+        if (desc) desc.textContent = 'Bu sayfayı kilitlemek için 4 haneli bir PIN kodu belirleyin:';
+        if (removeBtn) removeBtn.style.display = 'none';
+    }
+    openModal('modal-page-lock-set');
+    if (pinInp) setTimeout(() => pinInp.focus(), 200);
+}
+
+async function submitPageLockSet() {
+    const pinInp = document.getElementById('page-lock-modal-pin');
+    const pin = pinInp ? pinInp.value.trim() : '';
+    const errEl = document.getElementById('page-lock-modal-err');
+    if (!pin || pin.length < 4) {
+        if (errEl) { errEl.textContent = 'PIN en az 4 haneli olmalıdır.'; errEl.style.display = 'block'; }
+        return;
+    }
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/lock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin, action: 'lock' })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            currentPageData.is_locked = 1;
+            closeModal('modal-page-lock-set');
+            renderPageHeader();
+            showUndoToast('🔒 Sayfa kilitlendi', null);
+        } else {
+            if (errEl) { errEl.textContent = data.error || 'İşlem başarısız'; errEl.style.display = 'block'; }
+        }
+    } catch (e) {
+        if (errEl) { errEl.textContent = 'Bağlantı hatası'; errEl.style.display = 'block'; }
+    }
+}
+
+async function submitPageLockRemove() {
+    if (!confirm('Sayfa kilidini kaldırmak istediğinize emin misiniz?')) return;
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/lock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'unlock' })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            currentPageData.is_locked = 0;
+            closeModal('modal-page-lock-set');
+            renderPageHeader();
+            showUndoToast('🔓 Sayfa kilidi kaldırıldı', null);
+        }
+    } catch (e) {
+        console.error("Kilit kaldırma hatası:", e);
+    }
+}
+
+async function submitUnlockPagePin() {
+    const pinInp = document.getElementById('locked-page-pin-input');
+    const pin = pinInp ? pinInp.value.trim() : '';
+    const errEl = document.getElementById('locked-pin-error');
+    if (!pin) return;
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/verify-lock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin })
+        });
+        const data = await res.json();
+        if (data.ok && data.page) {
+            currentPageData = data.page;
+            currentItems = data.items || [];
+            document.getElementById('note-locked-view').style.display = 'none';
+            document.getElementById('note-unlocked-content-wrap').style.display = 'block';
+            renderNoteEditor();
+            loadAttachmentsList();
+        } else {
+            if (errEl) {
+                errEl.textContent = data.error || 'Hatalı PIN kodu';
+                errEl.style.display = 'block';
+            }
+        }
+    } catch (e) {
+        if (errEl) {
+            errEl.textContent = 'Bağlantı hatası';
+            errEl.style.display = 'block';
+        }
+    }
+}
+
+function promptWordGoal() {
+    if (!currentPageId) return;
+    const curTarget = (currentPageData && currentPageData.target_word_count) ? currentPageData.target_word_count : 0;
+    const val = prompt('Hedef kelime sayısı girin (Kaldırmak için 0):', curTarget > 0 ? curTarget : '1000');
+    if (val === null) return;
+    const target = parseInt(val, 10);
+    if (isNaN(target) || target < 0) return;
+
+    fetch(`/notes/api/pages/${currentPageId}/word-count-target`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target })
+    }).then(r => r.json()).then(data => {
+        if (data.ok) {
+            currentPageData.target_word_count = target;
+            updateNoteStats();
+            showUndoToast(target > 0 ? `🎯 Hedef belirlendi: ${target} kelime` : '🎯 Hedef kaldırıldı', null);
+        }
+    });
+}
+
+function insertToggleBlock() {
+    const editor = document.getElementById('note-rich-editor');
+    if (!editor) return;
+    const title = prompt('Katlanabilir Başlık:', '▶️ Bölüm Başlığı') || 'Bölüm';
+    const html = `<details class="note-toggle" open><summary>${escapeHtml(title)}</summary><p>Bu alana gizlenebilir detayları yazabilirsiniz...</p></details><p><br></p>`;
+    document.execCommand('insertHTML', false, html);
+    editor.focus();
+}
+
+function promptSmartClip() {
+    const box = document.getElementById('smart-clip-preview-box');
+    const stat = document.getElementById('smart-clip-status');
+    const inp = document.getElementById('smart-clip-url-input');
+    if (box) box.style.display = 'none';
+    if (stat) stat.style.display = 'none';
+    if (inp) inp.value = '';
+    openModal('modal-smart-clip');
+    if (inp) setTimeout(() => inp.focus(), 200);
+}
+
+async function submitSmartClip() {
+    const inp = document.getElementById('smart-clip-url-input');
+    const url = inp ? inp.value.trim() : '';
+    const stat = document.getElementById('smart-clip-status');
+    const btn = document.getElementById('btn-smart-clip-submit');
+    if (!url) return;
+
+    if (stat) { stat.textContent = 'Bağlantı ve meta veriler çözümleniyor...'; stat.style.display = 'block'; }
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await fetch('/notes/api/tools/clip_url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (data.ok && data.card) {
+            const c = data.card;
+            const thumbHtml = c.image_url ? `<div class="bookmark-card-thumb" style="background-image:url('${c.image_url}');"></div>` : '';
+            const cardHtml = `
+                <a href="${escapeHtml(c.url)}" target="_blank" rel="noopener noreferrer" class="bookmark-card">
+                    ${thumbHtml}
+                    <div class="bookmark-card-info">
+                        <div class="bookmark-card-title">${escapeHtml(c.title || c.url)}</div>
+                        <div class="bookmark-card-desc">${escapeHtml(c.description || '')}</div>
+                        <div class="bookmark-card-source">🔗 ${escapeHtml(c.site_name || 'Web')} &bull; ${new URL(c.url).hostname}</div>
+                    </div>
+                </a><p><br></p>
+            `;
+            const editor = document.getElementById('note-rich-editor');
+            if (editor) {
+                editor.focus();
+                document.execCommand('insertHTML', false, cardHtml);
+                handleRichNoteInput();
+            }
+            closeModal('modal-smart-clip');
+            showUndoToast('🔗 Yer imi notunuza eklendi', null);
+        } else {
+            if (stat) stat.textContent = data.error || 'Bağlantı alınamadı.';
+        }
+    } catch (e) {
+        if (stat) stat.textContent = 'Hata: URL çözümlenemedi.';
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function toggleAttachmentsTray(forceState) {
+    const bar = document.getElementById('note-attachments-bar');
+    if (!bar) return;
+    if (forceState !== undefined) {
+        bar.style.display = forceState ? 'block' : 'none';
+    } else {
+        bar.style.display = (bar.style.display === 'none' || !bar.style.display) ? 'block' : 'none';
+    }
+    if (bar.style.display === 'block') {
+        loadAttachmentsList();
+    }
+}
+
+async function loadAttachmentsList() {
+    if (!currentPageId) return;
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/attachments`);
+        const data = await res.json();
+        if (data.ok && data.attachments) {
+            const listEl = document.getElementById('note-attachments-list');
+            const countEl = document.getElementById('note-attachments-count');
+            if (countEl) countEl.textContent = data.attachments.length;
+            if (listEl) {
+                if (data.attachments.length === 0) {
+                    listEl.innerHTML = '<span style="font-size:0.78rem; color:var(--muted); font-style:italic;">Henüz ekli belge veya PDF yok.</span>';
+                    return;
+                }
+                listEl.innerHTML = data.attachments.map(att => {
+                    const isPdf = att.filename.toLowerCase().endsWith('.pdf') || att.mime_type.includes('pdf');
+                    const icon = isPdf ? '📄' : (att.filename.match(/\.(zip|tar|gz)$/i) ? '📦' : '📎');
+                    const sizeKb = Math.round((att.file_size || 0) / 1024);
+                    const clickAction = isPdf ? `openPdfViewer('${att.file_url}', '${escapeHtml(att.original_name)}')` : `window.open('${att.file_url}', '_blank')`;
+                    return `
+                        <div class="attachment-chip" title="${escapeHtml(att.original_name)} (${sizeKb} KB)">
+                            <span onclick="${clickAction}">${icon} <strong>${escapeHtml(att.original_name)}</strong> <span style="opacity:0.6; font-size:0.7rem;">(${sizeKb} KB)</span></span>
+                            <span class="att-del-btn" onclick="deleteAttachment(${att.id})" title="Eki Sil">✕</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    } catch (e) {
+        console.error("Ekler yüklenemedi:", e);
+    }
+}
+
+async function handleAttachmentFileSelected(event) {
+    const file = event.target.files[0];
+    if (!file || !currentPageId) return;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/attachments`, {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.ok) {
+            showUndoToast(`📎 ${file.name} başarıyla eklendi`, null);
+            loadAttachmentsList();
+            document.getElementById('note-attachments-bar').style.display = 'block';
+        } else {
+            alert(data.error || 'Dosya yüklenemedi');
+        }
+    } catch (e) {
+        alert('Dosya yükleme hatası');
+    }
+    event.target.value = '';
+}
+
+async function deleteAttachment(attId) {
+    if (!confirm('Bu eki silmek istediğinize emin misiniz?')) return;
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/attachments/${attId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+            loadAttachmentsList();
+            showUndoToast('Ek silindi', null);
+        }
+    } catch (e) {
+        console.error("Ek silinemedi:", e);
+    }
+}
+
+function openPdfViewer(fileUrl, filename) {
+    const frame = document.getElementById('pdf-viewer-iframe');
+    const nameEl = document.getElementById('pdf-viewer-filename');
+    const dlLink = document.getElementById('pdf-viewer-download-link');
+    if (frame) frame.src = fileUrl;
+    if (nameEl) nameEl.textContent = filename || 'PDF Belge';
+    if (dlLink) dlLink.href = fileUrl;
+    openModal('modal-pdf-viewer');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ZAMAN TÜNELİ (Time Machine / Sayfa Versiyon Geçmişi)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function openTimeMachineModal() {
+    if (!currentPageId) return;
+    openModal('modal-time-machine');
+    const listEl = document.getElementById('time-machine-list');
+    if (listEl) listEl.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">Versiyonlar yükleniyor...</div>';
+
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/versions`);
+        const data = await res.json();
+        if (data.ok && data.versions) {
+            if (data.versions.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted); font-style:italic;">Bu sayfa için henüz kaydedilmiş bir önceki versiyon yok. Sayfayı düzenledikçe anlık kopyalar buraya eklenir.</div>';
+                return;
+            }
+            listEl.innerHTML = data.versions.map(v => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+                    <div>
+                        <div style="font-weight:600; font-size:0.85rem; color:var(--text);">${escapeHtml(v.title || 'Başlıksız')}</div>
+                        <div style="font-size:0.75rem; color:var(--muted);">${v.created_at} &bull; ${v.char_count || 0} karakter</div>
+                    </div>
+                    <button class="btn btn-xs btn-primary" onclick="restorePageVersion(${v.id})">↩️ Geri Yükle</button>
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        if (listEl) listEl.innerHTML = '<div style="color:var(--danger); text-align:center; padding:20px;">Versiyon geçmişi alınamadı.</div>';
+    }
+}
+
+async function restorePageVersion(versionId) {
+    if (!confirm('Bu versiyonu geri yüklemek istediğinize emin misiniz? Mevcut sayfa bu kopyayla değiştirilecek.')) return;
+    try {
+        const res = await fetch(`/notes/api/pages/${currentPageId}/versions/${versionId}/restore`, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok && data.page) {
+            currentPageData = data.page;
+            renderPageHeader();
+            renderNoteEditor();
+            closeModal('modal-time-machine');
+            showUndoToast('⏳ Sayfa önceki versiyona geri yüklendi!', null);
+        } else {
+            alert(data.error || 'Geri yüklenemedi');
+        }
+    } catch (e) {
+        alert('Geri yükleme hatası');
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OBSIDIAN BENZERİ İNTERAKTİF ZİHİN AĞI GRAFİĞİ (Mind Map / Graph View)
+// ─────────────────────────────────────────────────────────────────────────────
+
+let graphSimData = null;
+let graphAnimationId = null;
+
+async function openGraphViewModal() {
+    openModal('modal-graph-view');
+    await refreshGraphData();
+}
+
+async function refreshGraphData() {
+    try {
+        const nbParam = window.CURRENT_NOTEBOOK_ID ? `?notebook_id=${window.CURRENT_NOTEBOOK_ID}` : '';
+        const res = await fetch(`/notes/api/graph${nbParam}`);
+        const data = await res.json();
+        if (data.ok && data.graph) {
+            initGraphRenderer(data.graph);
+        }
+    } catch (e) {
+        console.error("Graf verisi alınamadı:", e);
+    }
+}
+
+function initGraphRenderer(graph) {
+    const canvas = document.getElementById('graph-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // Canvas boyutlandırma
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Node konumlarını merkez etrafında başlat
+    const nodes = graph.nodes.map((n, i) => {
+        const angle = (i / graph.nodes.length) * 2 * Math.PI;
+        const radius = 100 + Math.random() * 80;
+        return {
+            ...n,
+            x: width / 2 + Math.cos(angle) * radius,
+            y: height / 2 + Math.sin(angle) * radius,
+            vx: 0,
+            vy: 0,
+            r: Math.max(8, Math.min(22, 6 + (n.val || 1) * 3))
+        };
+    });
+
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const links = graph.links.map(l => ({
+        source: nodeMap.get(l.source),
+        target: nodeMap.get(l.target)
+    })).filter(l => l.source && l.target);
+
+    let scale = 1;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let dragNode = null;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+
+    canvas.onmousedown = (e) => {
+        const r = canvas.getBoundingClientRect();
+        const mx = (e.clientX - r.left - panX) / scale;
+        const my = (e.clientY - r.top - panY) / scale;
+
+        // Tıklanan node bul
+        dragNode = nodes.find(n => Math.hypot(n.x - mx, n.y - my) <= n.r);
+        isDragging = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    };
+
+    canvas.onmousemove = (e) => {
+        if (!isDragging) return;
+        if (dragNode) {
+            const r = canvas.getBoundingClientRect();
+            dragNode.x = (e.clientX - r.left - panX) / scale;
+            dragNode.y = (e.clientY - r.top - panY) / scale;
+            dragNode.vx = 0;
+            dragNode.vy = 0;
+        } else {
+            panX += (e.clientX - lastMouseX);
+            panY += (e.clientY - lastMouseY);
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        }
+    };
+
+    canvas.onmouseup = (e) => {
+        if (dragNode) {
+            const r = canvas.getBoundingClientRect();
+            const mx = (e.clientX - r.left - panX) / scale;
+            const my = (e.clientY - r.top - panY) / scale;
+            if (Math.hypot(dragNode.x - mx, dragNode.y - my) < 5) {
+                // Tıklanan sayfaya git!
+                closeModal('modal-graph-view');
+                selectPage(dragNode.id);
+            }
+        }
+        isDragging = false;
+        dragNode = null;
+    };
+
+    canvas.onwheel = (e) => {
+        e.preventDefault();
+        const zoom = e.deltaY < 0 ? 1.1 : 0.9;
+        scale = Math.max(0.3, Math.min(3, scale * zoom));
+    };
+
+    if (graphAnimationId) cancelAnimationFrame(graphAnimationId);
+
+    function simulateAndDraw() {
+        // Basit Yay ve İtme Simülasyonu (Spring Force Layout)
+        for (let i = 0; i < nodes.length; i++) {
+            const a = nodes[i];
+            // Merkeze çekim
+            a.vx += (width / 2 - a.x) * 0.0005;
+            a.vy += (height / 2 - a.y) * 0.0005;
+
+            // Düğümler arası itme (Repulsion)
+            for (let j = i + 1; j < nodes.length; j++) {
+                const b = nodes[j];
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const dist = Math.hypot(dx, dy) || 1;
+                if (dist < 220) {
+                    const force = (220 - dist) / dist * 0.05;
+                    a.vx -= dx * force;
+                    a.vy -= dy * force;
+                    b.vx += dx * force;
+                    b.vy += dy * force;
+                }
+            }
+        }
+
+        // Bağlantılar (Spring Attaction)
+        for (const l of links) {
+            const dx = l.target.x - l.source.x;
+            const dy = l.target.y - l.source.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const force = (dist - 80) * 0.005;
+            l.source.vx += dx * force;
+            l.source.vy += dy * force;
+            l.target.vx -= dx * force;
+            l.target.vy -= dy * force;
+        }
+
+        // Konum güncelle ve sürtünme uygula
+        for (const n of nodes) {
+            if (n !== dragNode) {
+                n.x += n.vx;
+                n.y += n.vy;
+                n.vx *= 0.88;
+                n.vy *= 0.88;
+            }
+        }
+
+        // Çizim
+        ctx.clearRect(0, 0, width, height);
+        ctx.save();
+        ctx.translate(panX, panY);
+        ctx.scale(scale, scale);
+
+        // Çizgiler (Edges)
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+        ctx.lineWidth = 1.5;
+        for (const l of links) {
+            ctx.beginPath();
+            ctx.moveTo(l.source.x, l.source.y);
+            ctx.lineTo(l.target.x, l.target.y);
+            ctx.stroke();
+        }
+
+        // Düğümler (Nodes)
+        for (const n of nodes) {
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, n.r, 0, 2 * Math.PI);
+            ctx.fillStyle = n.id === currentPageId ? '#3b82f6' : (n.group || '#94a3b8');
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Etiket
+            ctx.font = '11px sans-serif';
+            ctx.fillStyle = '#f8fafc';
+            ctx.textAlign = 'center';
+            ctx.fillText(n.label, n.x, n.y + n.r + 14);
+        }
+
+        ctx.restore();
+        graphAnimationId = requestAnimationFrame(simulateAndDraw);
+    }
+
+    simulateAndDraw();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// E-POSTA DOĞRULAMA (6 Haneli Kod)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function submitVerifyEmailCode() {
+    const inp = document.getElementById('verify-email-code-input');
+    const code = inp ? inp.value.trim() : '';
+    const stat = document.getElementById('verify-code-status');
+    if (!code || code.length < 6) {
+        if (stat) { stat.textContent = 'Lütfen 6 haneli kodu girin.'; stat.style.color = 'var(--danger)'; stat.style.display = 'block'; }
+        return;
+    }
+    try {
+        const res = await fetch('/notes/api/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            if (stat) { stat.textContent = '✓ E-posta başarıyla doğrulandı!'; stat.style.color = 'var(--success)'; stat.style.display = 'block'; }
+            setTimeout(() => {
+                closeModal('modal-email-verify');
+                window.location.reload();
+            }, 1000);
+        } else {
+            if (stat) { stat.textContent = data.error || 'Geçersiz kod'; stat.style.color = 'var(--danger)'; stat.style.display = 'block'; }
+        }
+    } catch (e) {
+        if (stat) { stat.textContent = 'Doğrulama hatası'; stat.style.color = 'var(--danger)'; stat.style.display = 'block'; }
+    }
+}
+
+async function resendEmailVerificationCode() {
+    const stat = document.getElementById('verify-code-status');
+    try {
+        const res = await fetch('/notes/api/auth/resend-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        const data = await res.json();
+        if (data.ok) {
+            if (stat) {
+                const demoHint = data.code_demo ? ` (Demo Kodu: ${data.code_demo})` : '';
+                stat.textContent = `Doğrulama kodu tekrar gönderildi!${demoHint}`;
+                stat.style.color = 'var(--primary)';
+                stat.style.display = 'block';
+            }
+        }
+    } catch (e) {
+        if (stat) { stat.textContent = 'Kod gönderilemedi.'; stat.style.color = 'var(--danger)'; stat.style.display = 'block'; }
+    }
+}
+
 
 
 

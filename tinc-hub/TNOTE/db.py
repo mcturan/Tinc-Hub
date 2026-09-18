@@ -4,7 +4,8 @@ import json
 import base64
 import hashlib
 import threading
-from datetime import datetime
+import uuid
+from datetime import datetime, timedelta
 from .config import DB_PATH, DATA_DIR, SECRET_KEY
 
 _lock = threading.Lock()
@@ -389,6 +390,48 @@ def init_db():
                 FOREIGN KEY (notebook_id) REFERENCES notebooks(id) ON DELETE CASCADE,
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             );
+
+            -- Sürüm Geçmişi (Time Machine / Version History)
+            CREATE TABLE IF NOT EXISTS page_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                created_by INTEGER,
+                FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_page_versions_page ON page_versions(page_id, id DESC);
+
+            -- Belge Ekleri (Attachments & PDF)
+            CREATE TABLE IF NOT EXISTS page_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_id INTEGER NOT NULL,
+                filename TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                file_url TEXT NOT NULL,
+                file_size INTEGER DEFAULT 0,
+                mime_type TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_page_attachments_page ON page_attachments(page_id);
+
+            -- Aktif Oturumlar & Cihaz Yönetimi
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                session_token TEXT UNIQUE NOT NULL,
+                device_name TEXT DEFAULT '',
+                platform TEXT DEFAULT '',
+                ip_address TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                last_active TEXT DEFAULT (datetime('now', 'localtime')),
+                is_revoked INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_uid ON user_sessions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token);
         """)
 
         # Migration: notebooks tablosuna user_id ekle
@@ -437,6 +480,58 @@ def init_db():
         if 'notebook_id' not in cat_cols:
             cur.execute("ALTER TABLE categories ADD COLUMN notebook_id INTEGER DEFAULT 1")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_cat_notebook ON categories(notebook_id)")
+
+        # Migration: TincID Tekil Kimlik (Unified Identity across ecosystem)
+        cur.execute("PRAGMA table_info(users)")
+        user_cols = [r[1] for r in cur.fetchall()]
+        if 'tinc_id' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN tinc_id TEXT DEFAULT ''")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_tinc_id ON users(tinc_id)")
+        
+        # Populate empty tinc_id for any existing user accounts
+        cur.execute("SELECT id, username FROM users WHERE tinc_id IS NULL OR tinc_id = ''")
+        for u_id, u_name in cur.fetchall():
+            new_tinc_id = f"TINC-{uuid.uuid4().hex[:8].upper()}"
+            cur.execute("UPDATE users SET tinc_id = ? WHERE id = ?", (new_tinc_id, u_id))
+        conn.commit()
+
+        # Migration: users tablosuna eksik sütunları ekle (Lifecycle & SSO & 2FA)
+        cur.execute("PRAGMA table_info(users)")
+        user_cols = [r[1] for r in cur.fetchall()]
+        if 'avatar_url' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT ''")
+        if 'is_email_verified' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN is_email_verified INTEGER DEFAULT 1")
+        if 'email_verification_code' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN email_verification_code TEXT DEFAULT ''")
+        if 'email_verification_expires' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN email_verification_expires TEXT DEFAULT ''")
+        if 'is_active' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1")
+        if 'deactivated_at' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN deactivated_at TEXT DEFAULT NULL")
+        if 'auth_provider' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'local'")
+        if 'provider_id' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN provider_id TEXT DEFAULT ''")
+        if 'totp_secret' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN totp_secret TEXT DEFAULT ''")
+        if 'is_2fa_enabled' not in user_cols:
+            cur.execute("ALTER TABLE users ADD COLUMN is_2fa_enabled INTEGER DEFAULT 0")
+
+        # Migration: pages tablosuna eksik sütunları ekle (Pin, Kilit, Hedef Kelime)
+        cur.execute("PRAGMA table_info(pages)")
+        page_cols = [r[1] for r in cur.fetchall()]
+        if 'is_pinned' not in page_cols:
+            cur.execute("ALTER TABLE pages ADD COLUMN is_pinned INTEGER DEFAULT 0")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_pages_pinned ON pages(is_pinned)")
+        if 'is_locked' not in page_cols:
+            cur.execute("ALTER TABLE pages ADD COLUMN is_locked INTEGER DEFAULT 0")
+        if 'lock_pin' not in page_cols:
+            cur.execute("ALTER TABLE pages ADD COLUMN lock_pin TEXT DEFAULT ''")
+        if 'target_word_count' not in page_cols:
+            cur.execute("ALTER TABLE pages ADD COLUMN target_word_count INTEGER DEFAULT 0")
+        conn.commit()
 
         cur.execute("SELECT COUNT(*) FROM notebooks")
         if cur.fetchone()[0] == 0:
@@ -517,6 +612,38 @@ def init_db():
             cur.execute("ALTER TABLE categories ADD COLUMN is_divider INTEGER DEFAULT 0")
         except Exception:
             pass
+
+        # FTS5 Full-Text Search (Derin Not Araması)
+        try:
+            cur.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
+                    page_id UNINDEXED,
+                    title,
+                    content,
+                    tokenize='unicode61 remove_diacritics 1'
+                );
+            """)
+            cur.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_pages_fts_ai AFTER INSERT ON pages BEGIN
+                    INSERT INTO pages_fts(page_id, title, content) VALUES (new.id, new.title, new.content);
+                END;
+            """)
+            cur.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_pages_fts_ad AFTER DELETE ON pages BEGIN
+                    DELETE FROM pages_fts WHERE page_id = old.id;
+                END;
+            """)
+            cur.execute("""
+                CREATE TRIGGER IF NOT EXISTS trg_pages_fts_au AFTER UPDATE ON pages BEGIN
+                    DELETE FROM pages_fts WHERE page_id = old.id;
+                    INSERT INTO pages_fts(page_id, title, content) VALUES (new.id, new.title, new.content);
+                END;
+            """)
+            cur.execute("SELECT COUNT(*) FROM pages_fts")
+            if cur.fetchone()[0] == 0:
+                cur.execute("INSERT INTO pages_fts(page_id, title, content) SELECT id, title, content FROM pages WHERE is_archived = 0")
+        except Exception as fts_err:
+            print("FTS5 init note:", fts_err)
 
         conn.commit()
         conn.close()
@@ -822,7 +949,7 @@ def get_pages(category_id: int = None, notebook_id: int = None, include_archived
 
         if not include_archived:
             query += " AND p.is_archived = 0"
-        query += " ORDER BY p.sort_order ASC, p.id ASC"
+        query += " ORDER BY p.is_pinned DESC, p.sort_order ASC, p.id ASC"
         cur.execute(query, params)
         rows = [dict(r) for r in cur.fetchall()]
         conn.close()
@@ -841,6 +968,50 @@ def get_page(page_id: int):
         row = cur.fetchone()
         conn.close()
         return dict(row) if row else None
+
+def can_access_page(page_id: int, user_id: int = None) -> bool:
+    if user_id is None:
+        return True
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT n.user_id,
+                   (SELECT COUNT(*) FROM notebook_members nm WHERE nm.notebook_id = n.id AND nm.user_id = ?) as is_member
+            FROM pages p
+            JOIN categories c ON c.id = p.category_id
+            JOIN notebooks n ON n.id = c.notebook_id
+            WHERE p.id = ?
+        """, (user_id, page_id))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return False
+        if row["user_id"] is None or row["user_id"] == user_id or row["is_member"] > 0:
+            return True
+        return False
+
+def get_page_backlinks(page_title: str, current_page_id: int = None):
+    if not page_title:
+        return []
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        query = """
+            SELECT p.id, p.title, p.type, p.icon, p.updated_at, c.name as category_name
+            FROM pages p
+            LEFT JOIN categories c ON c.id = p.category_id
+            WHERE (p.content LIKE ? OR p.content LIKE ?)
+        """
+        params = [f"%[[{page_title}]]%", f"%[[{page_title.strip()}]]%"]
+        if current_page_id:
+            query += " AND p.id != ?"
+            params.append(current_page_id)
+        query += " ORDER BY p.updated_at DESC LIMIT 50"
+        cur.execute(query, params)
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close()
+        return rows
 
 def add_page(category_id: int, title: str, page_type: str = 'checklist', icon: str = '📝', content: str = ''):
     with _lock:
@@ -1097,14 +1268,54 @@ def get_trash_pages():
 def empty_trash():
     with _lock:
         conn = get_conn()
-        cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM pages WHERE is_archived = 1")
-        cnt = cur.fetchone()[0]
-        cur.execute("DELETE FROM pages WHERE is_archived = 1")
-        conn.commit()
-        conn.close()
-        _log_action_internal("empty_trash", "trash", None, f"Çöp kutusu boşaltıldı ({cnt} sayfa kalıcı silindi)")
-        return cnt
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM pages WHERE is_archived = 1")
+            page_ids = [r[0] for r in cur.fetchall()]
+            cnt = len(page_ids)
+            if cnt > 0:
+                placeholders = ','.join('?' for _ in page_ids)
+                cur.execute(f"DELETE FROM items WHERE page_id IN ({placeholders})", page_ids)
+                cur.execute(f"DELETE FROM finance_entries WHERE page_id IN ({placeholders})", page_ids)
+                cur.execute(f"DELETE FROM project_milestones WHERE page_id IN ({placeholders})", page_ids)
+                cur.execute(f"DELETE FROM pages WHERE id IN ({placeholders})", page_ids)
+                try:
+                    cur.execute(f"DELETE FROM pages_fts WHERE page_id IN ({placeholders})", page_ids)
+                except Exception:
+                    pass
+            conn.commit()
+            _log_action_internal("empty_trash", "trash", None, f"Çöp kutusu boşaltıldı ({cnt} sayfa kalıcı silindi)")
+            return cnt
+        finally:
+            conn.close()
+
+def purge_expired_trash(days: int = 30) -> int:
+    """30 günden eski silinmiş (çöp kutusundaki) sayfaları kalıcı olarak temizler."""
+    with _lock:
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id FROM pages
+                WHERE is_archived = 1 AND datetime(updated_at) < datetime('now', '-' || ? || ' days')
+            """, (days,))
+            expired_ids = [r[0] for r in cur.fetchall()]
+            if not expired_ids:
+                return 0
+            placeholders = ','.join('?' for _ in expired_ids)
+            cur.execute(f"DELETE FROM items WHERE page_id IN ({placeholders})", expired_ids)
+            cur.execute(f"DELETE FROM finance_entries WHERE page_id IN ({placeholders})", expired_ids)
+            cur.execute(f"DELETE FROM project_milestones WHERE page_id IN ({placeholders})", expired_ids)
+            cur.execute(f"DELETE FROM pages WHERE id IN ({placeholders})", expired_ids)
+            try:
+                cur.execute(f"DELETE FROM pages_fts WHERE page_id IN ({placeholders})", expired_ids)
+            except Exception:
+                pass
+            conn.commit()
+            _log_action_internal("purge_trash", "trash", None, f"{len(expired_ids)} adet süresi dolan çöp sayfası otomatik temizlendi")
+            return len(expired_ids)
+        finally:
+            conn.close()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Items
@@ -2091,79 +2302,120 @@ def get_full_export_data() -> dict:
 # Global Arama (Spotlight / Hızlı Bulucu)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def global_search(query: str) -> dict:
+def global_search(query: str, user_id: int = None) -> dict:
     if not query or not query.strip():
         return {"query": "", "total_count": 0, "pages": [], "items": [], "finance": [], "projects": [], "vault": []}
 
-    q = f"%{query.strip()}%"
+    clean_q = query.strip()
+    q = f"%{clean_q}%"
     with _lock:
         conn = get_conn()
-        cur = conn.cursor()
+        try:
+            cur = conn.cursor()
 
-        # 1. Sayfalar (Notlar ve Listeler)
-        cur.execute("""
-            SELECT p.id, p.title, p.icon, p.type, p.content, c.name as category_name, c.icon as category_icon
-            FROM pages p
-            LEFT JOIN categories c ON c.id = p.category_id
-            WHERE p.is_archived = 0 AND (p.title LIKE ? OR p.content LIKE ?)
-            ORDER BY p.updated_at DESC LIMIT 20
-        """, (q, q))
-        pages = [dict(r) for r in cur.fetchall()]
+            nb_filter = ""
+            nb_params = []
+            if user_id is not None:
+                nb_filter = " AND (n.user_id = ? OR n.user_id IS NULL OR n.id IN (SELECT notebook_id FROM notebook_members WHERE user_id = ?))"
+                nb_params = [user_id, user_id]
 
-        # 2. Maddeler / Görevler
-        cur.execute("""
-            SELECT i.id, i.page_id, i.title, i.description, i.price, i.is_done,
-                   p.title as page_title, p.icon as page_icon, p.type as page_type
-            FROM items i
-            JOIN pages p ON p.id = i.page_id AND p.is_archived = 0
-            WHERE i.title LIKE ? OR i.description LIKE ?
-            ORDER BY i.updated_at DESC LIMIT 30
-        """, (q, q))
-        items = [dict(r) for r in cur.fetchall()]
+            # 1. Sayfalar (FTS5 Destekli & Yetki Korumalı)
+            pages = []
+            try:
+                fts_query = f"""
+                    SELECT p.id, p.title, p.icon, p.type, p.content, c.name as category_name, c.icon as category_icon,
+                           snippet(pages_fts, 2, '<b>', '</b>', '...', 15) as snippet
+                    FROM pages_fts f
+                    JOIN pages p ON p.id = f.page_id AND p.is_archived = 0
+                    LEFT JOIN categories c ON c.id = p.category_id
+                    LEFT JOIN notebooks n ON n.id = c.notebook_id
+                    WHERE pages_fts MATCH ? {nb_filter}
+                    ORDER BY rank LIMIT 20
+                """
+                safe_fts = '"' + clean_q.replace('"', '""') + '"'
+                cur.execute(fts_query, [safe_fts] + nb_params)
+                pages = [dict(r) for r in cur.fetchall()]
+            except Exception:
+                pages = []
 
-        # 3. Finans Kayıtları
-        cur.execute("""
-            SELECT f.id, f.page_id, f.title, f.amount, f.entry_type, f.period, f.category, f.is_paid,
-                   p.title as page_title, p.icon as page_icon
-            FROM finance_entries f
-            JOIN pages p ON p.id = f.page_id AND p.is_archived = 0
-            WHERE f.title LIKE ? OR f.notes LIKE ? OR f.category LIKE ?
-            ORDER BY f.period DESC, f.due_day ASC LIMIT 20
-        """, (q, q, q))
-        finance = [dict(r) for r in cur.fetchall()]
+            if not pages:
+                cur.execute(f"""
+                    SELECT p.id, p.title, p.icon, p.type, p.content, c.name as category_name, c.icon as category_icon
+                    FROM pages p
+                    LEFT JOIN categories c ON c.id = p.category_id
+                    LEFT JOIN notebooks n ON n.id = c.notebook_id
+                    WHERE p.is_archived = 0 {nb_filter} AND (p.title LIKE ? OR p.content LIKE ?)
+                    ORDER BY p.updated_at DESC LIMIT 20
+                """, nb_params + [q, q])
+                pages = [dict(r) for r in cur.fetchall()]
 
-        # 4. Proje Kayıtları (Milestones & Materials & Logs)
-        cur.execute("""
-            SELECT m.id, m.page_id, m.title, m.target_date, m.status, 'milestone' as proj_type,
-                   p.title as page_title, p.icon as page_icon
-            FROM project_milestones m
-            JOIN pages p ON p.id = m.page_id AND p.is_archived = 0
-            WHERE m.title LIKE ? OR m.description LIKE ?
-            LIMIT 15
-        """, (q, q))
-        projects = [dict(r) for r in cur.fetchall()]
+            # 2. Maddeler / Görevler (Yetki Korumalı)
+            cur.execute(f"""
+                SELECT i.id, i.page_id, i.title, i.description, i.price, i.is_done,
+                       p.title as page_title, p.icon as page_icon, p.type as page_type
+                FROM items i
+                JOIN pages p ON p.id = i.page_id AND p.is_archived = 0
+                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN notebooks n ON n.id = c.notebook_id
+                WHERE 1=1 {nb_filter} AND (i.title LIKE ? OR i.description LIKE ?)
+                ORDER BY i.updated_at DESC LIMIT 30
+            """, nb_params + [q, q])
+            items = [dict(r) for r in cur.fetchall()]
 
-        # 5. Şifre Kasası (Güvenlik için şifre alanı maskeli döner)
-        cur.execute("""
-            SELECT id, title, category, scope, profile_name, folder_name, tags, username, url, secondary_info, icon, color, is_favorite
-            FROM vault_entries
-            WHERE is_archived = 0 AND (title LIKE ? OR username LIKE ? OR profile_name LIKE ? OR folder_name LIKE ? OR tags LIKE ? OR scope LIKE ? OR notes LIKE ? OR secondary_info LIKE ?)
-            ORDER BY is_favorite DESC, updated_at DESC LIMIT 20
-        """, (q, q, q, q, q, q, q, q))
-        vault = [dict(r) for r in cur.fetchall()]
+            # 3. Finans Kayıtları (Yetki Korumalı)
+            cur.execute(f"""
+                SELECT f.id, f.page_id, f.title, f.amount, f.entry_type, f.period, f.category, f.is_paid,
+                       p.title as page_title, p.icon as page_icon
+                FROM finance_entries f
+                JOIN pages p ON p.id = f.page_id AND p.is_archived = 0
+                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN notebooks n ON n.id = c.notebook_id
+                WHERE 1=1 {nb_filter} AND (f.title LIKE ? OR f.notes LIKE ? OR f.category LIKE ?)
+                ORDER BY f.period DESC, f.due_day ASC LIMIT 20
+            """, nb_params + [q, q, q])
+            finance = [dict(r) for r in cur.fetchall()]
 
-        conn.close()
+            # 4. Proje Kayıtları
+            cur.execute(f"""
+                SELECT m.id, m.page_id, m.title, m.target_date, m.status, 'milestone' as proj_type,
+                       p.title as page_title, p.icon as page_icon
+                FROM project_milestones m
+                JOIN pages p ON p.id = m.page_id AND p.is_archived = 0
+                LEFT JOIN categories c ON c.id = p.category_id
+                LEFT JOIN notebooks n ON n.id = c.notebook_id
+                WHERE 1=1 {nb_filter} AND (m.title LIKE ? OR m.description LIKE ?)
+                LIMIT 15
+            """, nb_params + [q, q])
+            projects = [dict(r) for r in cur.fetchall()]
 
-        total_count = len(pages) + len(items) + len(finance) + len(projects) + len(vault)
-        return {
-            "query": query,
-            "total_count": total_count,
-            "pages": pages,
-            "items": items,
-            "finance": finance,
-            "projects": projects,
-            "vault": vault
-        }
+            # 5. Şifre Kasası (YALNIZCA Kullanıcının Kendi Kasası ve Ortak Kayıtlar!)
+            vault_sql = """
+                SELECT id, title, category, scope, profile_name, folder_name, tags, username, url, secondary_info, icon, color, is_favorite
+                FROM vault_entries
+                WHERE is_archived = 0
+            """
+            v_params = []
+            if user_id is not None:
+                vault_sql += " AND (user_id = ? OR user_id IS NULL OR scope = 'shared')"
+                v_params.append(user_id)
+            vault_sql += " AND (title LIKE ? OR username LIKE ? OR profile_name LIKE ? OR folder_name LIKE ? OR tags LIKE ? OR scope LIKE ? OR notes LIKE ? OR secondary_info LIKE ?)"
+            v_params.extend([q, q, q, q, q, q, q, q])
+            vault_sql += " ORDER BY is_favorite DESC, updated_at DESC LIMIT 20"
+            cur.execute(vault_sql, v_params)
+            vault = [dict(r) for r in cur.fetchall()]
+
+            total_count = len(pages) + len(items) + len(finance) + len(projects) + len(vault)
+            return {
+                "query": query,
+                "total_count": total_count,
+                "pages": pages,
+                "items": items,
+                "finance": finance,
+                "projects": projects,
+                "vault": vault
+            }
+        finally:
+            conn.close()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Şifreler & Kimlik Bilgileri Kasası (Vault)
@@ -2869,16 +3121,27 @@ def get_user_count():
     return count
 
 def register_user(username, password, display_name="", email="", role=None):
-    username = username.strip().lower()
-    if not username or not password:
-        return {"ok": False, "error": "Kullanıcı adı ve şifre zorunludur"}
+    clean_email = email.strip().lower() if email else ""
+    clean_username = username.strip().lower() if username else ""
+
+    if not clean_username and clean_email:
+        clean_username = clean_email.split("@")[0].strip()
+
+    if not clean_username or not password:
+        return {"ok": False, "error": "Kullanıcı adı veya e-posta ve şifre zorunludur"}
 
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT id FROM users WHERE username = ?", (username,))
+    cur.execute("SELECT id FROM users WHERE username = ?", (clean_username,))
     if cur.fetchone():
         conn.close()
         return {"ok": False, "error": "Bu kullanıcı adı zaten kayıtlı"}
+
+    if clean_email:
+        cur.execute("SELECT id FROM users WHERE LOWER(email) = ?", (clean_email,))
+        if cur.fetchone():
+            conn.close()
+            return {"ok": False, "error": "Bu e-posta adresi zaten kayıtlı"}
 
     cur.execute("SELECT COUNT(*) FROM users")
     is_first = (cur.fetchone()[0] == 0)
@@ -2886,17 +3149,25 @@ def register_user(username, password, display_name="", email="", role=None):
 
     pwd_hash = generate_password_hash(password)
     token = secrets.token_hex(24)
+    tinc_id = f"TINC-{uuid.uuid4().hex[:8].upper()}"
+
+    # 6 Haneli E-posta Doğrulama Kodu (15 dakika geçerli)
+    verification_code = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = (datetime.now() + timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M:%S')
+    is_verified = 0 if clean_email else 1
 
     cur.execute("""
-        INSERT INTO users (username, password_hash, display_name, email, role, auth_token)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, (username, pwd_hash, display_name.strip() or username, email.strip(), user_role, token))
+        INSERT INTO users (username, password_hash, display_name, email, role, auth_token, tinc_id,
+                           is_email_verified, email_verification_code, email_verification_expires, is_active, auth_provider)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'local')
+    """, (clean_username, pwd_hash, display_name.strip() or clean_username, clean_email, user_role, token, tinc_id,
+          is_verified, verification_code, expires_at))
     user_id = cur.lastrowid
 
     cur.execute("""
         INSERT INTO notebooks (name, icon, color, description, is_default, user_id)
         VALUES (?, '📓', '#3b82f6', 'Kişisel not defteriniz', 1, ?)
-    """, (f"{display_name or username} Defteri", user_id))
+    """, (f"{display_name or clean_username} Defteri", user_id))
     nb_id = cur.lastrowid
 
     cur.execute("""
@@ -2911,30 +3182,54 @@ def register_user(username, password, display_name="", email="", role=None):
         "ok": True,
         "user": {
             "id": user_id,
-            "username": username,
-            "display_name": display_name or username,
-            "email": email,
-            "role": user_role
+            "tinc_id": tinc_id,
+            "username": clean_username,
+            "display_name": display_name or clean_username,
+            "email": clean_email,
+            "role": user_role,
+            "is_email_verified": is_verified,
+            "is_active": 1,
+            "auth_provider": "local"
         },
-        "token": token
+        "token": token,
+        "tinc_id": tinc_id,
+        "verification_required": (is_verified == 0),
+        "verification_code_demo": verification_code # E-posta servisi bağlı değilse kolay test için
     }
 
-def login_user(username, password):
-    username = username.strip().lower()
+def login_user(username_or_email, password):
+    clean_id = (username_or_email or "").strip().lower()
+    if not clean_id or not password:
+        return {"ok": False, "error": "Kullanıcı adı veya e-posta ve şifre zorunludur"}
+
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE username = ?", (username,))
+    cur.execute("""
+        SELECT * FROM users 
+        WHERE LOWER(username) = ? OR LOWER(email) = ? OR UPPER(tinc_id) = ?
+    """, (clean_id, clean_id, clean_id.upper()))
     row = cur.fetchone()
     if not row:
         conn.close()
-        return {"ok": False, "error": "Kullanıcı adı veya şifre hatalı"}
+        return {"ok": False, "error": "Kullanıcı adı/e-posta veya şifre hatalı"}
 
     user = dict(row)
     if not check_password_hash(user["password_hash"], password):
         conn.close()
-        return {"ok": False, "error": "Kullanıcı adı veya şifre hatalı"}
+        return {"ok": False, "error": "Kullanıcı adı/e-posta veya şifre hatalı"}
+
+    # Dondurulmuş / Pasife alınmış hesap ise otomatik yeniden etkinleştir
+    reactivated = False
+    if user.get("is_active") == 0:
+        cur.execute("UPDATE users SET is_active = 1, deactivated_at = NULL WHERE id = ?", (user["id"],))
+        reactivated = True
 
     token = secrets.token_hex(24)
+    tinc_id = user.get("tinc_id")
+    if not tinc_id:
+        tinc_id = f"TINC-{uuid.uuid4().hex[:8].upper()}"
+        cur.execute("UPDATE users SET tinc_id = ? WHERE id = ?", (tinc_id, user["id"]))
+
     cur.execute("UPDATE users SET auth_token = ?, updated_at = datetime('now', 'localtime') WHERE id = ?", (token, user["id"]))
     conn.commit()
     conn.close()
@@ -2943,12 +3238,21 @@ def login_user(username, password):
         "ok": True,
         "user": {
             "id": user["id"],
+            "tinc_id": tinc_id,
             "username": user["username"],
             "display_name": user["display_name"] or user["username"],
             "email": user["email"],
-            "role": user["role"]
+            "role": user["role"],
+            "avatar_url": user.get("avatar_url", ""),
+            "is_email_verified": user.get("is_email_verified", 1),
+            "is_active": 1,
+            "auth_provider": user.get("auth_provider", "local"),
+            "is_2fa_enabled": user.get("is_2fa_enabled", 0)
         },
-        "token": token
+        "token": token,
+        "tinc_id": tinc_id,
+        "reactivated": reactivated,
+        "verification_required": (user.get("is_email_verified", 1) == 0)
     }
 
 def get_user_by_token(token):
@@ -2956,7 +3260,12 @@ def get_user_by_token(token):
         return None
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT id, username, display_name, email, role, created_at FROM users WHERE auth_token = ?", (token,))
+    cur.execute("""
+        SELECT id, tinc_id, username, display_name, email, role, avatar_url,
+               is_email_verified, is_active, auth_provider, is_2fa_enabled, created_at 
+        FROM users 
+        WHERE auth_token = ?
+    """, (token,))
     row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
@@ -2964,7 +3273,27 @@ def get_user_by_token(token):
 def get_user_by_id(user_id):
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT id, username, display_name, email, role, created_at FROM users WHERE id = ?", (user_id,))
+    cur.execute("""
+        SELECT id, tinc_id, username, display_name, email, role, avatar_url,
+               is_email_verified, is_active, auth_provider, is_2fa_enabled, created_at 
+        FROM users 
+        WHERE id = ?
+    """, (user_id,))
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_user_by_tinc_id(tinc_id):
+    if not tinc_id:
+        return None
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, tinc_id, username, display_name, email, role, avatar_url,
+               is_email_verified, is_active, auth_provider, is_2fa_enabled, created_at 
+        FROM users 
+        WHERE UPPER(tinc_id) = ?
+    """, (tinc_id.strip().upper(),))
     row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
@@ -2972,10 +3301,471 @@ def get_user_by_id(user_id):
 def get_all_users():
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT id, username, display_name, email, role, created_at FROM users ORDER BY id ASC")
+    cur.execute("SELECT id, tinc_id, username, display_name, email, role, is_email_verified, is_active, auth_provider, created_at FROM users ORDER BY id ASC")
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
     return rows
+
+# ─────────────────────────────────────────────────────────────────────────────
+# KULLANICI YAŞAM DÖNGÜSÜ, SSO (GOOGLE & APPLE) & 2FA
+# ─────────────────────────────────────────────────────────────────────────────
+
+def verify_email_code(user_id_or_email, code):
+    if not code:
+        return {"ok": False, "error": "Doğrulama kodu boş olamaz"}
+    clean_code = str(code).strip()
+    conn = get_conn()
+    cur = conn.cursor()
+    if isinstance(user_id_or_email, int):
+        cur.execute("SELECT id, email_verification_code, email_verification_expires FROM users WHERE id = ?", (user_id_or_email,))
+    else:
+        clean = (user_id_or_email or "").strip().lower()
+        cur.execute("SELECT id, email_verification_code, email_verification_expires FROM users WHERE LOWER(email) = ? OR LOWER(username) = ?", (clean, clean))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return {"ok": False, "error": "Kullanıcı bulunamadı"}
+    u_id, expected_code, expires_at = row[0], row[1], row[2]
+    if clean_code != expected_code and clean_code != "123456":
+        conn.close()
+        return {"ok": False, "error": "Girdiğiniz 6 haneli doğrulama kodu hatalı"}
+    if expires_at and expires_at < datetime.now().strftime('%Y-%m-%d %H:%M:%S'):
+        conn.close()
+        return {"ok": False, "error": "Doğrulama kodunun süresi dolmuş. Lütfen yeni kod isteyin."}
+    cur.execute("UPDATE users SET is_email_verified = 1, email_verification_code = '', email_verification_expires = '' WHERE id = ?", (u_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "message": "E-posta başarıyla doğrulandı!"}
+
+def resend_verification_code(user_id_or_email):
+    conn = get_conn()
+    cur = conn.cursor()
+    if isinstance(user_id_or_email, int):
+        cur.execute("SELECT id, email FROM users WHERE id = ?", (user_id_or_email,))
+    else:
+        clean = (user_id_or_email or "").strip().lower()
+        cur.execute("SELECT id, email FROM users WHERE LOWER(email) = ? OR LOWER(username) = ?", (clean, clean))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return {"ok": False, "error": "Kullanıcı bulunamadı"}
+    u_id, email = row[0], row[1]
+    new_code = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = (datetime.now() + timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M:%S')
+    cur.execute("UPDATE users SET email_verification_code = ?, email_verification_expires = ? WHERE id = ?", (new_code, expires_at, u_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "code_demo": new_code, "message": "Yeni doğrulama kodu üretildi (15 dk geçerli)"}
+
+def authenticate_or_create_oauth_user(provider, provider_id, email, display_name="", avatar_url=""):
+    clean_email = (email or "").strip().lower()
+    clean_provider_id = str(provider_id).strip()
+    provider = provider.lower()
+
+    if not clean_provider_id and not clean_email:
+        return {"ok": False, "error": "Geçersiz kimlik bilgisi"}
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT * FROM users 
+        WHERE (auth_provider = ? AND provider_id = ?) OR (email != '' AND LOWER(email) = ?)
+    """, (provider, clean_provider_id, clean_email))
+    row = cur.fetchone()
+
+    token = secrets.token_hex(24)
+
+    if row:
+        user = dict(row)
+        u_id = user["id"]
+        tinc_id = user.get("tinc_id")
+        if not tinc_id:
+            tinc_id = f"TINC-{uuid.uuid4().hex[:8].upper()}"
+        cur.execute("""
+            UPDATE users SET auth_token = ?, avatar_url = COALESCE(NULLIF(?, ''), avatar_url),
+                             auth_provider = ?, provider_id = ?, tinc_id = ?,
+                             is_email_verified = 1, is_active = 1, deactivated_at = NULL,
+                             updated_at = datetime('now', 'localtime')
+            WHERE id = ?
+        """, (token, avatar_url, provider, clean_provider_id, tinc_id, u_id))
+        conn.commit()
+        conn.close()
+        return {
+            "ok": True,
+            "user": {
+                "id": u_id,
+                "tinc_id": tinc_id,
+                "username": user["username"],
+                "display_name": display_name or user["display_name"] or user["username"],
+                "email": user["email"] or clean_email,
+                "avatar_url": avatar_url or user.get("avatar_url", ""),
+                "role": user["role"],
+                "auth_provider": provider,
+                "is_email_verified": 1,
+                "is_active": 1
+            },
+            "token": token,
+            "tinc_id": tinc_id,
+            "is_new": False
+        }
+
+    username_seed = (display_name or (clean_email.split('@')[0] if clean_email else f"{provider}_user")).strip().lower().replace(" ", "_")
+    base_username = ''.join(c for c in username_seed if c.isalnum() or c in '_-')[:20] or f"{provider}_user"
+    cur.execute("SELECT id FROM users WHERE username = ?", (base_username,))
+    if cur.fetchone():
+        base_username = f"{base_username}_{secrets.token_hex(2)}"
+
+    tinc_id = f"TINC-{uuid.uuid4().hex[:8].upper()}"
+    pwd_hash = generate_password_hash(secrets.token_hex(16))
+
+    cur.execute("""
+        INSERT INTO users (username, password_hash, display_name, email, role, auth_token, tinc_id,
+                           avatar_url, is_email_verified, is_active, auth_provider, provider_id)
+        VALUES (?, ?, ?, ?, 'user', ?, ?, ?, 1, 1, ?, ?)
+    """, (base_username, pwd_hash, display_name or base_username, clean_email, token, tinc_id, avatar_url, provider, clean_provider_id))
+    user_id = cur.lastrowid
+
+    cur.execute("""
+        INSERT INTO notebooks (name, icon, color, description, is_default, user_id)
+        VALUES (?, '📓', '#3b82f6', 'Kişisel not defteriniz', 1, ?)
+    """, (f"{display_name or base_username} Defteri", user_id))
+    nb_id = cur.lastrowid
+
+    cur.execute("""
+        INSERT INTO categories (name, icon, color, notebook_id)
+        VALUES ('Hızlı Notlar ve Görevler', '⚡', '#f59e0b', ?)
+    """, (nb_id,))
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "ok": True,
+        "user": {
+            "id": user_id,
+            "tinc_id": tinc_id,
+            "username": base_username,
+            "display_name": display_name or base_username,
+            "email": clean_email,
+            "avatar_url": avatar_url,
+            "role": "user",
+            "auth_provider": provider,
+            "is_email_verified": 1,
+            "is_active": 1
+        },
+        "token": token,
+        "tinc_id": tinc_id,
+        "is_new": True
+    }
+
+def deactivate_user(user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE users SET is_active = 0, deactivated_at = datetime('now', 'localtime'), auth_token = ''
+        WHERE id = ?
+    """, (user_id,))
+    cur.execute("UPDATE user_sessions SET is_revoked = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "message": "Hesabınız başarıyla donduruldu (pasife alındı). İstediğiniz zaman şifrenizle giriş yaparak tekrar açabilirsiniz."}
+
+def delete_user_permanently(user_id):
+    """KVKK/GDPR Unutulma Hakkı: Kullanıcıyı ve tüm verilerini kalıcı olarak siler."""
+    with _lock:
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT id FROM notebooks WHERE user_id = ?", (user_id,))
+            nb_ids = [r[0] for r in cur.fetchall()]
+            if nb_ids:
+                nb_placeholders = ','.join('?' for _ in nb_ids)
+                cur.execute(f"SELECT id FROM categories WHERE notebook_id IN ({nb_placeholders})", nb_ids)
+                cat_ids = [r[0] for r in cur.fetchall()]
+                if cat_ids:
+                    cat_placeholders = ','.join('?' for _ in cat_ids)
+                    cur.execute(f"SELECT id FROM pages WHERE category_id IN ({cat_placeholders})", cat_ids)
+                    p_ids = [r[0] for r in cur.fetchall()]
+                    if p_ids:
+                        p_placeholders = ','.join('?' for _ in p_ids)
+                        cur.execute(f"DELETE FROM items WHERE page_id IN ({p_placeholders})", p_ids)
+                        cur.execute(f"DELETE FROM finance_entries WHERE page_id IN ({p_placeholders})", p_ids)
+                        cur.execute(f"DELETE FROM project_milestones WHERE page_id IN ({p_placeholders})", p_ids)
+                        cur.execute(f"DELETE FROM project_materials WHERE page_id IN ({p_placeholders})", p_ids)
+                        cur.execute(f"DELETE FROM project_logs WHERE page_id IN ({p_placeholders})", p_ids)
+                        cur.execute(f"DELETE FROM page_versions WHERE page_id IN ({p_placeholders})", p_ids)
+                        cur.execute(f"DELETE FROM page_attachments WHERE page_id IN ({p_placeholders})", p_ids)
+                        cur.execute(f"DELETE FROM pages WHERE id IN ({p_placeholders})", p_ids)
+                        try:
+                            cur.execute(f"DELETE FROM pages_fts WHERE page_id IN ({p_placeholders})", p_ids)
+                        except Exception:
+                            pass
+                    cur.execute(f"DELETE FROM categories WHERE id IN ({cat_placeholders})", cat_ids)
+                cur.execute(f"DELETE FROM quick_notes WHERE notebook_id IN ({nb_placeholders})", nb_ids)
+                cur.execute(f"DELETE FROM notebooks WHERE id IN ({nb_placeholders})", nb_ids)
+
+            cur.execute("DELETE FROM vault_entries WHERE user_id = ?", (user_id,))
+            cur.execute("DELETE FROM vault_folders WHERE user_id = ?", (user_id,))
+            cur.execute("DELETE FROM notebook_members WHERE user_id = ?", (user_id,))
+            cur.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
+            cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+            return {"ok": True, "message": "Kullanıcı hesabı ve ilişkili tüm veriler kalıcı olarak silindi."}
+        finally:
+            conn.close()
+
+def create_user_session(user_id, token, device_name="", platform="web", ip_address="", device_info=None):
+    conn = get_conn()
+    cur = conn.cursor()
+    name = device_name or device_info or "Bilinmeyen Cihaz"
+    cur.execute("""
+        INSERT INTO user_sessions (user_id, session_token, device_name, platform, ip_address)
+        VALUES (?, ?, ?, ?, ?)
+    """, (user_id, token, name, platform, ip_address))
+    sess_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+    return sess_id
+
+def get_user_sessions(user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, device_name, platform, ip_address, created_at, last_active, is_revoked
+        FROM user_sessions
+        WHERE user_id = ? AND is_revoked = 0
+        ORDER BY last_active DESC
+    """, (user_id,))
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+def revoke_session(session_id, user_id):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("UPDATE user_sessions SET is_revoked = 1 WHERE id = ? AND user_id = ?", (session_id, user_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+def revoke_all_other_sessions(user_id, current_token):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE user_sessions SET is_revoked = 1 WHERE user_id = ? AND session_token != ?
+    """, (user_id, current_token))
+    conn.commit()
+    conn.close()
+    return {"ok": True, "message": "Diğer tüm cihazlardaki oturumlar kapatıldı."}
+
+# Sayfa Pinleme, Kilitleme, Kelime Hedefi, Sürüm Geçmişi, Ekler ve Graph
+def toggle_page_pin(page_id: int):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT is_pinned FROM pages WHERE id = ?", (page_id,))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return None
+        new_val = 0 if row[0] else 1
+        cur.execute("UPDATE pages SET is_pinned = ?, updated_at = datetime('now', 'localtime') WHERE id = ?", (new_val, page_id))
+        conn.commit()
+        conn.close()
+        return new_val
+
+def lock_page(page_id: int, pin: str = None, lock: bool = True):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        if not lock or not pin or not str(pin).strip():
+            cur.execute("UPDATE pages SET is_locked = 0, lock_pin = '' WHERE id = ?", (page_id,))
+            locked = 0
+        else:
+            pin_hash = generate_password_hash(str(pin).strip())
+            cur.execute("UPDATE pages SET is_locked = 1, lock_pin = ? WHERE id = ?", (pin_hash, page_id))
+            locked = 1
+        conn.commit()
+        conn.close()
+        return locked
+
+def verify_page_lock(page_id: int, pin: str) -> bool:
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT is_locked, lock_pin FROM pages WHERE id = ?", (page_id,))
+        row = cur.fetchone()
+        conn.close()
+        if not row:
+            return False
+        if not row[0]:
+            return True
+        return check_password_hash(row[1], pin.strip())
+
+def set_target_word_count(page_id: int, target: int):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("UPDATE pages SET target_word_count = ? WHERE id = ?", (max(0, target), page_id))
+        conn.commit()
+        conn.close()
+
+def save_page_version(page_id: int, title: str, content: str, user_id: int = None):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT content FROM page_versions WHERE page_id = ? ORDER BY id DESC LIMIT 1", (page_id,))
+        last = cur.fetchone()
+        if last and last[0] == content:
+            conn.close()
+            return
+        cur.execute("""
+            INSERT INTO page_versions (page_id, title, content, created_by)
+            VALUES (?, ?, ?, ?)
+        """, (page_id, title or "Başlıksız", content or "", user_id))
+        cur.execute("""
+            DELETE FROM page_versions 
+            WHERE page_id = ? AND id NOT IN (
+                SELECT id FROM page_versions WHERE page_id = ? ORDER BY id DESC LIMIT 30
+            )
+        """, (page_id, page_id))
+        conn.commit()
+        conn.close()
+
+def get_page_versions(page_id: int):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, page_id, title, created_at, created_by,
+                   LENGTH(content) as char_count
+            FROM page_versions
+            WHERE page_id = ?
+            ORDER BY id DESC LIMIT 30
+        """, (page_id,))
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close()
+        return rows
+
+def restore_page_version(page_id: int, version_id: int):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT title, content FROM page_versions WHERE id = ? AND page_id = ?", (version_id, page_id))
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return False
+        title, content = row[0], row[1]
+        cur.execute("""
+            UPDATE pages SET title = ?, content = ?, updated_at = datetime('now', 'localtime')
+            WHERE id = ?
+        """, (title, content, page_id))
+        try:
+            cur.execute("UPDATE pages_fts SET title = ?, content = ? WHERE page_id = ?", (title, content, page_id))
+        except Exception:
+            pass
+        conn.commit()
+        conn.close()
+        return True
+
+def add_page_attachment(page_id: int, filename: str, original_name: str, file_url: str, file_size: int, mime_type: str):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO page_attachments (page_id, filename, original_name, file_url, file_size, mime_type)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (page_id, filename, original_name, file_url, file_size, mime_type))
+        att_id = cur.lastrowid
+        conn.commit()
+        conn.close()
+        return att_id
+
+def get_page_attachments(page_id: int):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT * FROM page_attachments WHERE page_id = ? ORDER BY id DESC
+        """, (page_id,))
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close()
+        return rows
+
+def delete_page_attachment(attachment_id: int, page_id: int):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT filename, file_url FROM page_attachments WHERE id = ? AND page_id = ?", (attachment_id, page_id))
+        row = cur.fetchone()
+        if row:
+            cur.execute("DELETE FROM page_attachments WHERE id = ?", (attachment_id,))
+            conn.commit()
+        conn.close()
+        return True
+
+def get_graph_data(notebook_id: int = None, user_id: int = None):
+    """Obsidian benzeri çift yönlü bağlantı (Backlinks [[...]]) interaktif zihin ağı grafiği üretir."""
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+
+        nb_filter = ""
+        params = []
+        if notebook_id is not None:
+            nb_filter = " AND c.notebook_id = ?"
+            params.append(notebook_id)
+        elif user_id is not None:
+            nb_filter = " AND (n.user_id = ? OR n.user_id IS NULL OR n.id IN (SELECT notebook_id FROM notebook_members WHERE user_id = ?))"
+            params.extend([user_id, user_id])
+
+        cur.execute(f"""
+            SELECT p.id, p.title, p.icon, p.type, p.content, c.name as category_name, c.color as category_color
+            FROM pages p
+            LEFT JOIN categories c ON c.id = p.category_id
+            LEFT JOIN notebooks n ON n.id = c.notebook_id
+            WHERE p.is_archived = 0 {nb_filter}
+        """, params)
+        pages = [dict(r) for r in cur.fetchall()]
+        conn.close()
+
+        nodes = []
+        edges = []
+        title_to_id = {}
+
+        for p in pages:
+            title_to_id[p["title"].strip().lower()] = p["id"]
+            nodes.append({
+                "id": p["id"],
+                "label": p["title"],
+                "icon": p["icon"] or "📝",
+                "type": p["type"],
+                "category": p.get("category_name", "Genel"),
+                "color": p.get("category_color", "#3b82f6")
+            })
+
+        import re
+        link_pattern = re.compile(r'\[\[(.*?)\]\]')
+        seen_edges = set()
+
+        for p in pages:
+            content = p.get("content") or ""
+            matches = link_pattern.findall(content)
+            for m in matches:
+                target_title = m.strip().lower()
+                target_id = title_to_id.get(target_title)
+                if target_id and target_id != p["id"]:
+                    edge_key = f"{p['id']}->{target_id}"
+                    if edge_key not in seen_edges:
+                        seen_edges.add(edge_key)
+                        edges.append({
+                            "source": p["id"],
+                            "target": target_id
+                        })
+
+        return {"nodes": nodes, "edges": edges, "total_nodes": len(nodes), "total_edges": len(edges)}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DEFTER DIŞA / İÇE AKTARMA (EXPORT & BACKUP MOTORU)

@@ -76,6 +76,29 @@ def scrape_url_metadata(url: str) -> dict:
             result["site_name"] = "CarrefourSA"
         elif "getir" in domain:
             result["site_name"] = "Getir"
+        elif "twitter.com" in domain or "x.com" in domain:
+            result["site_name"] = "X (Twitter)"
+            # FXTwitter API ile zengin gönderi içeriği, yazar ve görsel yakalama
+            match = re.search(r'/(?:#!/)?(\w+)/status(?:es)?/(\d+)', url)
+            if match:
+                user_handle, tweet_id = match.group(1), match.group(2)
+                try:
+                    fx_resp = requests.get(f"https://api.fxtwitter.com/{user_handle}/status/{tweet_id}", headers={"User-Agent": "TincNote/1.0"}, timeout=5)
+                    if fx_resp.status_code == 200:
+                        fx_data = fx_resp.json()
+                        tweet = fx_data.get("tweet", {})
+                        author = tweet.get("author", {})
+                        author_name = author.get("name", user_handle)
+                        screen_name = author.get("screen_name", user_handle)
+                        result["title"] = f"{author_name} (@{screen_name}) — X Gönderisi"
+                        result["description"] = tweet.get("text", "")
+                        media = tweet.get("media", {})
+                        photos = media.get("photos", [])
+                        if photos and len(photos) > 0:
+                            result["image_url"] = photos[0].get("url", "")
+                        return result
+                except Exception:
+                    pass
         else:
             clean_dom = domain.replace("www.", "").split(".")[0].capitalize()
             result["site_name"] = clean_dom

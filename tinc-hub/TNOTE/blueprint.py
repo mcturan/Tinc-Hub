@@ -2,6 +2,11 @@ import os
 import io
 import json
 import zipfile
+import subprocess
+import tempfile
+import base64
+import re
+import uuid
 from datetime import datetime
 from functools import wraps
 from flask import Blueprint, render_template, request, jsonify, redirect, session, send_from_directory, send_file, url_for
@@ -180,6 +185,432 @@ def api_get_users():
     if user and user.get("role") != "admin":
         return jsonify({"ok": False, "error": "Yalnızca yöneticiler kullanıcıları listeleyebilir"}), 403
     return jsonify({"ok": True, "users": db.get_all_users()})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TincID — Tekil Kimlik & Ekosistem Entegrasyonu (SSO & Ecosystem)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/auth/tincid/profile', methods=['GET'])
+def api_tincid_profile():
+    user = get_current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Oturum açık değil"}), 401
+    return jsonify({
+        "ok": True,
+        "tinc_id": user.get("tinc_id", ""),
+        "user": {
+            "id": user.get("id"),
+            "tinc_id": user.get("tinc_id", ""),
+            "username": user.get("username", ""),
+            "display_name": user.get("display_name", ""),
+            "email": user.get("email", ""),
+            "role": user.get("role", "user")
+        }
+    })
+
+@tnote_bp.route('/api/auth/tincid/verify', methods=['POST'])
+def api_tincid_verify():
+    data = request.get_json() or {}
+    token = data.get("token") or request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    if not token:
+        return jsonify({"ok": False, "error": "Token sağlanmadı"}), 400
+    user = db.get_user_by_token(token)
+    if not user:
+        return jsonify({"ok": False, "error": "Geçersiz veya süresi dolmuş token"}), 401
+    return jsonify({
+        "ok": True,
+        "valid": True,
+        "tinc_id": user.get("tinc_id", ""),
+        "user": {
+            "id": user.get("id"),
+            "tinc_id": user.get("tinc_id", ""),
+            "username": user.get("username", ""),
+            "display_name": user.get("display_name", ""),
+            "email": user.get("email", ""),
+            "role": user.get("role", "user")
+        }
+    })
+
+@tnote_bp.route('/api/auth/tincid/ecosystem', methods=['GET'])
+def api_tincid_ecosystem():
+    import socket
+    def is_port_open(port):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.3)
+        try:
+            res = s.connect_ex(('127.0.0.1', port))
+            s.close()
+            return res == 0
+        except Exception:
+            return False
+
+    sync_online = is_port_open(9015)
+    dash_online = is_port_open(9010)
+
+    return jsonify({
+        "ok": True,
+        "ecosystem": {
+            "apps": [
+                {
+                    "name": "TincNote",
+                    "port": 9013,
+                    "status": "online",
+                    "url": "http://127.0.0.1:9013",
+                    "desc": "Notlar, Hızlı Görevler & Finans Merkezi"
+                },
+                {
+                    "name": "TincSync",
+                    "port": 9015,
+                    "status": "online" if sync_online else "offline",
+                    "url": "http://127.0.0.1:9015",
+                    "desc": "P2P Bulut Senkronizasyonu & Git Depoları"
+                },
+                {
+                    "name": "TincHub Dashboard",
+                    "port": 9010,
+                    "status": "online" if dash_online else "offline",
+                    "url": "http://127.0.0.1:9010",
+                    "desc": "Merkezi Sunucu ve Servis Yönetim Paneli"
+                }
+            ]
+        }
+    })
+
+def _parse_jwt_claims(token: str) -> dict:
+    """JWT base64url payload kısmını güvenli bir şekilde JSON sözlüğüne dönüştürür."""
+    if not token or '.' not in token:
+        return {}
+    try:
+        parts = token.split('.')
+        if len(parts) >= 2:
+            payload_b64 = parts[1]
+            payload_b64 += '=' * (-len(payload_b64) % 4)
+            data = json.loads(base64.urlsafe_b64decode(payload_b64.encode('utf-8')).decode('utf-8'))
+            return data
+    except Exception:
+        pass
+    return {}
+
+@tnote_bp.route('/api/auth/oauth/google', methods=['POST'])
+def api_oauth_google():
+    data = request.get_json() or {}
+    credential = data.get("credential") or data.get("id_token") or ""
+    email = data.get("email") or ""
+    display_name = data.get("name") or data.get("display_name") or ""
+    provider_id = data.get("sub") or data.get("id") or ""
+    avatar_url = data.get("picture") or data.get("avatar_url") or ""
+
+    if credential:
+        claims = _parse_jwt_claims(credential)
+        if claims:
+            email = claims.get("email", email)
+            display_name = claims.get("name", display_name)
+            provider_id = claims.get("sub", provider_id)
+            avatar_url = claims.get("picture", avatar_url)
+
+    if not provider_id and not email:
+        return jsonify({"ok": False, "error": "Google kimlik bilgisi doğrulanamadı"}), 400
+
+    res = db.authenticate_or_create_oauth_user(
+        provider="google",
+        provider_id=str(provider_id or email),
+        email=email,
+        display_name=display_name,
+        avatar_url=avatar_url
+    )
+    if not res.get("ok"):
+        return jsonify(res), 400
+
+    session["user_id"] = res["user"]["id"]
+    session["user_token"] = res["token"]
+    session["username"] = res["user"]["username"]
+
+    ua = request.headers.get("User-Agent", "Web")
+    ip = request.remote_addr or "127.0.0.1"
+    sess_id = db.create_user_session(res["user"]["id"], res["token"], device_info=ua[:120], ip_address=ip)
+    res["session_id"] = sess_id
+
+    return jsonify(res)
+
+@tnote_bp.route('/api/auth/oauth/apple', methods=['POST'])
+def api_oauth_apple():
+    data = request.get_json() or {}
+    identity_token = data.get("identityToken") or data.get("token") or ""
+    provider_id = data.get("user") or data.get("sub") or ""
+    email = data.get("email") or ""
+    display_name = data.get("name") or ""
+
+    if identity_token:
+        claims = _parse_jwt_claims(identity_token)
+        if claims:
+            email = claims.get("email", email)
+            provider_id = claims.get("sub", provider_id)
+
+    if not provider_id and not email:
+        return jsonify({"ok": False, "error": "Apple kimlik bilgisi doğrulanamadı"}), 400
+
+    res = db.authenticate_or_create_oauth_user(
+        provider="apple",
+        provider_id=str(provider_id or email),
+        email=email,
+        display_name=display_name or (email.split('@')[0] if email else "Apple Kullanıcısı")
+    )
+    if not res.get("ok"):
+        return jsonify(res), 400
+
+    session["user_id"] = res["user"]["id"]
+    session["user_token"] = res["token"]
+    session["username"] = res["user"]["username"]
+
+    ua = request.headers.get("User-Agent", "iOS/Apple")
+    ip = request.remote_addr or "127.0.0.1"
+    sess_id = db.create_user_session(res["user"]["id"], res["token"], device_info=ua[:120], ip_address=ip)
+    res["session_id"] = sess_id
+
+    return jsonify(res)
+
+@tnote_bp.route('/api/auth/verify-email', methods=['POST'])
+def api_verify_email():
+    data = request.get_json() or {}
+    code = str(data.get("code", "")).strip()
+    email_or_user = data.get("email") or session.get("user_id")
+    if not code or not email_or_user:
+        return jsonify({"ok": False, "error": "Doğrulama kodu ve kullanıcı bilgisi zorunludur"}), 400
+    res = db.verify_email_code(email_or_user, code)
+    if not res.get("ok"):
+        return jsonify(res), 400
+    return jsonify(res)
+
+@tnote_bp.route('/api/auth/resend-code', methods=['POST'])
+def api_resend_code():
+    data = request.get_json() or {}
+    email_or_user = data.get("email") or session.get("user_id")
+    if not email_or_user:
+        return jsonify({"ok": False, "error": "E-posta adresi gereklidir"}), 400
+    res = db.resend_verification_code(email_or_user)
+    return jsonify(res)
+
+@tnote_bp.route('/api/auth/profile/deactivate', methods=['POST'])
+@auth_check
+def api_profile_deactivate():
+    user = get_current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Oturum açık değil"}), 401
+    res = db.deactivate_user(user["id"])
+    session.clear()
+    return jsonify(res)
+
+@tnote_bp.route('/api/auth/profile/delete', methods=['POST'])
+@auth_check
+def api_profile_delete():
+    user = get_current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Oturum açık değil"}), 401
+    res = db.delete_user_permanently(user["id"])
+    session.clear()
+    return jsonify(res)
+
+@tnote_bp.route('/api/auth/profile/export', methods=['GET'])
+@auth_check
+def api_profile_takeout():
+    user = get_current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Oturum açık değil"}), 401
+    try:
+        data = db.get_full_export_data()
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            json_str = json.dumps({
+                "tinc_id": user.get("tinc_id"),
+                "username": user.get("username"),
+                "display_name": user.get("display_name"),
+                "email": user.get("email"),
+                "export_date": datetime.now().isoformat(),
+                "data": data
+            }, ensure_ascii=False, indent=2)
+            zf.writestr("tinc_profile_takeout.json", json_str.encode("utf-8"))
+
+            cat_map = {c["id"]: c["name"] for c in data.get("categories", [])}
+            items_by_page = {}
+            for item in data.get("items", []):
+                items_by_page.setdefault(item["page_id"], []).append(item)
+
+            for page in data.get("pages", []):
+                cat_name = cat_map.get(page.get("category_id"), "Genel")
+                safe_cat = "".join(c for c in cat_name if c.isalnum() or c in " _-ğüşıöçĞÜŞİÖÇ").strip() or "Genel"
+                safe_title = "".join(c for c in page.get("title", "Sayfa") if c.isalnum() or c in " _-ğüşıöçĞÜŞİÖÇ").strip() or f"Sayfa_{page.get('id')}"
+                md_lines = [f"# {page.get('title', 'Başlıksız')}", ""]
+                md_lines.append(f"> Tür: {page.get('type', 'notes')} | Oluşturulma: {page.get('created_at', '')}")
+                md_lines.append("")
+                if page.get("content"):
+                    md_lines.append(page["content"])
+                    md_lines.append("")
+                for it in items_by_page.get(page["id"], []):
+                    checked = "[x]" if it.get("is_checked") else "[ ]"
+                    md_lines.append(f"- {checked} {it.get('title', '')}")
+                    if it.get("notes"):
+                        md_lines.append(f"  > {it['notes']}")
+                zf.writestr(f"markdown/{safe_cat}/{safe_title}.md", "\n".join(md_lines).encode("utf-8"))
+
+        zip_buffer.seek(0)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"tinc_takeout_{user.get('username')}_{timestamp}.zip"
+        return send_file(zip_buffer, mimetype="application/zip", as_attachment=True, download_name=filename)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Veri dışa aktarılamadı: {str(e)}"}), 500
+
+@tnote_bp.route('/api/auth/sessions', methods=['GET'])
+@auth_check
+def api_get_sessions():
+    user = get_current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Oturum açık değil"}), 401
+    sessions = db.get_user_sessions(user["id"])
+    return jsonify({"ok": True, "sessions": sessions})
+
+@tnote_bp.route('/api/auth/sessions/revoke', methods=['POST'])
+@auth_check
+def api_revoke_session():
+    user = get_current_user()
+    if not user:
+        return jsonify({"ok": False, "error": "Oturum açık değil"}), 401
+    data = request.get_json() or {}
+    session_id = data.get("session_id")
+    revoke_all_other = data.get("all_other", False)
+    current_token = session.get("user_token") or request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    if revoke_all_other:
+        db.revoke_all_other_sessions(user["id"], current_token)
+    elif session_id:
+        db.revoke_session(session_id, user["id"])
+    return jsonify({"ok": True})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Akıllı Araçlar: OCR (Fotoğraftan Metin) & AI Eyleme Dönüştür (Actionize)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/tools/ocr', methods=['POST'])
+def api_tools_ocr():
+    img_bytes = None
+    if 'image' in request.files:
+        img_file = request.files['image']
+        img_bytes = img_file.read()
+    else:
+        data = request.get_json(silent=True) or {}
+        b64_str = data.get("base64_image") or data.get("image") or ""
+        if b64_str:
+            if "," in b64_str:
+                b64_str = b64_str.split(",", 1)[1]
+            try:
+                img_bytes = base64.b64decode(b64_str)
+            except Exception as e:
+                return jsonify({"ok": False, "error": f"Base64 çözülemedi: {e}"}), 400
+
+    if not img_bytes:
+        return jsonify({"ok": False, "error": "İşlenecek görsel verisi bulunamadı"}), 400
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            tmp.write(img_bytes)
+            tmp_path = tmp.name
+
+        cmd = ['/usr/bin/tesseract', tmp_path, 'stdout', '-l', 'tur+eng', '--oem', '1', '--psm', '3']
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+        extracted = res.stdout.strip()
+        if not extracted and res.returncode != 0:
+            return jsonify({"ok": False, "error": f"OCR Hatası: {res.stderr.strip()}"}), 500
+
+        return jsonify({
+            "ok": True,
+            "text": extracted,
+            "char_count": len(extracted)
+        })
+    except subprocess.TimeoutExpired:
+        return jsonify({"ok": False, "error": "OCR işlemi zaman aşımına uğradı"}), 504
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
+@tnote_bp.route('/api/ai/actionize', methods=['POST'])
+def api_ai_actionize():
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"ok": False, "error": "Ayrıştırılacak metin boş"}), 400
+
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
+    tasks = []
+    
+    # 1. Regex ve semantik görev ayıklama
+    action_keywords = [
+        "yapılacak", "lazım", "gerek", "al", "sat", "öde", "fatura", "ara", 
+        "gönder", "mail", "hazırla", "kur", "incele", "düzelt", "kontrol", 
+        "bitir", "yaz", "oku", "toplantı", "görüş", "teslim", "tamamla"
+    ]
+
+    for line in lines:
+        # Madde işaretlerini temizle
+        clean = re.sub(r'^(?:[-*•+]|\d+[.)]|\[[\sxX]?\])\s*', '', line).strip()
+        if not clean or len(clean) < 3:
+            continue
+            
+        is_action = False
+        lower_line = clean.lower()
+
+        # Orijinal satır madde imiyle veya onay kutusuyla başlıyorsa
+        if re.match(r'^(?:[-*•+]|\d+[.)]|\[[\sxX]?\])', line):
+            is_action = True
+        else:
+            # Eylem anahtar kelimelerinden biri geçiyor mu?
+            for kw in action_keywords:
+                if kw in lower_line:
+                    is_action = True
+                    break
+
+        if is_action:
+            tasks.append({
+                "title": clean,
+                "is_completed": False
+            })
+
+    # Eğer kural tabanlı görev bulunamadıysa her anlamlı satırı bir görev yap
+    if not tasks:
+        for line in lines:
+            clean = re.sub(r'^(?:[-*•+]|\d+[.)]|\[[\sxX]?\])\s*', '', line).strip()
+            if len(clean) >= 3:
+                tasks.append({"title": clean, "is_completed": False})
+
+    return jsonify({
+        "ok": True,
+        "tasks": tasks,
+        "count": len(tasks)
+    })
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bilgi Ağı: Çift Yönlü Bağlantılar (Backlinks `[[Sayfa Adı]]`)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/pages/<int:page_id>/backlinks', methods=['GET'])
+def api_page_backlinks(page_id):
+    page = db.get_page(page_id)
+    if not page:
+        return jsonify({"ok": False, "error": "Sayfa bulunamadı"}), 404
+
+    page_title = page.get("title", "").strip()
+    backlinks = db.get_page_backlinks(page_title, current_page_id=page_id)
+    return jsonify({
+        "ok": True,
+        "page_id": page_id,
+        "page_title": page_title,
+        "backlinks": backlinks,
+        "count": len(backlinks)
+    })
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Web Sayfaları
@@ -513,9 +944,29 @@ def api_get_pages():
 @tnote_bp.route('/api/pages/<int:page_id>', methods=['GET'])
 @auth_check
 def api_get_page(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Bu sayfaya erişim yetkiniz yok"}), 403
     page = db.get_page(page_id)
     if not page:
         return jsonify({"ok": False, "error": "Sayfa bulunamadı"}), 404
+
+    # Sayfa Kilit (PIN/Biyometrik) Güvenlik Katmanı
+    if page.get("is_locked"):
+        unlocked_in_session = session.get(f"unlocked_page_{page_id}")
+        query_pin = request.args.get("pin") or request.headers.get("X-Page-PIN")
+        if query_pin and db.verify_page_lock(page_id, query_pin):
+            unlocked_in_session = True
+            session[f"unlocked_page_{page_id}"] = True
+
+        if not unlocked_in_session:
+            page_copy = dict(page)
+            page_copy["content"] = ""
+            page_copy["is_locked_view"] = True
+            page_copy["content_masked"] = True
+            return jsonify({"ok": True, "page": page_copy, "items": [], "requires_unlock": True, "content_masked": True})
+
     items = db.get_items(page_id)
     return jsonify({"ok": True, "page": page, "items": items})
 
@@ -532,7 +983,6 @@ def api_add_page():
     if cat and cat.get("notebook_id"):
         nb_id = cat["notebook_id"]
         session["active_notebook_id"] = nb_id
-        db.set_active_notebook_id(nb_id)
     else:
         nb_id = data.get("notebook_id") or session.get("active_notebook_id") or db.get_active_notebook_id()
     page_id = db.add_page(
@@ -544,10 +994,30 @@ def api_add_page():
     )
     return jsonify({"ok": True, "id": page_id, "pages": db.get_pages(notebook_id=nb_id), "notebook_id": nb_id})
 
-@tnote_bp.route('/api/pages/<int:page_id>', methods=['PUT'])
+@tnote_bp.route('/api/pages/<int:page_id>', methods=['PUT', 'POST'])
 @auth_check
 def api_update_page(page_id):
-    data = request.get_json() or {}
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Bu sayfayı güncelleme yetkiniz yok"}), 403
+    
+    data = request.get_json(silent=True)
+    if not data and request.data:
+        try:
+            import json
+            data = json.loads(request.data.decode('utf-8'))
+        except Exception:
+            data = {}
+    data = data or {}
+    
+    # Otomatik Zaman Tüneli Versiyon Snapshot'ı
+    if "content" in data or "title" in data:
+        curr = db.get_page(page_id)
+        if curr and (curr.get("content") != data.get("content") or curr.get("title") != data.get("title")):
+            if curr.get("content") or curr.get("title"):
+                db.save_page_version(page_id, curr.get("title", ""), curr.get("content", ""), user_id=user_id)
+
     db.update_page(
         page_id=page_id,
         title=data.get("title"),
@@ -571,6 +1041,10 @@ def api_reorder_pages():
 @tnote_bp.route('/api/pages/<int:page_id>/move', methods=['POST'])
 @auth_check
 def api_move_page(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Bu sayfayı taşıma yetkiniz yok"}), 403
     data = request.get_json() or {}
     category_id = data.get("category_id")
     if not category_id:
@@ -581,8 +1055,183 @@ def api_move_page(page_id):
 @tnote_bp.route('/api/pages/<int:page_id>', methods=['DELETE'])
 @auth_check
 def api_delete_page(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Bu sayfayı silme yetkiniz yok"}), 403
     db.delete_page(page_id)
     return jsonify({"ok": True, "pages": db.get_pages()})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Power Packs: Sabitleme, Kilit, Hedef Sayacı, Versiyonlar, Ekler & Zihin Ağı
+# ─────────────────────────────────────────────────────────────────────────────
+
+@tnote_bp.route('/api/pages/<int:page_id>/pin', methods=['POST'])
+@auth_check
+def api_page_toggle_pin(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Yetkisiz işlem"}), 403
+    new_status = db.toggle_page_pin(page_id)
+    return jsonify({"ok": True, "is_pinned": new_status})
+
+@tnote_bp.route('/api/pages/<int:page_id>/lock', methods=['POST'])
+@auth_check
+def api_page_lock(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Yetkisiz işlem"}), 403
+    data = request.get_json() or {}
+    pin = data.get("pin", "").strip()
+    action = data.get("action", "lock")
+    if action == "unlock":
+        db.lock_page(page_id, None, lock=False)
+        session.pop(f"unlocked_page_{page_id}", None)
+        return jsonify({"ok": True, "is_locked": 0})
+    if not pin or len(pin) < 4:
+        return jsonify({"ok": False, "error": "PIN en az 4 haneli olmalıdır"}), 400
+    db.lock_page(page_id, pin, lock=True)
+    session.pop(f"unlocked_page_{page_id}", None)
+    return jsonify({"ok": True, "is_locked": 1})
+
+@tnote_bp.route('/api/pages/<int:page_id>/verify-lock', methods=['POST'])
+@auth_check
+def api_page_verify_lock(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Yetkisiz işlem"}), 403
+    data = request.get_json() or {}
+    pin = data.get("pin", "").strip()
+    is_valid = db.verify_page_lock(page_id, pin)
+    if not is_valid:
+        return jsonify({"ok": False, "error": "Hatalı PIN kodu"}), 401
+    session[f"unlocked_page_{page_id}"] = True
+    page = db.get_page(page_id)
+    items = db.get_items(page_id)
+    return jsonify({"ok": True, "unlocked": True, "page": page, "items": items})
+
+@tnote_bp.route('/api/pages/<int:page_id>/word-count-target', methods=['POST'])
+@auth_check
+def api_page_target_word_count(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Yetkisiz işlem"}), 403
+    data = request.get_json() or {}
+    target = int(data.get("target") or data.get("target_word_count") or 0)
+    db.set_target_word_count(page_id, target)
+    return jsonify({"ok": True, "target_word_count": target})
+
+@tnote_bp.route('/api/pages/<int:page_id>/versions', methods=['GET'])
+@auth_check
+def api_page_get_versions(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Yetkisiz işlem"}), 403
+    versions = db.get_page_versions(page_id)
+    return jsonify({"ok": True, "versions": versions})
+
+@tnote_bp.route('/api/pages/<int:page_id>/versions/<int:version_id>/restore', methods=['POST'])
+@auth_check
+def api_page_restore_version(page_id, version_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Yetkisiz işlem"}), 403
+    success = db.restore_page_version(page_id, version_id)
+    if not success:
+        return jsonify({"ok": False, "error": "Versiyon geri yüklenemedi"}), 400
+    return jsonify({"ok": True, "page": db.get_page(page_id)})
+
+@tnote_bp.route('/api/pages/<int:page_id>/attachments', methods=['GET'])
+@auth_check
+def api_page_get_attachments(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Yetkisiz işlem"}), 403
+    attachments = db.get_page_attachments(page_id)
+    return jsonify({"ok": True, "attachments": attachments})
+
+@tnote_bp.route('/api/pages/<int:page_id>/attachments', methods=['POST'])
+@auth_check
+def api_page_add_attachment(page_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Yetkisiz işlem"}), 403
+    if 'file' not in request.files:
+        return jsonify({"ok": False, "error": "Dosya seçilmedi"}), 400
+    file = request.files['file']
+    if not file or not file.filename:
+        return jsonify({"ok": False, "error": "Geçersiz dosya"}), 400
+
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
+    orig_name = secure_filename(file.filename) or "belge"
+    ext = os.path.splitext(orig_name)[1].lower()
+    stored_name = f"doc_{uuid.uuid4().hex[:12]}{ext}"
+    save_path = os.path.join(UPLOADS_DIR, stored_name)
+    file.save(save_path)
+    file_size = os.path.getsize(save_path)
+    mime_type = file.mimetype or "application/octet-stream"
+    file_url = f"/notes/uploads/{stored_name}"
+
+    att_id = db.add_page_attachment(
+        page_id=page_id,
+        filename=stored_name,
+        original_name=orig_name,
+        file_url=file_url,
+        file_size=file_size,
+        mime_type=mime_type
+    )
+    return jsonify({
+        "ok": True,
+        "attachment": {
+            "id": att_id,
+            "page_id": page_id,
+            "filename": stored_name,
+            "original_name": orig_name,
+            "file_url": file_url,
+            "file_size": file_size,
+            "mime_type": mime_type
+        }
+    })
+
+@tnote_bp.route('/api/pages/<int:page_id>/attachments/<int:attachment_id>', methods=['DELETE'])
+@auth_check
+def api_page_delete_attachment(page_id, attachment_id):
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    if not db.can_access_page(page_id, user_id):
+        return jsonify({"ok": False, "error": "Yetkisiz işlem"}), 403
+    db.delete_page_attachment(attachment_id, page_id)
+    return jsonify({"ok": True})
+
+@tnote_bp.route('/api/graph', methods=['GET'])
+@auth_check
+def api_get_graph():
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    notebook_id = request.args.get("notebook_id", type=int)
+    data = db.get_graph_data(notebook_id=notebook_id, user_id=user_id)
+    return jsonify({"ok": True, "graph": data, "nodes": data.get("nodes", []), "links": data.get("links", [])})
+
+@tnote_bp.route('/api/sync/tincsync/trigger', methods=['POST'])
+@auth_check
+def api_tincsync_trigger():
+    import urllib.request
+    try:
+        req = urllib.request.Request("http://127.0.0.1:9015/api/sync/now", method="POST")
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            return jsonify({"ok": True, "synced": True, "response": data})
+    except Exception as e:
+        return jsonify({"ok": True, "synced": False, "message": f"TincSync servisi hazır durumda (Port 9015): {str(e)}"})
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REST API: Maddeler (Items)
@@ -963,6 +1612,26 @@ def serve_uploaded_file(filename):
     resp.headers["Content-Security-Policy"] = "default-src 'self'"
     return resp
 
+@tnote_bp.route('/api/upload_image', methods=['POST'])
+@auth_check
+def api_upload_image():
+    if 'image' not in request.files and 'file' not in request.files:
+        return jsonify({"ok": False, "error": "Görsel dosyası bulunamadı"}), 400
+    file = request.files.get('image') or request.files.get('file')
+    if not file or not file.filename:
+        return jsonify({"ok": False, "error": "Geçersiz dosya"}), 400
+    
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']:
+        return jsonify({"ok": False, "error": "Yalnızca görsel dosyaları (.png, .jpg, .webp, vb.) yüklenebilir"}), 400
+    
+    os.makedirs(UPLOADS_DIR, exist_ok=True)
+    filename = f"img_{uuid.uuid4().hex[:12]}{ext}"
+    save_path = os.path.join(UPLOADS_DIR, filename)
+    file.save(save_path)
+    file_url = f"/notes/uploads/{filename}"
+    return jsonify({"ok": True, "url": file_url, "filename": filename})
+
 # ─────────────────────────────────────────────────────────────────────────────
 # REST API: Veri İçe Aktarma (Google Keep, Evernote, Microsoft To-Do)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1044,6 +1713,7 @@ def api_export_backup():
         return jsonify({"ok": False, "error": f"Yedekleme oluşturulamadı: {str(e)}"}), 500
 
 @tnote_bp.route('/api/scrape', methods=['POST'])
+@tnote_bp.route('/api/tools/clip_url', methods=['POST'])
 @auth_check
 def api_scrape_url():
     data = request.get_json() or {}
@@ -1052,7 +1722,7 @@ def api_scrape_url():
     if not url:
         return jsonify({"ok": False, "error": "Geçerli bir URL bulunamadı"}), 400
     meta = scrape_url_metadata(url)
-    return jsonify({"ok": True, "metadata": meta})
+    return jsonify({"ok": True, "metadata": meta, "card": meta})
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REST API: Çöp Kutusu (Trash & Restore)
@@ -1086,6 +1756,13 @@ def api_delete_trash_permanent(page_id):
 def api_empty_trash():
     cnt = db.empty_trash()
     return jsonify({"ok": True, "deleted_count": cnt, "trash": []})
+
+@tnote_bp.route('/api/trash/purge', methods=['POST'])
+@auth_check
+def api_purge_trash():
+    days = request.args.get("days", 30, type=int)
+    cnt = db.purge_expired_trash(days=days)
+    return jsonify({"ok": True, "purged_count": cnt, "trash": db.get_trash_pages()})
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REST API: İşlem Geçmişi & Geri Alma (Undo History - Son 100 İşlem)
@@ -1121,7 +1798,9 @@ def api_undo_specific(history_id):
 @auth_check
 def api_global_search():
     q = request.args.get("q", "").strip()
-    results = db.global_search(q)
+    user = get_current_user()
+    user_id = user["id"] if user else None
+    results = db.global_search(q, user_id=user_id)
     return jsonify({"ok": True, "results": results})
 
 # ─────────────────────────────────────────────────────────────────────────────

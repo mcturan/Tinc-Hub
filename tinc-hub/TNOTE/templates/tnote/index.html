@@ -92,7 +92,6 @@
                     <div class="category-title-area">
                         <span class="cat-drag-handle" onclick="event.stopPropagation()" title="Dosyayı taşımak için sürükleyin" style="cursor:grab; opacity:0.4; font-size:0.85rem; user-select:none; margin-right:3px;">⠿</span>
                         <span class="cat-chevron" id="cat-chevron-{{ cat.id }}">▾</span>
-                        <span class="cat-color-dot" style="background:{{ cat.color or '#3b82f6' }};"></span>
                         <span style="font-size:0.95rem; margin-right:3px; flex-shrink:0;">{{ cat.icon or '📁' }}</span>
                         <span class="category-title-text" title="{{ cat.name }}">{{ cat.name }}</span>
                     </div>
@@ -204,17 +203,39 @@
             </div>
 
             <div class="header-actions" id="page-header-actions">
+                <button class="btn-icon-subtle" id="btn-header-pin" onclick="toggleCurrentPagePin()" title="Sayfayı Başa Sabitle (Pin)">
+                    📌
+                </button>
+                <button class="btn-icon-subtle" id="btn-header-lock" onclick="promptPageLock()" title="Sayfayı Kilitle / PIN Belirle">
+                    🔒
+                </button>
+                <button class="btn-icon-subtle" onclick="openGraphViewModal()" title="Zihin Ağı Grafiği (Graph View)">
+                    🕸️
+                </button>
                 <button class="btn btn-sm btn-outline header-ai-btn" id="btn-header-ai" onclick="openAiAssistModal()" title="TincAI Asistanı">
                     <svg class="svg-icon svg-icon-xs" style="margin-right:4px;"><use href="#i-zap"/></svg><span>TincAI</span>
                 </button>
                 <button class="btn btn-sm btn-primary header-add-btn" id="btn-header-add" onclick="focusQuickAdd()" title="Ekle">
                     <svg class="svg-icon svg-icon-sm" style="margin-right:4px;"><use href="#i-plus"/></svg><span>Ekle</span>
                 </button>
+                <button class="btn-icon-subtle" onclick="exportPageToPdf()" title="Yazdır / PDF Olarak Kaydet">
+                    🖨️
+                </button>
                 <div class="action-dropdown-container">
                     <button class="btn-icon-subtle btn-more-actions" onclick="toggleMoreActionsDropdown(event)" title="İşlemler">
                         <svg class="svg-icon svg-icon-sm"><use href="#i-more-vertical"/></svg>
                     </button>
                     <div class="action-dropdown-menu" id="page-more-dropdown" style="display:none;">
+                        <div class="dropdown-item" onclick="openTimeMachineModal(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon">⏳</span> Zaman Tüneli (Versiyonlar)
+                        </div>
+                        <div class="dropdown-item" onclick="toggleAttachmentsTray(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon">📎</span> Dosya &amp; PDF Ekleri
+                        </div>
+                        <div class="dropdown-item" onclick="openGraphViewModal(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon">🕸️</span> Zihin Ağı Grafiği
+                        </div>
+                        <div class="dropdown-divider"></div>
                         <div class="dropdown-item" onclick="openSendTelegramModal(); closeMoreActionsDropdown();">
                             <span class="dropdown-item-icon"><svg class="svg-icon svg-icon-sm"><use href="#i-zap"/></svg></span> Telegram'a Gönder
                         </div>
@@ -235,6 +256,9 @@
                             <span class="dropdown-item-icon">✨</span> TincAI Asistanı
                         </div>
                         <div class="dropdown-divider"></div>
+                        <div class="dropdown-item" onclick="exportPageToPdf(); closeMoreActionsDropdown();">
+                            <span class="dropdown-item-icon">🖨️</span> Yazdır / PDF Dışa Aktar
+                        </div>
                         <div class="dropdown-item" onclick="exportCurrentPage('md'); closeMoreActionsDropdown();">
                             <span class="dropdown-item-icon">📄</span> Dışa Aktar (.md)
                         </div>
@@ -889,32 +913,79 @@
             </div>
         </div>
 
-        <!-- Not / Serbest Metin Görünümü (Modern Markdown Editor) -->
+        <!-- Not / Serbest Metin Görünümü (WYSIWYG Zengin Metin Editörü) -->
         <div id="note-view" class="note-editor-area" style="display:none;">
-            <div class="note-toolbar">
-                <div class="note-toolbar-group">
-                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('**', '**')" title="Kalın (Ctrl+B)"><b>B</b></button>
-                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('*', '*')" title="İtalik (Ctrl+I)"><i>I</i></button>
-                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('# ')" title="Başlık 1">H1</button>
-                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('## ')" title="Başlık 2">H2</button>
-                    <span class="tb-divider"></span>
-                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('- ')" title="Madde İşareti">• Liste</button>
-                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('- [ ] ')" title="Yapılacak Kutusu">☑ Görev</button>
-                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('`', '`')" title="Kod Satırı">`Kod`</button>
-                    <button type="button" class="btn-tb" onclick="insertMarkdownSyntax('> ')" title="Alıntı">❝</button>
+            <!-- Kilitli Sayfa Ekranı (PIN Koruması) -->
+            <div id="note-locked-view" class="note-locked-view" style="display:none; text-align:center; padding:40px 20px; background:var(--surface); border:1px solid var(--border); border-radius:12px; margin-bottom:16px;">
+                <div style="font-size:3rem; margin-bottom:12px;">🔒</div>
+                <h3 style="margin-bottom:8px; font-weight:700;">Bu Sayfa PIN ile Kilitli</h3>
+                <p style="color:var(--muted); font-size:0.88rem; max-width:400px; margin:0 auto 16px auto;">İçeriği ve ekleri görüntülemek için lütfen 4 haneli PIN kodunuzu girin.</p>
+                <div style="display:flex; justify-content:center; gap:8px; max-width:280px; margin:0 auto;">
+                    <input type="password" id="locked-page-pin-input" maxlength="6" class="form-control" placeholder="••••" style="font-size:1.4rem; letter-spacing:6px; text-align:center; font-weight:700;" onkeydown="if(event.key==='Enter') submitUnlockPagePin()">
+                    <button class="btn btn-primary" onclick="submitUnlockPagePin()" style="padding:0 16px;">Aç</button>
                 </div>
-                <div class="note-toolbar-group">
-                    <div class="btn-group-segmented">
-                        <button type="button" id="btn-note-mode-edit" class="btn-seg active" onclick="toggleNoteEditorMode('edit')">Düzenle</button>
-                        <button type="button" id="btn-note-mode-preview" class="btn-seg" onclick="toggleNoteEditorMode('preview')">Önizle</button>
-                    </div>
-                    <span id="note-save-status" class="note-save-status" style="font-size:0.75rem; color:var(--muted); font-weight:500;">Kaydedildi ✓</span>
-                </div>
+                <div id="locked-pin-error" style="color:var(--danger); font-size:0.8rem; margin-top:8px; display:none;"></div>
             </div>
-            <textarea id="note-content-textarea" class="note-textarea" oninput="handleNoteInput()" placeholder="Not..."></textarea>
-            <div id="note-markdown-preview" class="note-markdown-preview" style="display:none;"></div>
-            <div class="note-footer-bar">
-                <span id="note-char-count" style="font-size:0.75rem; color:var(--muted);">0 karakter</span>
+
+            <!-- Normal Düzenleyici Alanı (Kilit açıkken görünür) -->
+            <div id="note-unlocked-content-wrap">
+                <div class="note-toolbar">
+                    <div class="note-toolbar-group">
+                        <button type="button" class="btn-tb" onclick="formatNoteText('bold')" title="Kalın (Ctrl+B)"><b>B</b></button>
+                        <button type="button" class="btn-tb" onclick="formatNoteText('italic')" title="İtalik (Ctrl+I)"><i>I</i></button>
+                        <button type="button" class="btn-tb" onclick="formatNoteText('underline')" title="Altı Çizili (Ctrl+U)"><u>U</u></button>
+                        <button type="button" class="btn-tb" onclick="formatNoteText('strikeThrough')" title="Üstü Çizili"><s>S</s></button>
+                        <span class="tb-divider"></span>
+                        <button type="button" class="btn-tb" onclick="formatNoteText('formatBlock', 'h2')" title="Büyük Başlık">H1</button>
+                        <button type="button" class="btn-tb" onclick="formatNoteText('formatBlock', 'h3')" title="Alt Başlık">H2</button>
+                        <span class="tb-divider"></span>
+                        <button type="button" class="btn-tb" onclick="formatNoteText('insertUnorderedList')" title="Madde İşaretli Liste">• Liste</button>
+                        <button type="button" class="btn-tb" onclick="formatNoteText('insertOrderedList')" title="Numaralı Liste">1. Liste</button>
+                        <button type="button" class="btn-tb" onclick="insertNoteChecklist()" title="Yapılacak Kutusu">☑ Görev</button>
+                        <button type="button" class="btn-tb" onclick="insertToggleBlock()" title="Katlanabilir Bölüm (Toggle Block)">▶️ Bölüm</button>
+                        <button type="button" class="btn-tb" onclick="promptSmartClip()" title="Web veya X (Twitter) Gönderisi Kırp">🔗 Kırp</button>
+                        <button type="button" class="btn-tb" onclick="insertNoteCode()" title="Kod Satırı">`Kod`</button>
+                        <button type="button" class="btn-tb" onclick="formatNoteText('formatBlock', 'blockquote')" title="Alıntı">❝</button>
+                    </div>
+                    <div class="note-toolbar-group">
+                        <button type="button" class="btn-tb" onclick="triggerAiActionizeNote()" title="Notu Yapılacaklar Listesine Dönüştür" style="color:var(--primary); font-weight:600;">🤖 Görevlere Dönüştür</button>
+                        <span id="note-save-status" class="note-save-status" style="font-size:0.75rem; color:var(--muted); font-weight:500;">Kaydedildi ✓</span>
+                    </div>
+                </div>
+
+                <!-- Ekler ve Belgeler Şeridi (Attachments Tray) -->
+                <div id="note-attachments-bar" class="note-attachments-bar" style="display:none; padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:0.82rem; font-weight:700; color:var(--text);">📎 Ekli Belgeler &amp; Dosyalar (<span id="note-attachments-count">0</span>)</span>
+                        <div style="display:flex; gap:6px;">
+                            <input type="file" id="note-attachment-file-input" style="display:none;" onchange="handleAttachmentFileSelected(event)">
+                            <button type="button" class="btn btn-xs btn-outline" onclick="document.getElementById('note-attachment-file-input').click()">+ Belge / PDF Ekle</button>
+                            <button type="button" class="btn-icon-subtle" onclick="toggleAttachmentsTray(false)" title="Kapat">✕</button>
+                        </div>
+                    </div>
+                    <div id="note-attachments-list" style="display:flex; flex-wrap:wrap; gap:8px;">
+                        <!-- Ek kartları dinamik eklenir -->
+                    </div>
+                </div>
+
+                <!-- Gerçek Zengin Metin Alanı (Kalın, İtalik, Başlık ve Listeler ekranda doğrudan görünür) -->
+                <div id="note-rich-editor" class="note-rich-editor" contenteditable="true" oninput="handleRichNoteInput()" placeholder="Notlarınızı buraya yazın..."></div>
+                <textarea id="note-content-textarea" style="display:none;"></textarea>
+                <div class="note-footer-bar" style="display:flex; justify-content:space-between; align-items:center; padding:8px 4px; border-top:1px solid var(--border); margin-top:8px;">
+                    <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--muted);">
+                        <span id="note-char-count">0 karakter</span>
+                        <span>•</span>
+                        <span id="note-word-count">0 kelime</span>
+                        <span>•</span>
+                        <span id="note-word-goal-status" style="cursor:pointer; color:var(--primary); font-weight:600;" onclick="promptWordGoal()" title="Hedef belirlemek veya değiştirmek için tıklayın">🎯 Hedef Belirle</span>
+                    </div>
+                    <div id="note-word-goal-progress-wrap" style="display:none; align-items:center; gap:6px; min-width:140px;">
+                        <div style="flex:1; height:6px; background:var(--border); border-radius:3px; overflow:hidden;">
+                            <div id="note-word-goal-progress-fill" style="width:0%; height:100%; background:var(--primary); transition:width 0.3s ease;"></div>
+                        </div>
+                        <span id="note-word-goal-percent" style="font-size:0.72rem; font-weight:700; color:var(--muted);">%0</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1176,8 +1247,9 @@
                 <label>Sayfa Tipi</label>
                 <select id="new-page-type" class="form-control">
                     <option value="checklist">🛒 Kontrol Listesi</option>
-                    <option value="software">💻 Yazılım Projesi (TincSync & AI)</option>
-                    <option value="finance">💳 Finans & Fatura</option>
+                    <option value="academic">🎓 Tez &amp; Ödev Çalışma Masası</option>
+                    <option value="software">💻 Yazılım Projesi (TincSync &amp; AI)</option>
+                    <option value="finance">💳 Finans &amp; Fatura</option>
                     <option value="project">🔬 Proje Atölyesi</option>
                     <option value="notes">📝 Not</option>
                 </select>
@@ -2106,6 +2178,138 @@
         </div>
     </div>
 </div>
+
+<!-- Zihin Ağı (Graph View) Modalı -->
+<div class="tnote-modal-backdrop" id="modal-graph-view" style="display:none;">
+    <div class="tnote-modal" style="max-width:920px; width:95%; height:85vh; display:flex; flex-direction:column;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+                <span>🕸️</span> <span>Zihin Ağı Grafiği (Obsidian / Backlinks)</span>
+            </div>
+            <button class="btn-icon" onclick="closeModal('modal-graph-view')">✕</button>
+        </div>
+        <div class="modal-body" style="flex:1; position:relative; overflow:hidden; padding:0; background:var(--bg-main, #0f172a); border-radius:6px;">
+            <canvas id="graph-canvas" style="width:100%; height:100%; display:block; cursor:grab;"></canvas>
+            <div style="position:absolute; bottom:12px; left:12px; font-size:0.75rem; color:var(--muted); background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); padding:4px 10px; border-radius:6px; pointer-events:none;">
+                🖱️ Sürükleyerek gezinin, farenin tekeriyle yakınlaşın, gitmek istediğiniz nota tıklayın.
+            </div>
+            <button class="btn btn-xs btn-outline" style="position:absolute; top:12px; right:12px; background:var(--surface);" onclick="refreshGraphData()">🔄 Yenile</button>
+        </div>
+    </div>
+</div>
+
+<!-- Zaman Tüneli (Time Machine - Sayfa Versiyon Geçmişi) Modalı -->
+<div class="tnote-modal-backdrop" id="modal-time-machine" style="display:none;">
+    <div class="tnote-modal" style="max-width:620px; width:95%;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+                <span>⏳</span> <span>Zaman Tüneli (Versiyon Geçmişi)</span>
+            </div>
+            <button class="btn-icon" onclick="closeModal('modal-time-machine')">✕</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:0.82rem; color:var(--muted); margin-bottom:12px;">Bu sayfanın otomatik veya manuel kaydedilmiş önceki anlık kopyaları:</p>
+            <div id="time-machine-list" style="display:flex; flex-direction:column; gap:8px; max-height:360px; overflow-y:auto;">
+                <div style="text-align:center; padding:20px; color:var(--muted);">Versiyonlar yükleniyor...</div>
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end;">
+            <button class="btn btn-sm" onclick="closeModal('modal-time-machine')">Kapat</button>
+        </div>
+    </div>
+</div>
+
+<!-- PDF & Belge Önizleme Modalı -->
+<div class="tnote-modal-backdrop" id="modal-pdf-viewer" style="display:none;">
+    <div class="tnote-modal" style="max-width:960px; width:95%; height:88vh; display:flex; flex-direction:column;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+                <span>📄</span> <span id="pdf-viewer-filename">Belge Önizleme</span>
+            </div>
+            <div style="display:flex; gap:6px;">
+                <a id="pdf-viewer-download-link" href="#" target="_blank" class="btn btn-xs btn-outline" download>⬇️ İndir</a>
+                <button class="btn-icon" onclick="closeModal('modal-pdf-viewer')">✕</button>
+            </div>
+        </div>
+        <div class="modal-body" style="flex:1; padding:0; overflow:hidden; background:#222;">
+            <iframe id="pdf-viewer-iframe" style="width:100%; height:100%; border:none;" src="about:blank"></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- Sayfa Kilidi (PIN) Belirleme / Kaldırma Modalı -->
+<div class="tnote-modal-backdrop" id="modal-page-lock-set" style="display:none;">
+    <div class="tnote-modal" style="max-width:400px; width:95%;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+                <span>🔒</span> <span>Sayfa Kilidi (PIN)</span>
+            </div>
+            <button class="btn-icon" onclick="closeModal('modal-page-lock-set')">✕</button>
+        </div>
+        <div class="modal-body">
+            <p id="page-lock-modal-desc" style="font-size:0.85rem; color:var(--muted); margin-bottom:12px;">Bu sayfayı kilitlemek için 4 haneli bir PIN kodu belirleyin:</p>
+            <div style="margin-bottom:12px;">
+                <input type="password" id="page-lock-modal-pin" maxlength="6" class="form-control" placeholder="••••" style="font-size:1.4rem; letter-spacing:6px; text-align:center; font-weight:700; width:160px; margin:0 auto;" onkeydown="if(event.key==='Enter') submitPageLockSet()">
+            </div>
+            <div id="page-lock-modal-err" style="color:var(--danger); font-size:0.8rem; text-align:center; display:none;"></div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:space-between;">
+            <button class="btn btn-sm btn-outline text-danger" id="btn-page-unlock-remove" style="display:none;" onclick="submitPageLockRemove()">Kilidi Kaldır</button>
+            <div style="display:flex; gap:6px; margin-left:auto;">
+                <button class="btn btn-sm" onclick="closeModal('modal-page-lock-set')">İptal</button>
+                <button class="btn btn-sm btn-primary" onclick="submitPageLockSet()">Kaydet &amp; Kilitle</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Web & X (Twitter) Akıllı Kırpıcı Modalı -->
+<div class="tnote-modal-backdrop" id="modal-smart-clip" style="display:none;">
+    <div class="tnote-modal" style="max-width:480px; width:95%;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+                <span>🔗</span> <span>Web &amp; X Gönderisi Kırp</span>
+            </div>
+            <button class="btn-icon" onclick="closeModal('modal-smart-clip')">✕</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:0.82rem; color:var(--muted); margin-bottom:10px;">Bir makale, ürün veya X (Twitter) gönderi bağlantısı yapıştırın:</p>
+            <input type="url" id="smart-clip-url-input" class="form-control" placeholder="https://x.com/... veya https://..." style="margin-bottom:10px;" onkeydown="if(event.key==='Enter') submitSmartClip()">
+            <div id="smart-clip-preview-box" style="display:none; padding:10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; margin-top:8px;"></div>
+            <div id="smart-clip-status" style="font-size:0.8rem; color:var(--primary); margin-top:6px; display:none;"></div>
+        </div>
+        <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:6px;">
+            <button class="btn btn-sm" onclick="closeModal('modal-smart-clip')">İptal</button>
+            <button class="btn btn-sm btn-primary" id="btn-smart-clip-submit" onclick="submitSmartClip()">Kırp &amp; Ekle</button>
+        </div>
+    </div>
+</div>
+
+<!-- 6 Haneli E-posta Doğrulama Modalı -->
+<div class="tnote-modal-backdrop" id="modal-email-verify" style="display:none;">
+    <div class="tnote-modal" style="max-width:400px; width:95%; text-align:center;">
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:700; font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+                <span>✉️</span> <span>E-posta Doğrulama</span>
+            </div>
+            <button class="btn-icon" onclick="closeModal('modal-email-verify')">✕</button>
+        </div>
+        <div class="modal-body">
+            <p style="font-size:0.85rem; color:var(--muted); margin-bottom:12px;">
+                E-posta adresinize gönderilen 6 haneli kodu girin:
+            </p>
+            <input type="text" id="verify-email-code-input" maxlength="6" class="form-control" placeholder="••••••" style="font-size:1.6rem; letter-spacing:8px; text-align:center; font-weight:700; width:180px; margin:0 auto 12px auto;" onkeydown="if(event.key==='Enter') submitVerifyEmailCode()">
+            <div id="verify-code-status" style="font-size:0.8rem; margin-bottom:12px; display:none;"></div>
+            <div style="display:flex; justify-content:center; gap:8px;">
+                <button class="btn btn-sm btn-outline" onclick="resendEmailVerificationCode()">Tekrar Gönder</button>
+                <button class="btn btn-sm btn-primary" onclick="submitVerifyEmailCode()">Doğrula</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Geri Al (Undo / Ctrl+Z) Bildirim Çubuğu -->
+<div id="undo-toast" class="undo-toast-container" style="display:none;"></div>
 
 <script>
     window.CURRENT_NOTEBOOK_ID = {{ current_notebook.id if current_notebook else 1 }};
