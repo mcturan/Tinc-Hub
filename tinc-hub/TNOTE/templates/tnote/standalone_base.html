@@ -104,14 +104,17 @@
             margin: 0 auto;
         }
     </style>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('tnote.static', filename='img/favicon.svg') }}?v=3">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('tnote.static', filename='img/favicon-32x32.png') }}?v=3">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('tnote.static', filename='img/favicon-16x16.png') }}?v=3">
+    <link rel="apple-touch-icon" href="{{ url_for('tnote.static', filename='img/apple-touch-icon.png') }}?v=3">
     {% block head %}{% endblock %}
 </head>
 <body>
     {% include "tnote/_icons.html" %}
     <header class="standalone-header">
-        <a href="/notes" class="header-logo">
-            <span class="header-logo-icon"><svg class="svg-icon svg-icon-lg"><use href="#i-book"/></svg></span>
-            <span>TincNote</span>
+        <a href="/notes" class="header-logo" title="TincNote Ana Sayfa">
+            <img src="{{ url_for('tnote.static', filename='img/tincnote_logo.svg') }}" alt="TincNote" style="height: 28px; width: auto; display: block;">
         </a>
         <div class="header-nav">
             <a href="/notes" class="header-nav-link {% if request.path == '/notes' or request.path == '/notes/' %}active{% endif %}" title="Notlar & Listeler">
