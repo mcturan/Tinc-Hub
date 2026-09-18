@@ -2133,24 +2133,25 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.5.6",
-        "versionCode": 111,
+        "version": "1.8.0",
+        "versionCode": 180,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.5.6:\n- Widget İkiye Ayrıldı: 1. Hızlı Notlar (Google Keep stili kartlar) ve 2. Görevler & Yapılacaklar widget'ı\n- Görevlere Alarm & Hatırlatıcı Kurma: Tek tıkla yerel Android AlarmManager üzerinden sesli ve titreşimli alarm kurma\n- Sunucu, Telegram botu ve web paneliyle senkronize hatırlatıcılar\n- Widget üzerinde alarm rozetleri (⏰) ve doğrudan widget'tan görev tamamlama\n- Hızlı Notlar widget'ından tek tıkla doğrudan not ekleme ve açma"
+        "notes": "v1.8.0:\n- TincID Merkezi Ekosistem Kimliği ve Google / Apple ile Giriş (SSO)\n- Notları En Üste Sabitleme (📌) ve Akordiyon / Katlanabilir Başlıklar (▶)\n- Biyometrik / PIN Sayfa Kilidi (🔒) ve Güvenli Maskeleme\n- PDF ve Belge Ekleri Tepsisi (📎)\n- Hedef Kelime Sayacı ve Canlı İlerleme Çubuğu (🎯)\n- Obsidian Tarzı İnteraktif Zihin Haritası (Graph View 🕸️)\n- Sürüm Geçmişi ve Geri Yükleme Zaman Makinesi (⏳)\n- Akıllı Web & X/Twitter Tweet Kart Kırpıcı (🔗)\n- E-posta Kod Doğrulama, Hesap Dondurma ve Kalıcı Silme (GDPR Takeout ZIP)"
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
+        "/home/turan/Masaüstü/TincNote-v1.8.0.apk",
+        "/opt/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
+        "/home/turan/101/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
+        "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk",
+        "/home/turan/Masaüstü/TincNote-v1.7.0.apk",
         "/home/turan/Masaüstü/TincNote-v1.5.6.apk",
-        "/opt/tinc-hub/TNOTE/static/tincnote.apk",
-        "/home/turan/101/tinc-hub/TNOTE/static/tincnote.apk",
-        "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/debug/app-debug.apk",
-        "/home/turan/Masaüstü/TincNote-v1.5.5.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.5.6.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.0.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────
