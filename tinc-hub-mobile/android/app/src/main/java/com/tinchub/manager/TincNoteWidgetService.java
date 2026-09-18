@@ -30,6 +30,7 @@ class TincNoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
         long pageId;
         String pageTitle;
         String dueBadge;
+        String remindAt;
         boolean isDone;
     }
 
@@ -52,7 +53,6 @@ class TincNoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
         SharedPreferences prefs = mContext.getSharedPreferences(TincNoteWidgetProvider.PREFS_NAME, Context.MODE_PRIVATE);
         String jsonStr = prefs.getString(TincNoteWidgetProvider.KEY_TASKS_JSON, null);
         if (jsonStr == null || jsonStr.trim().isEmpty()) {
-            // onDataSetChanged arka plan binder iş parçacığında çalışır; sunucudan senkron şekilde veri alınabilir
             jsonStr = TincNoteWidgetProvider.fetchTasksFromServerSync(mContext);
         }
 
@@ -63,14 +63,19 @@ class TincNoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
                 if (tasks != null) {
                     for (int i = 0; i < tasks.length(); i++) {
                         JSONObject t = tasks.getJSONObject(i);
+                        String type = t.optString("type", "checklist");
+                        // Görevler widget'ında hızlı notlar gösterilmez (onlar artık Hızlı Notlar widget'ında)
+                        if ("quick_note".equals(type)) continue;
+
                         TaskItem item = new TaskItem();
                         item.id = t.optString("id", "task_" + i);
                         item.rawId = t.optLong("raw_id", t.optLong("id", 0));
-                        item.type = t.optString("type", "checklist");
+                        item.type = type;
                         item.title = t.optString("title", "");
                         item.pageId = t.optLong("page_id", 0);
                         item.pageTitle = t.optString("page_title", t.optString("page_name", ""));
                         item.dueBadge = t.optString("due_badge", "");
+                        item.remindAt = t.optString("remind_at", "");
                         item.isDone = t.optBoolean("is_done", false);
                         mTasks.add(item);
                     }
@@ -98,16 +103,10 @@ class TincNoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
 
         RemoteViews views = new RemoteViews(mContext.getPackageName(), R.layout.widget_task_item);
 
-        boolean isQuickNote = "quick_note".equals(item.type);
         boolean isFinance = "finance".equals(item.type);
 
         // İkon, Renk ve Başlık
-        if (isQuickNote) {
-            views.setTextViewText(R.id.widget_item_check_text, "📝");
-            views.setTextColor(R.id.widget_item_check_text, 0xFF6366F1); // İndigo
-            views.setTextViewText(R.id.widget_item_title, item.title);
-            views.setTextColor(R.id.widget_item_title, 0xFF0F172A);      // Koyu
-        } else if (item.isDone) {
+        if (item.isDone) {
             views.setTextViewText(R.id.widget_item_check_text, "✓");
             views.setTextColor(R.id.widget_item_check_text, 0xFF10B981); // Yeşil
             views.setTextViewText(R.id.widget_item_title, android.text.Html.fromHtml("<s>" + item.title + "</s>"));
@@ -124,8 +123,22 @@ class TincNoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
             views.setTextColor(R.id.widget_item_title, 0xFF0F172A);      // Koyu
         }
 
+        // Alarm / Hatırlatıcı Rozeti (⏰ 14:30)
+        if (item.remindAt != null && !item.remindAt.trim().isEmpty() && !item.isDone) {
+            views.setViewVisibility(R.id.widget_item_alarm_badge, View.VISIBLE);
+            String alarmText = "⏰";
+            try {
+                if (item.remindAt.length() >= 16) {
+                    alarmText = "⏰ " + item.remindAt.substring(11, 16);
+                }
+            } catch (Exception ignored) {}
+            views.setTextViewText(R.id.widget_item_alarm_badge, alarmText);
+        } else {
+            views.setViewVisibility(R.id.widget_item_alarm_badge, View.GONE);
+        }
+
         // Vade / Durum Rozeti (Yarın, Gecikmiş, vb.)
-        if (item.dueBadge != null && !item.dueBadge.isEmpty()) {
+        if (item.dueBadge != null && !item.dueBadge.isEmpty() && !item.dueBadge.startsWith("⏰")) {
             views.setViewVisibility(R.id.widget_item_due_badge, View.VISIBLE);
             views.setTextViewText(R.id.widget_item_due_badge, item.dueBadge);
             if (item.dueBadge.contains("Gecikmiş")) {
@@ -147,23 +160,14 @@ class TincNoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
             views.setViewVisibility(R.id.widget_item_page_badge, View.GONE);
         }
 
-        // 1. Sol İkon / Tik Butonu Tıklaması
-        if (!isQuickNote) {
-            Intent toggleFillIn = new Intent();
-            toggleFillIn.setAction(TincNoteWidgetProvider.ACTION_TOGGLE_TASK);
-            toggleFillIn.putExtra("task_id", item.id);
-            toggleFillIn.putExtra("raw_id", item.rawId);
-            toggleFillIn.putExtra("task_type", item.type);
-            views.setOnClickFillInIntent(R.id.widget_item_check_box, toggleFillIn);
-            views.setOnClickFillInIntent(R.id.widget_item_check_text, toggleFillIn);
-        } else {
-            // Hızlı not ise tıklanınca doğrudan Hızlı Notlar ekranını aç
-            Intent openQuickFillIn = new Intent();
-            openQuickFillIn.setAction(TincNoteWidgetProvider.ACTION_OPEN_PAGE);
-            openQuickFillIn.putExtra("open_page_id", 0L);
-            views.setOnClickFillInIntent(R.id.widget_item_check_box, openQuickFillIn);
-            views.setOnClickFillInIntent(R.id.widget_item_check_text, openQuickFillIn);
-        }
+        // 1. Sol İkon / Tik Butonu Tıklaması: Görevi Tamamla / Geri Al
+        Intent toggleFillIn = new Intent();
+        toggleFillIn.setAction(TincNoteWidgetProvider.ACTION_TOGGLE_TASK);
+        toggleFillIn.putExtra("task_id", item.id);
+        toggleFillIn.putExtra("raw_id", item.rawId);
+        toggleFillIn.putExtra("task_type", item.type);
+        views.setOnClickFillInIntent(R.id.widget_item_check_box, toggleFillIn);
+        views.setOnClickFillInIntent(R.id.widget_item_check_text, toggleFillIn);
 
         // 2. Satır Gövdesi (Metin) Tıklaması: İlgili Sayfayı Aç
         Intent openPageFillIn = new Intent();

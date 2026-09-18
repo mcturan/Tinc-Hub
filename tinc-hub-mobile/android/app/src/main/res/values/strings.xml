@@ -4,6 +4,10 @@
     <string name="title_activity_main">TincNote</string>
     <string name="package_name">com.tinchub.manager</string>
     <string name="custom_url_scheme">com.tinchub.manager</string>
-    <string name="widget_name">TincNote Görevler</string>
+    <string name="widget_name">TincNote - Görevler</string>
     <string name="widget_desc">TincNote bekleyen görevlerinizi ve listelerinizi gösterir</string>
+    <string name="widget_tasks_name">TincNote - Görevler</string>
+    <string name="widget_tasks_desc">TincNote bekleyen yapılacak görevlerinizi, alarmlarınızı ve ödemelerinizi gösterir</string>
+    <string name="widget_notes_name">TincNote - Hızlı Notlar</string>
+    <string name="widget_notes_desc">TincNote hızlı notlarınızı Google Keep stili kartlar halinde gösterir</string>
 </resources>

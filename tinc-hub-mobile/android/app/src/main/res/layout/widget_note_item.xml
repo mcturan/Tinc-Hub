@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_note_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingVertical="4dp"
+    android:paddingHorizontal="4dp">
+
+    <!-- Not Kartı -->
+    <LinearLayout
+        android:id="@+id/widget_note_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="@drawable/widget_note_card_bg"
+        android:padding="8dp">
+
+        <!-- Sol Renk Göstergesi -->
+        <ImageView
+            android:id="@+id/widget_note_color_strip"
+            android:layout_width="4dp"
+            android:layout_height="match_parent"
+            android:background="#F59E0B"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Not Metni ve Zamanı -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_note_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Hızlı not metni burada yer alacak..."
+                android:textColor="#0F172A"
+                android:textSize="12sp"
+                android:lineSpacingExtra="2dp"
+                android:maxLines="3"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/widget_note_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Bugün"
+                android:textColor="#94A3B8"
+                android:textSize="9sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>

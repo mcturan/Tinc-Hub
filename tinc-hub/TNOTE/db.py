@@ -2434,11 +2434,13 @@ def get_unified_tasks(notebook_id: int = None):
         # 1. Tüm sayfalardaki bekleyen checklist maddeleri
         cur.execute("""
             SELECT i.id, i.page_id, i.title, i.price, i.quantity, i.is_done,
+                   r.remind_at, r.recurrence,
                    p.title as page_title, p.icon as page_icon, p.type as page_type,
                    c.name as category_name, c.icon as category_icon, c.color as category_color
             FROM items i
             JOIN pages p ON i.page_id = p.id
             JOIN categories c ON p.category_id = c.id
+            LEFT JOIN reminders r ON r.target_type = 'item' AND r.target_id = i.id AND r.is_sent = 0
             WHERE c.notebook_id = ? AND i.is_done = 0 AND p.is_archived = 0
             ORDER BY i.id DESC
         """, (notebook_id,))
@@ -2521,12 +2523,15 @@ def get_unified_tasks(notebook_id: int = None):
             "raw_id": f["id"],
             "type": "finance",
             "title": display_title,
-            "amount": f["amount"],
+            "price": amt_str,
+            "quantity": None,
             "page_id": f["page_id"],
-            "page_title": f["page_title"] or "Ödemeler",
-            "category_name": f["category_name"] or "Finans",
-            "is_done": False,
+            "page_title": f["page_title"] or "Finans",
+            "category_name": f["category"] or "Giderler",
+            "is_done": bool(f["is_paid"]),
             "due_date": sort_str if sort_str != "9999-99-99" else None,
+            "remind_at": None,
+            "recurrence": "none",
             "due_badge": due_badge,
             "due_urgency": due_urgency,
             "sort_key": f"{due_urgency}_{sort_str}_{f['id']}"
@@ -2541,6 +2546,18 @@ def get_unified_tasks(notebook_id: int = None):
         due_urgency = 2.5 if is_quick else 6
         due_badge = "Hızlı" if is_quick else None
 
+        remind_at = it["remind_at"] if "remind_at" in it.keys() and it["remind_at"] else None
+        recurrence = it["recurrence"] if "recurrence" in it.keys() and it["recurrence"] else "none"
+
+        if remind_at:
+            try:
+                dt_obj = datetime.strptime(str(remind_at).strip()[:19], "%Y-%m-%d %H:%M:%S")
+                due_badge = "⏰ " + (dt_obj.strftime("%H:%M") if dt_obj.date() == today else dt_obj.strftime("%d.%m %H:%M"))
+                due_urgency = 1.5 if dt_obj.date() <= today else 2.2
+            except Exception:
+                due_badge = f"⏰ {remind_at[:16]}"
+                due_urgency = 2.0
+
         tasks.append({
             "id": f"item_{it['id']}",
             "raw_id": it["id"],
@@ -2553,6 +2570,8 @@ def get_unified_tasks(notebook_id: int = None):
             "category_name": cat_name or "Genel",
             "is_done": bool(it["is_done"]),
             "due_date": None,
+            "remind_at": remind_at,
+            "recurrence": recurrence,
             "due_badge": due_badge,
             "due_urgency": due_urgency,
             "sort_key": f"{due_urgency}_9999-99-99_{it['id']}"

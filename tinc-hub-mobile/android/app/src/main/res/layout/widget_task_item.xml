@@ -54,6 +54,18 @@
             android:gravity="center_vertical"
             android:paddingTop="2dp">
 
+            <!-- Alarm / Hatırlatma Rozeti (Örn: ⏰ 14:30) -->
+            <TextView
+                android:id="@+id/widget_item_alarm_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⏰ 14:30"
+                android:textColor="#7C3AED"
+                android:textSize="10sp"
+                android:textStyle="bold"
+                android:paddingEnd="6dp"
+                android:visibility="gone" />
+
             <!-- Vade / Durum Rozeti (Örn: Yarın, Gecikmiş, vb.) -->
             <TextView
                 android:id="@+id/widget_item_due_badge"

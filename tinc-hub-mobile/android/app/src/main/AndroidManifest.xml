@@ -30,10 +30,10 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- TincNote Ev Ekranı Widget'ı (Home Screen AppWidget) -->
+        <!-- 1. TincNote Görevler Widget'ı -->
         <receiver
             android:name=".TincNoteWidgetProvider"
-            android:label="@string/widget_name"
+            android:label="@string/widget_tasks_name"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -50,9 +50,42 @@
             android:name=".TincNoteWidgetService"
             android:permission="android.permission.BIND_REMOTEVIEWS"
             android:exported="true" />
+
+        <!-- 2. TincNote Hızlı Notlar Widget'ı (Google Keep Stili) -->
+        <receiver
+            android:name=".TincNoteNotesWidgetProvider"
+            android:label="@string/widget_notes_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.tinchub.manager.ACTION_NOTES_WIDGET_REFRESH" />
+                <action android:name="com.tinchub.manager.ACTION_NOTES_OPEN_PAGE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_notes_info" />
+        </receiver>
+
+        <service
+            android:name=".TincNoteNotesWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="true" />
+
+        <!-- 3. Görev Alarm ve Hatırlatıcı Receiver -->
+        <receiver
+            android:name=".TincNoteAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.tinchub.manager.ACTION_TASK_ALARM" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <!-- Permissions -->
-
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 </manifest>

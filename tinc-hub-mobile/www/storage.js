@@ -655,8 +655,26 @@ class TincNoteStorage {
             const page = pageMap[it.page_id] || {};
             const cat = catMap[page.category_id] || {};
             const isQuick = (cat.name === 'Hızlı Notlar ve Görevler' || page.title === 'Hızlı Görevler');
-            const dueUrgency = isQuick ? 2.5 : 6;
-            const dueBadge = isQuick ? '⚡ Hızlı Görev' : (page.title || 'Liste');
+            let dueUrgency = isQuick ? 2.5 : 6;
+            let dueBadge = isQuick ? '⚡ Hızlı Görev' : (page.title || 'Liste');
+            const remindAt = it.remind_at || null;
+            const recurrence = it.recurrence || 'none';
+
+            if (remindAt) {
+                try {
+                    const rDate = new Date(remindAt.replace(' ', 'T'));
+                    const isToday = rDate.toDateString() === today.toDateString();
+                    const hours = String(rDate.getHours()).padStart(2, '0');
+                    const mins = String(rDate.getMinutes()).padStart(2, '0');
+                    const day = String(rDate.getDate()).padStart(2, '0');
+                    const month = String(rDate.getMonth() + 1).padStart(2, '0');
+                    dueBadge = '⏰ ' + (isToday ? `${hours}:${mins}` : `${day}.${month} ${hours}:${mins}`);
+                    dueUrgency = isToday ? 1.5 : 2.2;
+                } catch(e) {
+                    dueBadge = '⏰ ' + remindAt.substring(0, 16);
+                    dueUrgency = 2.0;
+                }
+            }
 
             tasks.push({
                 id: `item_${it.id}`,
@@ -670,6 +688,8 @@ class TincNoteStorage {
                 category_name: cat.name || 'Genel',
                 is_done: !!it.is_done,
                 due_date: null,
+                remind_at: remindAt,
+                recurrence: recurrence,
                 due_badge: dueBadge,
                 due_urgency: dueUrgency,
                 sort_key: `${dueUrgency}_9999-99-99_${it.id}`
@@ -724,6 +744,30 @@ class TincNoteStorage {
             }
         }
         return false;
+    }
+
+    async setItemReminder(itemId, remindAt, recurrence = 'none') {
+        const it = await this.get('items', itemId);
+        if (it) {
+            it.remind_at = remindAt;
+            it.recurrence = recurrence;
+            it._dirty = true;
+            await this.put('items', it);
+            return it;
+        }
+        return null;
+    }
+
+    async deleteItemReminder(itemId) {
+        const it = await this.get('items', itemId);
+        if (it) {
+            it.remind_at = null;
+            it.recurrence = 'none';
+            it._dirty = true;
+            await this.put('items', it);
+            return it;
+        }
+        return null;
     }
 }
 

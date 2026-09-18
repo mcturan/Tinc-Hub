@@ -1,5 +1,6 @@
 package com.tinchub.manager;
 
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -97,12 +98,87 @@ public class MainActivity extends BridgeActivity {
                 e.printStackTrace();
             }
         }
+        @JavascriptInterface
+        public void scheduleTaskAlarm(long taskId, String title, String remindAtStr, String recurrence, long pageId) {
+            try {
+                if (remindAtStr == null || remindAtStr.trim().isEmpty()) return;
+                String clean = remindAtStr.trim().replace("T", " ");
+                if (clean.length() == 16) clean = clean + ":00";
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault());
+                java.util.Date d = sdf.parse(clean);
+                if (d == null) return;
+                long triggerMillis = d.getTime();
+                if (triggerMillis <= System.currentTimeMillis()) {
+                    android.util.Log.w("TincNoteAlarm", "Alarm time in past: " + clean);
+                    return;
+                }
+
+                android.app.AlarmManager am = (android.app.AlarmManager) mContext.getSystemService(Context.ALARM_SERVICE);
+                if (am != null) {
+                    Intent alarmIntent = new Intent(mContext, TincNoteAlarmReceiver.class);
+                    alarmIntent.setAction(TincNoteAlarmReceiver.ACTION_TASK_ALARM);
+                    alarmIntent.putExtra("task_id", taskId);
+                    alarmIntent.putExtra("task_title", title != null ? title : "Görev");
+                    alarmIntent.putExtra("page_id", pageId);
+                    alarmIntent.putExtra("recurrence", recurrence != null ? recurrence : "none");
+
+                    PendingIntent pi = PendingIntent.getBroadcast(
+                        mContext,
+                        (int) taskId,
+                        alarmIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                    );
+
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                        am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerMillis, pi);
+                    } else {
+                        am.setExact(android.app.AlarmManager.RTC_WAKEUP, triggerMillis, pi);
+                    }
+                    android.util.Log.i("TincNoteAlarm", "Alarm scheduled for task " + taskId + " at " + clean);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        @JavascriptInterface
+        public void cancelTaskAlarm(long taskId) {
+            try {
+                android.app.AlarmManager am = (android.app.AlarmManager) mContext.getSystemService(Context.ALARM_SERVICE);
+                if (am != null) {
+                    Intent alarmIntent = new Intent(mContext, TincNoteAlarmReceiver.class);
+                    alarmIntent.setAction(TincNoteAlarmReceiver.ACTION_TASK_ALARM);
+                    PendingIntent pi = PendingIntent.getBroadcast(
+                        mContext,
+                        (int) taskId,
+                        alarmIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                    );
+                    am.cancel(pi);
+                    pi.cancel();
+                }
+                androidx.core.app.NotificationManagerCompat.from(mContext).cancel((int) taskId);
+                android.util.Log.i("TincNoteAlarm", "Alarm cancelled for task " + taskId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         handleWidgetIntent(getIntent());
         super.onCreate(savedInstanceState);
+
+        // Bildirim kanalını oluştur
+        TincNoteAlarmReceiver.createNotificationChannel(this);
+
+        // Android 13+ bildirim izni kontrolü
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+            }
+        }
 
         TincNoteWidgetProvider.fetchTasksFromServer(this);
 

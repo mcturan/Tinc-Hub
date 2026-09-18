@@ -348,7 +348,7 @@
                 <div class="kpi-card" onclick="openSettingsView()">
                     <div class="kpi-icon-badge green">⚙️</div>
                     <div class="kpi-info">
-                        <span class="kpi-val">v1.5.3</span>
+                        <span class="kpi-val">v1.5.6</span>
                         <span class="kpi-label">Sürüm & Ayarlar</span>
                     </div>
                 </div>
@@ -563,7 +563,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <div style="font-weight:700; font-size:0.95rem;">Uygulama Sürümü</div>
-                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.5.3</div>
+                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.5.6</div>
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="window.appUpdater.checkForUpdates(false)">
                         🔍 Güncelleme Ara
@@ -844,6 +844,65 @@
             <div style="display:flex; gap:8px; margin-top:12px;">
                 <button class="btn btn-primary" style="flex:1;" onclick="submitAddMaterialEntry()">Kaydet</button>
                 <button class="btn btn-secondary" onclick="closeModal('modal-add-material')">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Görev Hatırlatıcısı / Alarm Kur -->
+    <div id="modal-item-reminder" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">⏰ Hatırlatıcı &amp; Alarm Kur</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-item-reminder')">✕</button>
+            </div>
+            <input type="hidden" id="rem-item-id">
+            <input type="hidden" id="rem-page-id">
+            
+            <div class="form-group" style="margin-bottom:10px;">
+                <label class="form-label" style="font-size:0.78rem; color:var(--muted);">Görev:</label>
+                <div id="rem-task-title-preview" style="font-weight:700; font-size:0.95rem; color:var(--text); padding:6px 0;"></div>
+            </div>
+
+            <!-- Hızlı Zaman Seçenekleri (Chips) -->
+            <div class="form-group" style="margin-bottom:12px;">
+                <label class="form-label" style="font-size:0.8rem; font-weight:600; margin-bottom:6px;">Hızlı Seçim:</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="setQuickReminderPreset('1hour')">⚡ 1 Saat Sonra</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="setQuickReminderPreset('tonight')">🌙 Bu Akşam 20:00</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="setQuickReminderPreset('tomorrow')">☀️ Yarın 09:00</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="setQuickReminderPreset('nextweek')">📅 Gelecek Hafta (Pzt)</button>
+                </div>
+            </div>
+
+            <!-- Tarih ve Saat Seçici -->
+            <div class="form-group" style="margin-bottom:12px;">
+                <label class="form-label" for="rem-datetime-input" style="font-size:0.8rem; font-weight:600;">Alarm Tarihi &amp; Saati:</label>
+                <input type="datetime-local" id="rem-datetime-input" class="input-text" style="width:100%;">
+            </div>
+
+            <!-- Tekrarlama -->
+            <div class="form-group" style="margin-bottom:12px;">
+                <label class="form-label" for="rem-recurrence-select" style="font-size:0.8rem; font-weight:600;">Tekrarlanma:</label>
+                <select id="rem-recurrence-select" class="input-text" style="width:100%;">
+                    <option value="none">Tek Seferlik</option>
+                    <option value="daily">Her Gün</option>
+                    <option value="weekly">Her Hafta</option>
+                    <option value="monthly">Her Ay</option>
+                </select>
+            </div>
+
+            <div style="font-size:0.74rem; color:var(--muted); line-height:1.3; margin-bottom:12px;">
+                🔔 Cihazda bildirim ve sesli alarm verilir, widget üzerinde alarm saati görüntülenir.
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-primary" style="flex:1;" onclick="submitSaveItemReminder()">💾 Alarmı Kur</button>
+                    <button class="btn btn-secondary" onclick="closeModal('modal-item-reminder')">İptal</button>
+                </div>
+                <button id="btn-delete-item-reminder" class="btn btn-ghost btn-sm" style="color:var(--danger); display:none;" onclick="submitDeleteItemReminder()">
+                    🗑️ Hatırlatıcıyı Kaldır
+                </button>
             </div>
         </div>
     </div>

@@ -401,7 +401,13 @@ def api_get_overview():
 def api_get_unified_tasks():
     nb_id = request.args.get('notebook_id', type=int) or session.get('active_notebook_id') or db.get_active_notebook_id()
     tasks = db.get_unified_tasks(nb_id)
-    return jsonify({"ok": True, "tasks": tasks, "total_count": len(tasks)})
+    quick_notes = db.get_quick_notes(nb_id)
+    return jsonify({
+        "ok": True,
+        "tasks": tasks,
+        "quick_notes": quick_notes,
+        "total_count": len([t for t in tasks if not t.get("is_done")])
+    })
 
 @tnote_bp.route('/api/toggle-task', methods=['POST'])
 @auth_check
@@ -422,6 +428,21 @@ def api_toggle_task():
         return jsonify({"ok": False, "error": "Geçersiz ID"}), 400
     is_done = db.toggle_unified_task(task_type, int(raw_id))
     return jsonify({"ok": True, "is_done": is_done})
+
+@tnote_bp.route('/api/items/<int:item_id>/reminder', methods=['POST', 'DELETE'])
+@auth_check
+def api_item_reminder(item_id):
+    if request.method == 'DELETE':
+        db.delete_reminder("item", item_id)
+        return jsonify({"ok": True, "deleted": True})
+    data = request.get_json() or {}
+    remind_at = data.get("remind_at")
+    recurrence = data.get("recurrence", "none")
+    if not remind_at:
+        db.delete_reminder("item", item_id)
+        return jsonify({"ok": True, "deleted": True})
+    rem_id = db.set_reminder("item", item_id, remind_at, recurrence)
+    return jsonify({"ok": True, "reminder_id": rem_id})
 
 # ─────────────────────────────────────────────────────────────────────────────
 # REST API: Kategoriler
@@ -1428,24 +1449,24 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.5.5",
-        "versionCode": 110,
+        "version": "1.5.6",
+        "versionCode": 111,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.5.5:\n- Android Widget: RemoteViews hatası (<View> etiketi) düzeltildi, launcher çökmesi ve simgeye dönüşme engellendi\n- Widget Grid: 4x3 boyutlandırma ve yeniden boyutlandırma parametreleri eklendi (Google Keep / Todo stili)\n- Hem yapılacaklar listesi hem hızlı notlar doğrudan widget üzerinde gösteriliyor\n- Widget içinden doğrudan tek tıkla görev tamamlama ve not açma desteği"
+        "notes": "v1.5.6:\n- Widget İkiye Ayrıldı: 1. Hızlı Notlar (Google Keep stili kartlar) ve 2. Görevler & Yapılacaklar widget'ı\n- Görevlere Alarm & Hatırlatıcı Kurma: Tek tıkla yerel Android AlarmManager üzerinden sesli ve titreşimli alarm kurma\n- Sunucu, Telegram botu ve web paneliyle senkronize hatırlatıcılar\n- Widget üzerinde alarm rozetleri (⏰) ve doğrudan widget'tan görev tamamlama\n- Hızlı Notlar widget'ından tek tıkla doğrudan not ekleme ve açma"
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
-        "/home/turan/Masaüstü/TincNote-v1.5.5.apk",
+        "/home/turan/Masaüstü/TincNote-v1.5.6.apk",
         "/opt/tinc-hub/TNOTE/static/tincnote.apk",
         "/home/turan/101/tinc-hub/TNOTE/static/tincnote.apk",
         "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/debug/app-debug.apk",
-        "/home/turan/Masaüstü/TincNote-v1.5.4.apk",
+        "/home/turan/Masaüstü/TincNote-v1.5.5.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.5.5.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.5.6.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────

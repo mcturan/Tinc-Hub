@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/widget_root"
+    android:id="@+id/widget_notes_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -18,12 +18,12 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="☑️"
+            android:text="📝"
             android:textSize="18sp"
             android:paddingEnd="6dp" />
 
         <LinearLayout
-            android:id="@+id/widget_header_title_box"
+            android:id="@+id/widget_notes_header_title_box"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -32,23 +32,23 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Görevler"
+                android:text="Hızlı Notlar"
                 android:textColor="#0F172A"
                 android:textSize="13sp"
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/widget_subtitle"
+                android:id="@+id/widget_notes_subtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Bekleyen görevler"
+                android:text="Notlarınız"
                 android:textColor="#64748B"
                 android:textSize="10sp" />
         </LinearLayout>
 
         <!-- Yenile Butonu -->
         <TextView
-            android:id="@+id/widget_btn_refresh"
+            android:id="@+id/widget_btn_notes_refresh"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:background="@drawable/widget_btn_bg"
@@ -57,15 +57,15 @@
             android:textSize="12sp"
             android:layout_marginEnd="6dp" />
 
-        <!-- Hızlı Ekleme Butonu -->
+        <!-- Hızlı Yeni Not Butonu -->
         <TextView
-            android:id="@+id/widget_btn_add"
+            android:id="@+id/widget_btn_notes_add"
             android:layout_width="32dp"
             android:layout_height="32dp"
             android:background="@drawable/widget_btn_bg"
             android:gravity="center"
             android:text="➕"
-            android:textColor="#2563EB"
+            android:textColor="#D97706"
             android:textSize="15sp"
             android:textStyle="bold" />
     </LinearLayout>
@@ -76,57 +76,57 @@
         android:background="#E2E8F0"
         android:layout_marginBottom="4dp" />
 
-    <!-- Kaydırılabilir Görev Listesi (Microsoft To-Do / Google Görevler Tarzı) -->
+    <!-- Kaydırılabilir Not Listesi (Google Keep Tarzı) -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
         <ListView
-            android:id="@+id/widget_tasks_list"
+            android:id="@+id/widget_notes_list"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:divider="#F1F5F9"
-            android:dividerHeight="1dp"
-            android:drawSelectorOnTop="false" />
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:scrollbars="vertical" />
 
         <!-- Boş Durum Görünümü -->
         <LinearLayout
-            android:id="@+id/widget_empty_view"
+            android:id="@+id/widget_notes_empty_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
             android:orientation="vertical"
             android:visibility="gone"
-            android:padding="12dp">
+            android:padding="16dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="✨"
-                android:textSize="22sp" />
+                android:text="📝"
+                android:textSize="26sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Bekleyen görev yok"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="Henüz hızlı not yok ✨\n+ butonuna dokunarak yeni not ekleyin"
                 android:textColor="#64748B"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:paddingTop="4dp" />
+                android:textSize="11sp" />
 
             <TextView
-                android:id="@+id/widget_btn_empty_add"
+                android:id="@+id/widget_btn_notes_empty_add"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="＋ Yeni Görev Ekle"
-                android:textColor="#2563EB"
-                android:textSize="11sp"
-                android:textStyle="bold"
+                android:layout_marginTop="10dp"
                 android:background="@drawable/widget_btn_bg"
-                android:paddingHorizontal="10dp"
+                android:paddingHorizontal="12dp"
                 android:paddingVertical="5dp"
-                android:layout_marginTop="8dp" />
+                android:text="➕ Yeni Not Yaz"
+                android:textColor="#D97706"
+                android:textSize="11sp"
+                android:textStyle="bold" />
         </LinearLayout>
     </FrameLayout>
 
@@ -136,19 +136,20 @@
         android:background="#E2E8F0"
         android:layout_marginTop="4dp" />
 
-    <!-- Alt Çubuk (Footer) -->
+    <!-- Alt Kısım -->
     <LinearLayout
-        android:id="@+id/widget_footer"
+        android:id="@+id/widget_notes_footer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
-        android:paddingTop="4dp">
+        android:orientation="horizontal"
+        android:paddingTop="5dp">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="TincNote • Çevrimdışı &amp; Senkronize"
+            android:text="TincNote • Hızlı Notlar"
             android:textColor="#94A3B8"
             android:textSize="9sp" />
 
@@ -156,8 +157,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Aç ➔"
-            android:textColor="#3B82F6"
-            android:textSize="9sp"
+            android:textColor="#D97706"
+            android:textSize="10sp"
             android:textStyle="bold" />
     </LinearLayout>
 

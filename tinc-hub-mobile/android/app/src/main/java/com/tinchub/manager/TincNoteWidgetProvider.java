@@ -233,14 +233,19 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
             }
             manager.notifyAppWidgetViewDataChanged(ids, R.id.widget_tasks_list);
         }
+
+        // Hızlı Notlar widget'larını da güncelle
+        try {
+            TincNoteNotesWidgetProvider.updateAllWidgets(context);
+        } catch (Exception ignored) {}
     }
 
     public static void updateWidget(Context context, AppWidgetManager appWidgetManager, int appWidgetId) {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout);
 
-        // 1. Üst Hızlı Ekleme Butonu (+)
+        // 1. Üst Hızlı Ekleme Butonu (+) -> Hızlı Görev Ekle
         Intent addIntent = new Intent(context, MainActivity.class);
-        addIntent.putExtra("action", "quick_add");
+        addIntent.putExtra("action", "quick_add_task");
         addIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent addPending = PendingIntent.getActivity(context, 1001, addIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         views.setOnClickPendingIntent(R.id.widget_btn_add, addPending);
@@ -276,19 +281,27 @@ public class TincNoteWidgetProvider extends AppWidgetProvider {
         );
         views.setPendingIntentTemplate(R.id.widget_tasks_list, clickPendingTemplate);
 
-        // 6. Başlık Altı Bekleyen Sayacı
+        // 6. Başlık Altı Bekleyen Görev Sayacı
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String jsonStr = prefs.getString(KEY_TASKS_JSON, null);
         int totalCount = 0;
         if (jsonStr != null) {
             try {
                 JSONObject root = new JSONObject(jsonStr);
-                totalCount = root.optInt("total_count", 0);
+                JSONArray tasks = root.optJSONArray("tasks");
+                if (tasks != null) {
+                    for (int i = 0; i < tasks.length(); i++) {
+                        JSONObject t = tasks.getJSONObject(i);
+                        if (!"quick_note".equals(t.optString("type")) && !t.optBoolean("is_done", false)) {
+                            totalCount++;
+                        }
+                    }
+                }
             } catch (Exception ignored) {}
         }
 
         if (totalCount > 0) {
-            views.setTextViewText(R.id.widget_subtitle, totalCount + " bekleyen madde / not");
+            views.setTextViewText(R.id.widget_subtitle, totalCount + " bekleyen görev");
         } else {
             views.setTextViewText(R.id.widget_subtitle, "Tüm görevler bitti ✨");
         }

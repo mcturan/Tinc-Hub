@@ -204,11 +204,14 @@ async function syncWidgetData() {
         }
 
         const tasks = await window.appStorage.getUnifiedTasks();
-        const activeTasks = tasks.filter(t => !t.is_done);
+        const allQuickNotes = await window.appStorage.getAll('quick_notes');
+        const activeQuickNotes = allQuickNotes.filter(n => !n._deleted && n.content);
+        const activeTasks = tasks.filter(t => !t.is_done && t.type !== 'quick_note');
 
         const payload = {
             total_count: activeTasks.length,
-            tasks: tasks
+            tasks: tasks,
+            quick_notes: activeQuickNotes
         };
 
         window.AndroidWidgetBridge.updateWidgetData(JSON.stringify(payload));
@@ -233,9 +236,17 @@ window.handleWidgetAction = (action, extra) => {
     }
     if (action === 'open_page' && extra && extra > 0) {
         openPage(parseInt(extra, 10));
-    } else if (action === 'quick_add') {
+    } else if (action === 'quick_add_task' || action === 'quick_add') {
         openQuickNotesView().then(() => {
             const input = document.getElementById('input-quick-task');
+            if (input) {
+                input.focus();
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    } else if (action === 'quick_add_note') {
+        openQuickNotesView().then(() => {
+            const input = document.getElementById('input-quick-note');
             if (input) {
                 input.focus();
                 input.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -313,25 +324,29 @@ async function renderQuickNotesView() {
         if (quickItems.length === 0) {
             directListEl.innerHTML = `<div class="empty-hint">Henüz hızlı görev eklenmedi. Yukarıdan hemen yazıp ekleyin ✨</div>`;
         } else {
-            directListEl.innerHTML = quickItems.map(it => `
+            directListEl.innerHTML = quickItems.map(it => {
+                const alarmColor = it.remind_at ? '#7c3aed' : 'var(--muted)';
+                return `
                 <div class="checklist-item-card ${it.is_done ? 'done' : ''}" style="margin-bottom:6px;">
                     <div class="checkbox-custom" onclick="toggleQuickDirectItem(${it.id})">
                         ${it.is_done ? '✓' : ''}
                     </div>
                     <div class="checklist-item-body" onclick="toggleQuickDirectItem(${it.id})">
                         <div class="checklist-item-title">${escapeHtml(it.title)}</div>
+                        ${it.remind_at ? `<div class="checklist-item-meta"><span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; cursor:pointer;" onclick="event.stopPropagation(); openItemReminderModal(${it.id})">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span></div>` : ''}
                     </div>
-                    <div class="checklist-item-actions">
+                    <div class="checklist-item-actions" style="display:flex; align-items:center; gap:4px;">
+                        <button class="item-action-btn" style="color:${alarmColor}; font-size:0.9rem;" onclick="event.stopPropagation(); openItemReminderModal(${it.id})" title="Alarm & Hatırlatıcı Ayarla">⏰</button>
                         <button class="item-action-btn" onclick="deleteQuickDirectItem(${it.id})" title="Sil">🗑️</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
     }
 
     // 3. Kategori ve Sayfalardan Gelen Görevler (Tarih Sıralı)
     const unifiedTasks = await window.appStorage.getUnifiedTasks();
-    const externalTasks = unifiedTasks.filter(t => !quickPage || t.page_id !== quickPage.id);
+    const externalTasks = unifiedTasks.filter(t => t.type !== 'quick_note' && (!quickPage || t.page_id !== quickPage.id));
 
     const unifiedListEl = document.getElementById('quick-unified-tasks-list');
     if (unifiedListEl) {
@@ -343,6 +358,10 @@ async function renderQuickNotesView() {
                 if (t.due_badge && t.due_badge.includes('Gecikmiş')) badgeColor = 'var(--danger)';
                 else if (t.due_badge && (t.due_badge.includes('Yarın') || t.due_badge.includes('Bugün'))) badgeColor = '#d97706';
                 else if (t.due_badge && t.due_badge.includes('Hızlı Görev')) badgeColor = 'var(--accent)';
+                else if (t.due_badge && t.due_badge.startsWith('⏰')) badgeColor = '#7c3aed';
+
+                const alarmBtn = (t.type === 'checklist') ?
+                    `<button class="item-action-btn" style="color:${t.remind_at ? '#7c3aed' : 'var(--muted)'}; font-size:0.9rem; padding:4px;" onclick="event.stopPropagation(); openItemReminderModal(${t.raw_id})" title="Alarm Ayarla">⏰</button>` : '';
 
                 return `
                     <div class="overview-item" style="padding:10px 12px; margin-bottom:6px; cursor:pointer;" onclick="openPage(${t.page_id})">
@@ -360,7 +379,10 @@ async function renderQuickNotesView() {
                                 </div>
                             </div>
                         </div>
-                        <span style="color:var(--muted); font-size:0.8rem;">➔</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            ${alarmBtn}
+                            <span style="color:var(--muted); font-size:0.8rem;">➔</span>
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -978,9 +1000,19 @@ async function renderChecklistItems(pageId) {
 
 function renderChecklistItemHtml(it) {
     let metaBadges = '';
+    if (it.remind_at) {
+        let displayRemind = it.remind_at;
+        try {
+            const dt = new Date(it.remind_at.replace(' ', 'T'));
+            displayRemind = `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+        } catch(e) {}
+        metaBadges += `<span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; cursor:pointer;" onclick="event.stopPropagation(); openItemReminderModal(${it.id})" title="Alarmı Düzenle">⏰ ${displayRemind}</span>`;
+    }
     if (it.price) metaBadges += `<span class="meta-badge price">💰 ${escapeHtml(it.price)}</span>`;
     if (it.quantity) metaBadges += `<span class="meta-badge" style="background:var(--surface2); color:var(--text-secondary);">${escapeHtml(it.quantity)}</span>`;
     if (it.url) metaBadges += `<a href="${escapeHtml(it.url)}" target="_system" class="meta-badge url">🔗 Link</a>`;
+
+    const alarmIconColor = it.remind_at ? '#7c3aed' : 'var(--muted)';
 
     return `
         <div class="checklist-item-card ${it.is_done ? 'done' : ''}" id="item-card-${it.id}">
@@ -991,7 +1023,8 @@ function renderChecklistItemHtml(it) {
                 <div class="checklist-item-title">${escapeHtml(it.title)}</div>
                 ${metaBadges ? `<div class="checklist-item-meta">${metaBadges}</div>` : ''}
             </div>
-            <div class="checklist-item-actions">
+            <div class="checklist-item-actions" style="display:flex; align-items:center; gap:4px;">
+                <button class="item-action-btn" style="color:${alarmIconColor}; font-size:0.9rem;" onclick="event.stopPropagation(); openItemReminderModal(${it.id})" title="Alarm & Hatırlatıcı Ayarla">⏰</button>
                 <button class="item-action-btn" onclick="deletePageItem(${it.id})" title="Sil">🗑️</button>
             </div>
         </div>
@@ -1854,19 +1887,27 @@ async function renderOverview() {
         if (pendingItems.length === 0) {
             taskListEl.innerHTML = `<div class="empty-hint">Bekleyen yapılacak görev yok ✨</div>`;
         } else {
-            taskListEl.innerHTML = pendingItems.slice(0, 8).map(it => `
+            taskListEl.innerHTML = pendingItems.slice(0, 8).map(it => {
+                const alarmBtn = `<button class="item-action-btn" style="color:${it.remind_at ? '#7c3aed' : 'var(--muted)'}; font-size:0.9rem; padding:4px;" onclick="event.stopPropagation(); openItemReminderModal(${it.id})" title="Alarm Ayarla">⏰</button>`;
+                return `
                 <div class="overview-item" style="cursor:pointer;" onclick="openPage(${it.page_id})">
                     <div style="display:flex; align-items:center; gap:10px; overflow:hidden; flex:1;">
                         <div class="checkbox-custom ${it.is_done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleOverviewItemDone(${it.id})">
                             ${it.is_done ? '✓' : ''}
                         </div>
-                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; font-size:0.9rem; ${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
-                            ${escapeHtml(it.title)}
-                        </span>
+                        <div style="overflow:hidden; display:flex; flex-direction:column; gap:1px;">
+                            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; font-size:0.9rem; ${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
+                                ${escapeHtml(it.title)}
+                            </span>
+                            ${it.remind_at ? `<span style="font-size:0.72rem; color:#7c3aed; font-weight:600;">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span>` : ''}
+                        </div>
                     </div>
-                    <span style="color:var(--muted); font-size:0.75rem;">➔</span>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        ${alarmBtn}
+                        <span style="color:var(--muted); font-size:0.75rem;">➔</span>
+                    </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
     }
 
@@ -2502,4 +2543,189 @@ async function handleMobileLogout() {
         await window.appSync.logout();
         await refreshMobileAuthUI();
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ⏰ Görev Alarmı & Hatırlatıcı Yöneticisi
+// ─────────────────────────────────────────────────────────────────────────────
+let activeReminderItemId = null;
+
+async function openItemReminderModal(itemId) {
+    if (!itemId) return;
+    activeReminderItemId = itemId;
+
+    const item = await window.appStorage.get('items', itemId);
+    if (!item) return;
+
+    const idEl = document.getElementById('rem-item-id');
+    const pageEl = document.getElementById('rem-page-id');
+    const titleEl = document.getElementById('rem-task-title-preview');
+    if (idEl) idEl.value = item.id;
+    if (pageEl) pageEl.value = item.page_id || 0;
+    if (titleEl) titleEl.innerText = item.title || 'İsimsiz Görev';
+
+    const dtInput = document.getElementById('rem-datetime-input');
+    const recSelect = document.getElementById('rem-recurrence-select');
+    const delBtn = document.getElementById('btn-delete-item-reminder');
+
+    if (recSelect) recSelect.value = item.recurrence || 'none';
+
+    if (item.remind_at) {
+        if (dtInput) dtInput.value = item.remind_at.substring(0, 16).replace(' ', 'T');
+        if (delBtn) delBtn.style.display = 'block';
+    } else {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(9, 0, 0, 0);
+        const yyyy = tomorrow.getFullYear();
+        const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+        const dd = String(tomorrow.getDate()).padStart(2, '0');
+        if (dtInput) dtInput.value = `${yyyy}-${mm}-${dd}T09:00`;
+        if (delBtn) delBtn.style.display = 'none';
+    }
+
+    openModal('modal-item-reminder');
+}
+
+function setQuickReminderPreset(preset) {
+    const dtInput = document.getElementById('rem-datetime-input');
+    if (!dtInput) return;
+    const now = new Date();
+
+    if (preset === '1hour') {
+        now.setHours(now.getHours() + 1);
+    } else if (preset === 'tonight') {
+        now.setHours(20, 0, 0, 0);
+        if (now <= new Date()) {
+            now.setDate(now.getDate() + 1);
+        }
+    } else if (preset === 'tomorrow') {
+        now.setDate(now.getDate() + 1);
+        now.setHours(9, 0, 0, 0);
+    } else if (preset === 'nextweek') {
+        const day = now.getDay();
+        const diff = (7 - day + 1) % 7 || 7;
+        now.setDate(now.getDate() + diff);
+        now.setHours(9, 0, 0, 0);
+    }
+
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    dtInput.value = `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+async function submitSaveItemReminder() {
+    if (!activeReminderItemId) return;
+    const dtInput = document.getElementById('rem-datetime-input');
+    const recSelect = document.getElementById('rem-recurrence-select');
+    if (!dtInput || !dtInput.value) {
+        alert("Lütfen geçerli bir hatırlatma tarihi ve saati seçin.");
+        return;
+    }
+
+    const rawVal = dtInput.value;
+    const remindAtStr = rawVal.replace('T', ' ') + ':00';
+    const recurrence = recSelect ? recSelect.value : 'none';
+
+    const item = await window.appStorage.get('items', activeReminderItemId);
+    if (!item) return;
+
+    // 1. Yerel IndexedDB'ye kaydet
+    await window.appStorage.setItemReminder(item.id, remindAtStr, recurrence);
+
+    // 2. Android Yerel Alarm & Bildirim Kur (AlarmManager)
+    if (window.AndroidWidgetBridge && window.AndroidWidgetBridge.scheduleTaskAlarm) {
+        try {
+            window.AndroidWidgetBridge.scheduleTaskAlarm(item.id, item.title, remindAtStr, recurrence, item.page_id || 0);
+        } catch (e) {
+            console.warn("scheduleTaskAlarm error:", e);
+        }
+    }
+
+    // 3. Sunucuya ilet
+    if (window.appSync) {
+        window.appSync.getServerUrl().then(sUrl => {
+            if (sUrl) {
+                window.appStorage.getSetting('auth_token', '').then(tok => {
+                    fetch(`${sUrl}/notes/api/items/${item.id}/reminder`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': tok ? `Bearer ${tok}` : '',
+                            'X-Auth-Token': tok || ''
+                        },
+                        body: JSON.stringify({ remind_at: remindAtStr, recurrence: recurrence })
+                    }).catch(() => {});
+                });
+            }
+        });
+    }
+
+    closeModal('modal-item-reminder');
+    showMobileToast("⏰ Alarm ve hatırlatıcı başarıyla kuruldu!");
+
+    if (activePageId) renderChecklistItems(activePageId);
+    renderQuickNotesView();
+    renderOverview();
+    syncWidgetData();
+}
+
+async function submitDeleteItemReminder() {
+    if (!activeReminderItemId) return;
+
+    const item = await window.appStorage.get('items', activeReminderItemId);
+    if (!item) return;
+
+    // 1. Yerel depolamadan kaldır
+    await window.appStorage.deleteItemReminder(item.id);
+
+    // 2. Android Yerel Alarmını İptal Et
+    if (window.AndroidWidgetBridge && window.AndroidWidgetBridge.cancelTaskAlarm) {
+        try {
+            window.AndroidWidgetBridge.cancelTaskAlarm(item.id);
+        } catch (e) {
+            console.warn("cancelTaskAlarm error:", e);
+        }
+    }
+
+    // 3. Sunucudan sil
+    if (window.appSync) {
+        window.appSync.getServerUrl().then(sUrl => {
+            if (sUrl) {
+                window.appStorage.getSetting('auth_token', '').then(tok => {
+                    fetch(`${sUrl}/notes/api/items/${item.id}/reminder`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': tok ? `Bearer ${tok}` : '',
+                            'X-Auth-Token': tok || ''
+                        }
+                    }).catch(() => {});
+                });
+            }
+        });
+    }
+
+    closeModal('modal-item-reminder');
+    showMobileToast("Hatırlatıcı kaldırıldı.");
+
+    if (activePageId) renderChecklistItems(activePageId);
+    renderQuickNotesView();
+    renderOverview();
+    syncWidgetData();
+}
+
+function showMobileToast(msg) {
+    let t = document.getElementById('mobile-quick-toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'mobile-quick-toast';
+        t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:24px;font-size:0.88rem;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.3);z-index:99999;transition:opacity 0.3s;pointer-events:none;';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    setTimeout(() => { t.style.opacity = '0'; }, 2600);
 }
