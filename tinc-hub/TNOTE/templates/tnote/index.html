@@ -50,7 +50,8 @@
                     </a>
                 </div>
             </div>
-            <div class="sidebar-header-actions">
+            <div class="sidebar-header-actions" style="display:flex; align-items:center; gap:2px;">
+                <button class="btn-icon" onclick="addCategoryDividerWeb()" title="Araya Ayraç Çizgisi Ekle" style="font-size:0.72rem; font-weight:700; width:24px; height:24px; border-radius:4px; color:var(--muted);" aria-label="Ayraç Ekle">―</button>
                 <button class="btn-icon" onclick="openModal('modal-add-category')" title="Bu Deftere Yeni Kategori Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
                 <button class="btn-icon sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarManual()" title="Menüyü Daralt ( « )">«</button>
             </div>
@@ -75,14 +76,26 @@
 
         <div class="sidebar-categories" id="sidebar-categories">
             {% for cat in categories %}
-            <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}">
+            {% if cat.is_divider or cat.icon == '―' or cat.name == '---' or (cat.name and cat.name.startswith('---')) %}
+            <div class="category-divider-item" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}" draggable="true">
+                <div class="cat-divider-line"></div>
+                {% if cat.name and cat.name != '---' and cat.name != 'Ayraç' %}
+                    <span class="cat-divider-label">{{ cat.name }}</span>
+                    <div class="cat-divider-line"></div>
+                {% endif %}
+                <button class="btn-icon-subtle btn-danger-hover cat-divider-del-btn" onclick="deleteCategory({{ cat.id }}, 'Ayraç')" title="Ayracı Sil">✕</button>
+            </div>
+            {% else %}
+            <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}" style="border-left: 3.5px solid {{ cat.color or '#3b82f6' }};">
                 <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" title="{{ cat.name }}" onclick="toggleCategoryGroup({{ cat.id }})">
                     <div class="category-title-area">
                         <span class="cat-chevron" id="cat-chevron-{{ cat.id }}">▾</span>
+                        <span class="cat-color-dot" style="background:{{ cat.color or '#3b82f6' }};"></span>
+                        <span style="font-size:0.95rem; margin-right:3px; flex-shrink:0;">{{ cat.icon or '📁' }}</span>
                         <span class="category-title-text" title="{{ cat.name }}">{{ cat.name }}</span>
                     </div>
                     <div class="category-actions" onclick="event.stopPropagation()">
-                        <span class="badge-count" id="cat-badge-{{ cat.id }}">{{ cat.page_count }}</span>
+                        <span class="badge-count" id="cat-badge-{{ cat.id }}" style="background:{{ cat.color or '#3b82f6' }}18; color:{{ cat.color or '#3b82f6' }}; font-weight:700;">{{ cat.page_count }}</span>
                         <button class="btn-icon-subtle" onclick="openAddPageForCat({{ cat.id }}, '{{ cat.name|escape }}')" title="Bu Kategoriye Liste Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
                         <button class="btn-icon-subtle" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|escape }}', '{{ cat.icon|escape }}', '{{ cat.color|escape }}')" title="Kategoriyi Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
                         <button class="btn-icon-subtle btn-danger-hover" onclick="deleteCategory({{ cat.id }}, '{{ cat.name|escape }}')" title="Kategoriyi Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
@@ -109,6 +122,7 @@
                     {% endfor %}
                 </ul>
             </div>
+            {% endif %}
             {% endfor %}
         </div>
 
@@ -1145,7 +1159,9 @@
                 <label>Bağlı Kategori</label>
                 <select id="new-page-cat" class="form-control">
                     {% for cat in categories %}
+                    {% if not cat.is_divider and cat.icon != '―' and cat.name != '---' and not (cat.name and cat.name.startswith('---')) %}
                     <option value="{{ cat.id }}">{{ cat.icon }} {{ cat.name }}</option>
+                    {% endif %}
                     {% endfor %}
                 </select>
             </div>
@@ -1241,11 +1257,51 @@
             </div>
             <div class="form-group">
                 <label>İkon (Emoji)</label>
-                <input type="text" id="edit-cat-icon" class="form-control">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="text" id="edit-cat-icon" class="form-control" style="width:70px; text-align:center; font-size:1.2rem;">
+                    <span style="font-size:0.75rem; color:var(--muted);">Aşağıdan seçin veya özel emoji yazın:</span>
+                </div>
+                <div class="emoji-picker-grid" style="margin-top:6px;">
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '📁', this)">📁</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '📂', this)">📂</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '📑', this)">📑</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '📝', this)">📝</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '📋', this)">📋</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '🛒', this)">🛒</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '💳', this)">💳</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '💰', this)">💰</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '🔬', this)">🔬</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '⚡', this)">⚡</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '🚀', this)">🚀</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '🎯', this)">🎯</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '📌', this)">📌</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '🔧', this)">🔧</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '💡', this)">💡</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '🏷️', this)">🏷️</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '📊', this)">📊</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '💻', this)">💻</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '🌐', this)">🌐</span>
+                    <span class="emoji-btn" onclick="selectPickerIcon('edit-cat-icon', '📚', this)">📚</span>
+                </div>
             </div>
             <div class="form-group">
                 <label>Renk</label>
-                <input type="color" id="edit-cat-color" style="height:40px; border:1px solid var(--border); border-radius:6px; width:100%; cursor:pointer;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="color" id="edit-cat-color" style="height:36px; width:50px; border:1px solid var(--border); border-radius:6px; cursor:pointer;" oninput="updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview')">
+                    <span id="edit-cat-color-preview" style="font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:6px; background:#3b82f618; color:#3b82f6; border:1px solid #3b82f635;">Örnek Kategori</span>
+                </div>
+                <div class="color-picker-palette" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                    <span class="color-swatch" style="background:#0284c7; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#0284c7', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Açık Mavi"></span>
+                    <span class="color-swatch" style="background:#2563eb; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#2563eb', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Koyu Mavi"></span>
+                    <span class="color-swatch" style="background:#059669; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#059669', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Zümrüt"></span>
+                    <span class="color-swatch" style="background:#10b981; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#10b981', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Yeşil"></span>
+                    <span class="color-swatch" style="background:#d97706; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#d97706', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Amber"></span>
+                    <span class="color-swatch" style="background:#dc2626; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#dc2626', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Kırmızı"></span>
+                    <span class="color-swatch" style="background:#7c3aed; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#7c3aed', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Mor"></span>
+                    <span class="color-swatch" style="background:#c026d3; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#c026d3', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Fuşya"></span>
+                    <span class="color-swatch" style="background:#475569; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#475569', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Arduvaz"></span>
+                    <span class="color-swatch" style="background:#0891b2; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#0891b2', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Camgöbeği"></span>
+                </div>
             </div>
         </div>
         <div class="modal-footer">
@@ -1268,7 +1324,9 @@
                 <label>Bağlı Kategori</label>
                 <select id="edit-page-cat" class="form-control">
                     {% for cat in categories %}
+                    {% if not cat.is_divider and cat.icon != '―' and cat.name != '---' and not (cat.name and cat.name.startswith('---')) %}
                     <option value="{{ cat.id }}">{{ cat.icon }} {{ cat.name }}</option>
+                    {% endif %}
                     {% endfor %}
                 </select>
             </div>

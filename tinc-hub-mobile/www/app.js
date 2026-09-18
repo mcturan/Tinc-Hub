@@ -747,8 +747,19 @@ async function reloadDrawerNavigation() {
     }
 
     catContainer.innerHTML = categories.map(cat => {
+        if (cat.is_divider || cat.icon === '―' || cat.name === '---' || (typeof cat.name === 'string' && cat.name.startsWith('---'))) {
+            return `
+                <div class="drawer-cat-divider-group" id="cat-group-${cat.id}">
+                    <div class="drawer-divider-line"></div>
+                    ${cat.name && cat.name !== '---' && cat.name !== 'Ayraç' ? `<span class="drawer-divider-label">${escapeHtml(cat.name)}</span><div class="drawer-divider-line"></div>` : ''}
+                    <button type="button" class="btn btn-ghost btn-xs drawer-divider-del" onclick="event.stopPropagation(); deleteCategoryDividerMobile(${cat.id})" title="Ayracı Sil">✕</button>
+                </div>
+            `;
+        }
+
         const catPages = allPages.filter(p => p.category_id == cat.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
         const isOpen = openCategoryIds.has(cat.id);
+        const catColor = cat.color || '#3b82f6';
 
         let pagesHtml = catPages.map(page => {
             const pageDefIcon = page.type === 'checklist' ? '🛒' :
@@ -777,16 +788,17 @@ async function reloadDrawerNavigation() {
         `;
 
         return `
-            <div class="drawer-cat-group ${isOpen ? 'open' : ''}" id="cat-group-${cat.id}">
+            <div class="drawer-cat-group ${isOpen ? 'open' : ''}" id="cat-group-${cat.id}" style="border-left: 4px solid ${catColor};">
                 <div class="drawer-cat-header" onclick="toggleCategoryAccordion(${cat.id})">
                     <div class="drawer-cat-title">
                         <span class="drawer-cat-arrow">▶</span>
-                        <span>${cat.icon || '📁'}</span>
-                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(cat.name)}</span>
+                        <span style="font-size:1.05rem; line-height:1;">${cat.icon || '📁'}</span>
+                        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600;">${escapeHtml(cat.name)}</span>
+                        <span class="cat-color-dot" style="width:7px; height:7px; border-radius:50%; background:${catColor}; flex-shrink:0; display:inline-block; box-shadow:0 0 0 1.5px rgba(0,0,0,0.06);"></span>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <button type="button" class="btn btn-ghost btn-xs" style="padding:2px 5px; font-size:0.75rem; color:var(--muted);" title="Kategoriyi Düzenle" onclick="event.stopPropagation(); openEditCategoryModal(${cat.id})">✏️</button>
-                        <span style="font-size:0.75rem; color:var(--muted); background:var(--surface); padding:2px 6px; border-radius:10px; font-weight:700;">
+                        <span style="font-size:0.75rem; color:${catColor}; background:${catColor}18; border:1px solid ${catColor}30; padding:1px 6px; border-radius:10px; font-weight:700;">
                             ${catPages.length}
                         </span>
                     </div>
@@ -936,7 +948,14 @@ async function renderActivePage() {
     document.getElementById('top-subtitle').innerText = `${document.getElementById('drawer-nb-name').innerText} > ${catName}`;
 
     // Sayfa Başlık Kartı
-    document.getElementById('page-view-cat-badge').innerText = catName;
+    const catColor = (cat && cat.color) ? cat.color : '#3b82f6';
+    const catBadge = document.getElementById('page-view-cat-badge');
+    if (catBadge) {
+        catBadge.innerText = (cat && cat.icon ? cat.icon + ' ' : '📁 ') + catName;
+        catBadge.style.backgroundColor = catColor + '18';
+        catBadge.style.color = catColor;
+        catBadge.style.borderColor = catColor + '35';
+    }
     document.getElementById('page-view-icon').innerText = page.icon || defaultIcon;
     document.getElementById('page-view-title-input').value = page.title || '';
 
@@ -2248,6 +2267,49 @@ async function submitCreateNotebook() {
     window.appSync.syncNow();
 }
 
+function setCatColorPicker(inputId, previewId, color) {
+    const el = document.getElementById(inputId);
+    if (el) el.value = color;
+    updateCatColorPreview(inputId, previewId);
+}
+
+function updateCatColorPreview(inputId, previewId) {
+    const el = document.getElementById(inputId);
+    const prev = document.getElementById(previewId);
+    if (el && prev) {
+        const c = el.value || '#3b82f6';
+        prev.style.background = c + '18';
+        prev.style.color = c;
+        prev.style.borderColor = c + '35';
+    }
+}
+
+async function addCategoryDividerMobile() {
+    const label = prompt("Ayraç etiketi (isteğe bağlı, sadece çizgi için boş bırakın):", "");
+    if (label === null) return;
+    const name = label.trim() || '---';
+    const newCat = {
+        id: Date.now(),
+        notebook_id: activeNotebookId,
+        name: name,
+        icon: '―',
+        color: '#94a3b8',
+        is_divider: 1,
+        sort_order: 99
+    };
+    await window.appStorage.saveCategory(newCat);
+    await reloadDrawerNavigation();
+    window.appSync.syncNow();
+    showMobileToast('Ayraç eklendi');
+}
+
+async function deleteCategoryDividerMobile(catId) {
+    await window.appStorage.deleteCategory(catId);
+    await reloadDrawerNavigation();
+    window.appSync.syncNow();
+    showMobileToast('Ayraç silindi');
+}
+
 function openAddCategoryModal() {
     const nameInput = document.getElementById('new-cat-name');
     const iconInput = document.getElementById('new-cat-icon');
@@ -2257,6 +2319,7 @@ function openAddCategoryModal() {
     if (iconInput) iconInput.value = '📁';
     if (iconPreview) iconPreview.innerText = '📁';
     if (colorInput) colorInput.value = '#3b82f6';
+    updateCatColorPreview('new-cat-color', 'new-cat-color-preview');
     openModal('modal-add-category');
 }
 
@@ -2299,6 +2362,7 @@ async function openEditCategoryModal(catId) {
     document.getElementById('edit-cat-color').value = cat.color || '#3b82f6';
     const preview = document.getElementById('edit-cat-icon-preview');
     if (preview) preview.innerText = cat.icon || '📁';
+    updateCatColorPreview('edit-cat-color', 'edit-cat-color-preview');
 
     openModal('modal-edit-category');
 }
@@ -2412,7 +2476,8 @@ async function submitCreatePage() {
     let catId = catInput && catInput.value ? parseInt(catInput.value, 10) : null;
     if (!catId) {
         const cats = await window.appStorage.getCategories(activeNotebookId);
-        if (cats.length > 0) catId = cats[0].id;
+        const realCats = cats.filter(c => !c.is_divider && c.icon !== '―' && c.name !== '---' && !(c.name && c.name.startsWith('---')));
+        if (realCats.length > 0) catId = realCats[0].id;
         else {
             const defaultCat = await window.appStorage.saveCategory({
                 id: Date.now(),
@@ -2477,7 +2542,8 @@ async function openEditPageModal(pageId) {
     const catSelect = document.getElementById('edit-page-cat-select');
     if (catSelect) {
         const cats = await window.appStorage.getCategories(activeNotebookId);
-        catSelect.innerHTML = cats.map(c => `
+        const realCats = cats.filter(c => !c.is_divider && c.icon !== '―' && c.name !== '---' && !(c.name && c.name.startsWith('---')));
+        catSelect.innerHTML = realCats.map(c => `
             <option value="${c.id}" ${c.id == page.category_id ? 'selected' : ''}>${c.icon || '📁'} ${escapeHtml(c.name)}</option>
         `).join('');
     }

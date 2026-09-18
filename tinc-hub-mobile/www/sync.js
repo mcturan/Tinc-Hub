@@ -370,14 +370,16 @@ class TincNoteSync {
                                 name: cat.name,
                                 icon: cat.icon || '📁',
                                 color: cat.color || '#3b82f6',
-                                notebook_id: cat.notebook_id || 1
+                                notebook_id: cat.notebook_id || 1,
+                                is_divider: cat.is_divider ? 1 : 0
                             })
                         });
                         const data = await res.json();
-                        if (data.ok && data.category_id) {
+                        const newCatId = data.id || data.category_id;
+                        if (data.ok && newCatId) {
                             const oldId = cat.id;
                             await this.storage.delete('categories', oldId);
-                            cat.id = data.category_id;
+                            cat.id = newCatId;
                             cat._dirty = false;
                             await this.storage.put('categories', cat);
 

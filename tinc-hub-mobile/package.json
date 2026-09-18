@@ -1,6 +1,6 @@
 {
   "name": "tinc-hub-manager",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "description": "Tinc Hub Mobile Manager",
   "dependencies": {
     "@capacitor/android": "^5.0.0",

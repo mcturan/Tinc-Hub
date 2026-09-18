@@ -459,15 +459,20 @@ def api_get_categories():
 def api_add_category():
     data = request.get_json() or {}
     name = data.get("name", "").strip()
-    if not name:
+    is_divider = 1 if data.get("is_divider") else 0
+    if not name and not is_divider:
         return jsonify({"ok": False, "error": "Kategori adı gerekli"}), 400
+    if not name and is_divider:
+        name = "---"
     nb_id = data.get("notebook_id") or session.get("active_notebook_id") or db.get_active_notebook_id()
     if nb_id:
         nb_id = int(nb_id)
         session["active_notebook_id"] = nb_id
         db.set_active_notebook_id(nb_id)
-    cat_id = db.add_category(name, data.get("icon", "📁"), data.get("color", "#3b82f6"), notebook_id=nb_id)
-    return jsonify({"ok": True, "id": cat_id, "categories": db.get_categories(nb_id), "notebook_id": nb_id})
+    default_icon = "―" if is_divider else "📁"
+    default_color = "#94a3b8" if is_divider else "#3b82f6"
+    cat_id = db.add_category(name, data.get("icon", default_icon), data.get("color", default_color), notebook_id=nb_id, is_divider=is_divider)
+    return jsonify({"ok": True, "id": cat_id, "category_id": cat_id, "categories": db.get_categories(nb_id), "notebook_id": nb_id})
 
 @tnote_bp.route('/api/categories/<int:cat_id>', methods=['PUT'])
 @auth_check

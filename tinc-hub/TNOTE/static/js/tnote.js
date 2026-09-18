@@ -2128,12 +2128,44 @@ async function submitAddPage() {
 }
 
 // Kategori Düzenleme & Silme
+function updateWebCatColorPreview(inputId, previewId) {
+    const el = document.getElementById(inputId);
+    const prev = document.getElementById(previewId);
+    if (el && prev) {
+        const c = el.value || '#3b82f6';
+        prev.style.background = c + '18';
+        prev.style.color = c;
+        prev.style.borderColor = c + '35';
+    }
+}
+
 function openEditCategoryModal(catId, name, icon, color) {
     document.getElementById('edit-cat-id').value = catId;
     document.getElementById('edit-cat-name').value = name;
     document.getElementById('edit-cat-icon').value = icon || '📁';
     document.getElementById('edit-cat-color').value = color || '#3b82f6';
+    updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');
     openModal('modal-edit-category');
+}
+
+async function addCategoryDividerWeb() {
+    const label = prompt("Ayraç etiketi (isteğe bağlı, sadece çizgi için boş bırakabilirsiniz):", "");
+    if (label === null) return;
+    const name = label.trim() || '---';
+    const res = await fetch('/notes/api/categories', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: name,
+            icon: '―',
+            color: '#94a3b8',
+            is_divider: 1
+        })
+    });
+    const data = await res.json();
+    if (data.ok) {
+        window.location.reload();
+    }
 }
 
 async function submitEditCategory() {
@@ -2156,7 +2188,10 @@ async function submitEditCategory() {
 }
 
 async function deleteCategory(catId, name) {
-    if (!confirm(`"${name}" kategorisini ve içindeki tüm sayfaları silmek istediğinize emin misiniz?`)) return;
+    const confirmMsg = (name === 'Ayraç' || name === '---') ? 
+        'Bu ayracı silmek istediğinize emin misiniz?' : 
+        `"${name}" kategorisini ve içindeki tüm sayfaları silmek istediğinize emin misiniz?`;
+    if (!confirm(confirmMsg)) return;
     const res = await fetch(`/notes/api/categories/${catId}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.ok) {

@@ -513,6 +513,11 @@ def init_db():
             ]
             cur.executemany("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", default_settings)
 
+        try:
+            cur.execute("ALTER TABLE categories ADD COLUMN is_divider INTEGER DEFAULT 0")
+        except Exception:
+            pass
+
         conn.commit()
         conn.close()
 
@@ -756,7 +761,7 @@ def get_category(cat_id: int):
         conn.close()
         return dict(row) if row else None
 
-def add_category(name: str, icon: str = '📁', color: str = '#3b82f6', notebook_id: int = None):
+def add_category(name: str, icon: str = '📁', color: str = '#3b82f6', notebook_id: int = None, is_divider: int = 0):
     with _lock:
         conn = get_conn()
         cur = conn.cursor()
@@ -767,8 +772,8 @@ def add_category(name: str, icon: str = '📁', color: str = '#3b82f6', notebook
 
         cur.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM categories WHERE notebook_id = ?", (notebook_id,))
         next_order = cur.fetchone()[0]
-        cur.execute("INSERT INTO categories (name, icon, color, notebook_id, sort_order) VALUES (?, ?, ?, ?, ?)",
-                    (name.strip(), icon or '📁', color or '#3b82f6', notebook_id, next_order))
+        cur.execute("INSERT INTO categories (name, icon, color, notebook_id, sort_order, is_divider) VALUES (?, ?, ?, ?, ?, ?)",
+                    (name.strip(), icon or '📁', color or '#3b82f6', notebook_id, next_order, 1 if is_divider else 0))
         cat_id = cur.lastrowid
         conn.commit()
         conn.close()

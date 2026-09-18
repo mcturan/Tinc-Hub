@@ -398,7 +398,7 @@ body {
 .drawer-cat-accordion {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 9px;
 }
 
 .drawer-cat-group {
@@ -406,6 +406,7 @@ body {
     border-radius: 10px;
     overflow: hidden;
     background: var(--surface);
+    transition: box-shadow 0.15s;
 }
 
 .drawer-cat-header {
@@ -419,6 +420,68 @@ body {
     font-size: 0.88rem;
     color: var(--text);
     transition: background 0.15s;
+}
+
+.cat-color-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.06);
+}
+
+/* Kategori Ayracı / Bölücü (Mobile Drawer) */
+.drawer-cat-divider-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 4px 3px;
+    padding: 2px 0;
+    user-select: none;
+}
+.drawer-divider-line {
+    flex: 1;
+    height: 1.5px;
+    background: var(--border);
+}
+.drawer-divider-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 0 4px;
+    white-space: nowrap;
+}
+.drawer-divider-del {
+    padding: 1px 5px !important;
+    font-size: 0.68rem !important;
+    color: var(--muted) !important;
+    border-radius: 4px;
+    opacity: 0.6;
+}
+.drawer-divider-del:active {
+    opacity: 1;
+    color: #ef4444 !important;
+}
+
+/* Renk Paleti Swatch'ları */
+.color-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    display: inline-block;
+    transition: transform 0.15s, box-shadow 0.15s;
+    flex-shrink: 0;
+}
+.color-swatch:active, .color-swatch.selected {
+    transform: scale(1.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    outline: 2px solid var(--accent);
 }
 
 .drawer-cat-header:active {
