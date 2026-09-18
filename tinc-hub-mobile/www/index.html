@@ -84,14 +84,14 @@
                 </div>
             </div>
 
-            <!-- Kategoriler & Sayfalar Akordeon Listesi -->
+            <!-- Dosyalar & Sayfalar Akordeon Listesi -->
             <div class="drawer-section-title">
-                <span>📁 Kategoriler</span>
+                <span>📁 Dosyalar</span>
                 <div style="display:flex; align-items:center; gap:6px;">
                     <button class="btn btn-ghost btn-xs" onclick="addCategoryDividerMobile()" style="font-size:0.72rem; padding:2px 8px; border:1px dashed var(--border); border-radius:6px; color:var(--muted); font-weight:600;" title="Araya Ayraç Çizgisi Ekle">
                         ＋ Ayraç
                     </button>
-                    <button class="icon-btn" onclick="openAddCategoryModal()" style="width:26px; height:26px; font-size:0.85rem; border-radius:6px;" title="Yeni Kategori Ekle">
+                    <button class="icon-btn" onclick="openAddCategoryModal()" style="width:26px; height:26px; font-size:0.85rem; border-radius:6px;" title="Yeni Dosya Ekle">
                         ＋
                     </button>
                 </div>
@@ -477,7 +477,7 @@
                 <div class="kpi-card" onclick="openSettingsView()">
                     <div class="kpi-icon-badge green">⚙️</div>
                     <div class="kpi-info">
-                        <span class="kpi-val">v1.5.6</span>
+                        <span class="kpi-val">v1.5.9</span>
                         <span class="kpi-label">Sürüm & Ayarlar</span>
                     </div>
                 </div>
@@ -557,10 +557,10 @@
                 </div>
             </div>
 
-            <!-- Bölüm 3: 📅 Kategori ve Sayfalardan Gelen Görevler (Tarih Sıralı) -->
-            <div class="overview-section">
-                <div class="overview-section-header">
-                    <div class="section-title">📅 Diğer Sayfa &amp; Kategorilerden Gelen Görevler</div>
+            <!-- Bölüm 3: 📅 Dosya ve Sayfalardan Gelen Görevler (Tarih Sıralı) -->
+            <div class="card" style="margin-bottom:12px;">
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="section-title">📅 Diğer Sayfa &amp; Dosyalardan Gelen Görevler</div>
                     <span style="font-size:0.72rem; color:var(--muted);">Tarih Sıralı</span>
                 </div>
                 <div id="quick-unified-tasks-list" class="overview-list">
@@ -692,7 +692,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <div style="font-weight:700; font-size:0.95rem;">Uygulama Sürümü</div>
-                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.5.6</div>
+                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.5.9</div>
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="window.appUpdater.checkForUpdates(false)">
                         🔍 Güncelleme Ara
@@ -739,11 +739,11 @@
     <div id="modal-add-category" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
-                <h3 class="modal-title">📁 Yeni Kategori</h3>
+                <h3 class="modal-title">📁 Yeni Dosya</h3>
                 <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-add-category')">✕</button>
             </div>
             <div class="form-group">
-                <label class="form-label">Kategori Adı</label>
+                <label class="form-label">Dosya Adı</label>
                 <input type="text" id="new-cat-name" class="input-text" placeholder="Örn: Market, Projeler, İş...">
             </div>
             <div class="form-group">
@@ -755,10 +755,10 @@
                 </div>
             </div>
             <div class="form-group">
-                <label class="form-label">Renk</label>
+                <label class="form-label">Dosya Rengi</label>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="color" id="new-cat-color" style="width:48px; height:38px; border:1px solid var(--border); border-radius:8px; cursor:pointer; padding:2px;" value="#3b82f6" oninput="updateCatColorPreview('new-cat-color', 'new-cat-color-preview')">
-                    <span id="new-cat-color-preview" style="font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:6px; background:#3b82f618; color:#3b82f6; border:1px solid #3b82f635;">Örnek Kategori</span>
+                    <span id="new-cat-color-preview" style="font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:6px; background:#3b82f618; color:#3b82f6; border:1px solid #3b82f635;">Örnek Dosya</span>
                 </div>
                 <div class="color-palette-swatches" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
                     <span class="color-swatch" style="background:#0284c7;" onclick="setCatColorPicker('new-cat-color', 'new-cat-color-preview', '#0284c7')"></span>
@@ -784,12 +784,12 @@
     <div id="modal-edit-category" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">
-                <h3 class="modal-title">📁 Kategoriyi Düzenle</h3>
+                <h3 class="modal-title">📁 Dosyayı Düzenle</h3>
                 <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-edit-category')">✕</button>
             </div>
             <input type="hidden" id="edit-cat-id">
             <div class="form-group">
-                <label class="form-label">Kategori Adı</label>
+                <label class="form-label">Dosya Adı</label>
                 <input type="text" id="edit-cat-name" class="input-text">
             </div>
             <div class="form-group">
@@ -801,10 +801,10 @@
                 </div>
             </div>
             <div class="form-group">
-                <label class="form-label">Renk</label>
+                <label class="form-label">Dosya Rengi</label>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <input type="color" id="edit-cat-color" style="width:48px; height:38px; border:1px solid var(--border); border-radius:8px; cursor:pointer; padding:2px;" value="#3b82f6" oninput="updateCatColorPreview('edit-cat-color', 'edit-cat-color-preview')">
-                    <span id="edit-cat-color-preview" style="font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:6px; background:#3b82f618; color:#3b82f6; border:1px solid #3b82f635;">Örnek Kategori</span>
+                    <span id="edit-cat-color-preview" style="font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:6px; background:#3b82f618; color:#3b82f6; border:1px solid #3b82f635;">Örnek Dosya</span>
                 </div>
                 <div class="color-palette-swatches" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
                     <span class="color-swatch" style="background:#0284c7;" onclick="setCatColorPicker('edit-cat-color', 'edit-cat-color-preview', '#0284c7')"></span>
@@ -885,7 +885,7 @@
             </div>
             <input type="hidden" id="edit-page-id">
             <div class="form-group">
-                <label class="form-label">Bağlı Kategori</label>
+                <label class="form-label">Bağlı Dosya</label>
                 <select id="edit-page-cat-select" class="input-text">
                     <!-- Dinamik kategoriler -->
                 </select>
@@ -1399,7 +1399,7 @@
 
             <div id="mobile-transfer-mode-new" style="display:none;">
                 <div class="form-group" style="margin-bottom:8px;">
-                    <label class="form-label" for="mobile-transfer-target-category" style="font-size:0.8rem; font-weight:600;">Hedef Kategori:</label>
+                    <label class="form-label" for="mobile-transfer-target-category" style="font-size:0.8rem; font-weight:600;">Hedef Dosya:</label>
                     <select id="mobile-transfer-target-category" class="input-text" style="width:100%;"></select>
                 </div>
                 <div class="form-group" style="margin-bottom:10px;">

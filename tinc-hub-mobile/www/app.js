@@ -431,14 +431,14 @@ async function openTransferQuickNoteModal(noteId) {
             pageSelect.innerHTML = '<option value="">(Mevcut sayfa bulunamadı)</option>';
         } else {
             pageSelect.innerHTML = activePages.map(p => {
-                const catName = catMap[p.category_id] || 'Kategori';
+                const catName = catMap[p.category_id] || 'Dosya';
                 const typeLabel = p.type === 'checklist' ? '✓ Görev Listesi' : '📝 Not';
                 return `<option value="${p.id}">${escapeHtml(catName)} / ${escapeHtml(p.title)} (${typeLabel})</option>`;
             }).join('');
         }
     }
 
-    // Hedef kategorileri doldur
+    // Hedef dosyaları doldur
     const catSelect = document.getElementById('mobile-transfer-target-category');
     if (catSelect) {
         catSelect.innerHTML = cats.map(c => `
@@ -487,7 +487,7 @@ async function submitTransferQuickNote() {
         const catId = Number(document.getElementById('mobile-transfer-target-category').value);
         const newTitle = document.getElementById('mobile-transfer-new-page-title').value.trim();
         if (!catId) {
-            alert('Lütfen bir kategori seçin.');
+            alert('Lütfen bir dosya seçin.');
             return;
         }
         if (!newTitle) {
@@ -732,9 +732,9 @@ async function reloadDrawerNavigation() {
     if (categories.length === 0) {
         catContainer.innerHTML = `
             <div style="text-align:center; padding:16px 8px; font-size:0.82rem; color:var(--muted);">
-                Bu defterde kategori yok.<br>
+                Bu defterde dosya yok.<br>
                 <button class="btn btn-ghost btn-sm" onclick="openAddCategoryModal()" style="color:var(--accent); font-weight:700; margin-top:4px;">
-                    ＋ Kategori Ekle
+                    ＋ Dosya Ekle
                 </button>
             </div>
         `;
@@ -749,7 +749,8 @@ async function reloadDrawerNavigation() {
     catContainer.innerHTML = categories.map(cat => {
         if (cat.is_divider || cat.icon === '―' || cat.name === '---' || (typeof cat.name === 'string' && cat.name.startsWith('---'))) {
             return `
-                <div class="drawer-cat-divider-group" id="cat-group-${cat.id}">
+                <div class="drawer-cat-divider-group" id="cat-group-${cat.id}" data-category-id="${cat.id}">
+                    <span class="drawer-drag-handle cat-drag-handle" title="Ayracı taşı">⠿</span>
                     <div class="drawer-divider-line"></div>
                     ${cat.name && cat.name !== '---' && cat.name !== 'Ayraç' ? `<span class="drawer-divider-label">${escapeHtml(cat.name)}</span><div class="drawer-divider-line"></div>` : ''}
                     <button type="button" class="btn btn-ghost btn-xs drawer-divider-del" onclick="event.stopPropagation(); deleteCategoryDividerMobile(${cat.id})" title="Ayracı Sil">✕</button>
@@ -771,8 +772,9 @@ async function reloadDrawerNavigation() {
                                   page.type === 'project' ? 'Proje' :
                                   page.type === 'finance' ? 'Finans' : 'Not';
             return `
-                <div class="drawer-page-item ${activePageId == page.id && activeView === 'page' ? 'active' : ''}" onclick="openPage(${page.id})">
+                <div class="drawer-page-item ${activePageId == page.id && activeView === 'page' ? 'active' : ''}" id="drawer-page-${page.id}" data-page-id="${page.id}" data-category-id="${cat.id}" onclick="openPage(${page.id})">
                     <span style="display:flex; align-items:center; gap:6px; overflow:hidden; text-overflow:ellipsis;">
+                        <span class="drawer-drag-handle page-drag-handle" onclick="event.stopPropagation()" title="Sayfayı taşı">⠿</span>
                         <span>${page.icon || pageDefIcon}</span>
                         <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(page.title)}</span>
                     </span>
@@ -788,27 +790,30 @@ async function reloadDrawerNavigation() {
         `;
 
         return `
-            <div class="drawer-cat-group ${isOpen ? 'open' : ''}" id="cat-group-${cat.id}" style="border-left: 4px solid ${catColor};">
-                <div class="drawer-cat-header" onclick="toggleCategoryAccordion(${cat.id})">
+            <div class="drawer-cat-group ${isOpen ? 'open' : ''}" id="cat-group-${cat.id}" data-category-id="${cat.id}" style="border-left: 4px solid ${catColor};">
+                <div class="drawer-cat-header" id="drawer-cat-header-${cat.id}" data-category-id="${cat.id}" onclick="toggleCategoryAccordion(${cat.id})">
                     <div class="drawer-cat-title">
+                        <span class="drawer-drag-handle cat-drag-handle" onclick="event.stopPropagation()" title="Dosyayı taşı">⠿</span>
                         <span class="drawer-cat-arrow">▶</span>
                         <span style="font-size:1.05rem; line-height:1;">${cat.icon || '📁'}</span>
                         <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600;">${escapeHtml(cat.name)}</span>
                         <span class="cat-color-dot" style="width:7px; height:7px; border-radius:50%; background:${catColor}; flex-shrink:0; display:inline-block; box-shadow:0 0 0 1.5px rgba(0,0,0,0.06);"></span>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
-                        <button type="button" class="btn btn-ghost btn-xs" style="padding:2px 5px; font-size:0.75rem; color:var(--muted);" title="Kategoriyi Düzenle" onclick="event.stopPropagation(); openEditCategoryModal(${cat.id})">✏️</button>
+                        <button type="button" class="btn btn-ghost btn-xs" style="padding:2px 5px; font-size:0.75rem; color:var(--muted);" title="Dosyayı Düzenle" onclick="event.stopPropagation(); openEditCategoryModal(${cat.id})">✏️</button>
                         <span style="font-size:0.75rem; color:${catColor}; background:${catColor}18; border:1px solid ${catColor}30; padding:1px 6px; border-radius:10px; font-weight:700;">
                             ${catPages.length}
                         </span>
                     </div>
                 </div>
-                <div class="drawer-cat-pages">
+                <div class="drawer-cat-pages" id="drawer-cat-pages-${cat.id}" data-category-id="${cat.id}">
                     ${pagesHtml}
                 </div>
             </div>
         `;
     }).join('');
+
+    initMobileDrawerDragAndDrop();
 }
 
 function toggleCategoryAccordion(catId) {
@@ -822,6 +827,278 @@ function toggleCategoryAccordion(catId) {
         group.classList.toggle('open');
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mobil Çekmece Sürükle-Bırak (Touch / Drag & Drop Controller)
+// ─────────────────────────────────────────────────────────────────────────────
+let mobileDragState = null;
+
+function initMobileDrawerDragAndDrop() {
+    const catContainer = document.getElementById('drawer-categories-list');
+    if (!catContainer) return;
+
+    const handles = catContainer.querySelectorAll('.drawer-drag-handle');
+    handles.forEach(handle => {
+        handle.removeEventListener('touchstart', onHandleTouchStart);
+        handle.addEventListener('touchstart', onHandleTouchStart, { passive: false });
+    });
+}
+
+function onHandleTouchStart(e) {
+    if (e.touches.length > 1) return;
+    const touch = e.touches[0];
+    const handle = e.currentTarget;
+    const isCat = handle.classList.contains('cat-drag-handle');
+    const itemEl = isCat ? handle.closest('.drawer-cat-group, .drawer-cat-divider-group') : handle.closest('.drawer-page-item');
+    if (!itemEl) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Sürükleme esnasında parmak altında takip edecek hayalet öğe (ghost)
+    const ghost = document.createElement('div');
+    ghost.className = 'drag-floating-ghost';
+    let labelText = 'Öğe';
+    if (isCat) {
+        const titleSpan = itemEl.querySelector('.drawer-cat-title span:nth-child(4)');
+        const divLabel = itemEl.querySelector('.drawer-divider-label');
+        labelText = titleSpan ? titleSpan.innerText : (divLabel ? divLabel.innerText : 'Ayraç');
+    } else {
+        const pageTitle = itemEl.querySelector('.drawer-page-item span:first-child span:last-child');
+        labelText = pageTitle ? pageTitle.innerText : 'Sayfa';
+    }
+    ghost.innerHTML = (isCat ? '📁 ' : '📄 ') + escapeHtml(labelText);
+    document.body.appendChild(ghost);
+
+    ghost.style.left = (touch.clientX - 25) + 'px';
+    ghost.style.top = (touch.clientY - 40) + 'px';
+
+    itemEl.classList.add('is-dragging');
+
+    mobileDragState = {
+        type: isCat ? 'cat' : 'page',
+        itemEl: itemEl,
+        itemId: isCat ? itemEl.dataset.categoryId : itemEl.dataset.pageId,
+        sourceCatId: isCat ? null : itemEl.dataset.categoryId,
+        ghost: ghost,
+        lastTarget: null,
+        lastPos: null,
+        lastAction: null
+    };
+
+    document.addEventListener('touchmove', onMobileTouchMove, { passive: false });
+    document.addEventListener('touchend', onMobileTouchEnd, { passive: false });
+    document.addEventListener('touchcancel', onMobileTouchCancel, { passive: false });
+}
+
+function onMobileTouchMove(e) {
+    if (!mobileDragState) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const touch = e.touches[0];
+    const ghost = mobileDragState.ghost;
+    if (ghost) {
+        ghost.style.left = (touch.clientX - 25) + 'px';
+        ghost.style.top = (touch.clientY - 40) + 'px';
+    }
+
+    clearMobileDropIndicators();
+
+    const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!elementUnder) return;
+
+    if (mobileDragState.type === 'cat') {
+        const hoverGroup = elementUnder.closest('.drawer-cat-group, .drawer-cat-divider-group');
+        if (hoverGroup && hoverGroup !== mobileDragState.itemEl) {
+            const rect = hoverGroup.getBoundingClientRect();
+            const relY = touch.clientY - rect.top;
+            if (relY < rect.height / 2) {
+                hoverGroup.classList.add('drop-target-above');
+                mobileDragState.lastPos = 'above';
+            } else {
+                hoverGroup.classList.add('drop-target-below');
+                mobileDragState.lastPos = 'below';
+            }
+            mobileDragState.lastTarget = hoverGroup;
+            mobileDragState.lastAction = 'reorderCat';
+        }
+    } else if (mobileDragState.type === 'page') {
+        // 1. Dosya Başlığı üzerine bırakma (Başka dosyaya aktarma)
+        const hoverCatHeader = elementUnder.closest('.drawer-cat-header');
+        if (hoverCatHeader) {
+            const targetCatId = hoverCatHeader.dataset.categoryId;
+            if (targetCatId !== mobileDragState.sourceCatId) {
+                hoverCatHeader.classList.add('cat-drop-hover');
+                mobileDragState.lastTarget = hoverCatHeader;
+                mobileDragState.lastAction = 'moveToCat';
+                return;
+            }
+        }
+
+        // 2. Sayfa üzerine bırakma (Aynı veya farklı dosya içinde sayfa sıralama)
+        const hoverPage = elementUnder.closest('.drawer-page-item');
+        if (hoverPage && hoverPage !== mobileDragState.itemEl) {
+            const rect = hoverPage.getBoundingClientRect();
+            const relY = touch.clientY - rect.top;
+            if (relY < rect.height / 2) {
+                hoverPage.classList.add('drop-target-above');
+                mobileDragState.lastPos = 'above';
+            } else {
+                hoverPage.classList.add('drop-target-below');
+                mobileDragState.lastPos = 'below';
+            }
+            mobileDragState.lastTarget = hoverPage;
+            mobileDragState.lastAction = 'reorderPage';
+        }
+    }
+}
+
+async function onMobileTouchEnd(e) {
+    if (!mobileDragState) return;
+    const state = mobileDragState;
+    mobileDragState = null;
+
+    document.removeEventListener('touchmove', onMobileTouchMove);
+    document.removeEventListener('touchend', onMobileTouchEnd);
+    document.removeEventListener('touchcancel', onMobileTouchCancel);
+
+    if (state.ghost && state.ghost.parentNode) {
+        state.ghost.parentNode.removeChild(state.ghost);
+    }
+    state.itemEl.classList.remove('is-dragging');
+    clearMobileDropIndicators();
+
+    if (!state.lastTarget || !state.lastAction) return;
+
+    try {
+        if (state.type === 'cat' && state.lastAction === 'reorderCat') {
+            const catContainer = document.getElementById('drawer-categories-list');
+            if (!catContainer) return;
+
+            if (state.lastPos === 'above') {
+                catContainer.insertBefore(state.itemEl, state.lastTarget);
+            } else {
+                catContainer.insertBefore(state.itemEl, state.lastTarget.nextSibling);
+            }
+
+            const catIds = Array.from(catContainer.querySelectorAll('.drawer-cat-group, .drawer-cat-divider-group'))
+                .map(el => parseInt(el.dataset.categoryId))
+                .filter(Boolean);
+
+            await window.appStorage.reorderCategories(catIds);
+
+            if (window.appSync && window.appSync.isOnline) {
+                try {
+                    await window.appSync.apiFetch('/notes/api/categories/reorder', {
+                        method: 'POST',
+                        body: JSON.stringify({ category_ids: catIds })
+                    });
+                } catch (e) {
+                    console.warn("Sunucu kategori sıralama hatası:", e);
+                }
+            }
+            window.appSync.syncNow();
+            showMobileToast('Dosya sırası güncellendi');
+        } else if (state.type === 'page') {
+            const pageId = parseInt(state.itemId);
+
+            if (state.lastAction === 'moveToCat') {
+                const targetCatId = parseInt(state.lastTarget.dataset.categoryId);
+                openCategoryIds.add(targetCatId);
+
+                const page = await window.appStorage.getPage(pageId);
+                if (page) {
+                    page.category_id = targetCatId;
+                    const targetPages = await window.appStorage.getPages(targetCatId);
+                    page.sort_order = targetPages.length + 1;
+                    await window.appStorage.savePage(page);
+                }
+
+                if (window.appSync && window.appSync.isOnline) {
+                    try {
+                        await window.appSync.apiFetch(`/notes/api/pages/${pageId}/move`, {
+                            method: 'POST',
+                            body: JSON.stringify({ category_id: targetCatId })
+                        });
+                    } catch (e) {
+                        console.warn("Sunucu sayfa taşıma hatası:", e);
+                    }
+                }
+                window.appSync.syncNow();
+                await reloadDrawerNavigation();
+                showMobileToast('Sayfa yeni dosyaya aktarıldı');
+            } else if (state.lastAction === 'reorderPage') {
+                const targetPageEl = state.lastTarget;
+                const targetParent = targetPageEl.closest('.drawer-cat-pages');
+                if (!targetParent) return;
+
+                const targetCatId = parseInt(targetParent.dataset.categoryId);
+
+                if (state.lastPos === 'above') {
+                    targetParent.insertBefore(state.itemEl, targetPageEl);
+                } else {
+                    targetParent.insertBefore(state.itemEl, targetPageEl.nextSibling);
+                }
+
+                const pageIds = Array.from(targetParent.querySelectorAll('.drawer-page-item'))
+                    .map(el => parseInt(el.dataset.pageId))
+                    .filter(Boolean);
+
+                await window.appStorage.reorderPages(targetCatId, pageIds);
+
+                // Eğer başka bir dosyadan bu dosyaya aktarılmışsa kaynak dosyayı da güncelle
+                if (parseInt(state.sourceCatId) !== targetCatId) {
+                    const sourceParent = document.getElementById(`drawer-cat-pages-${state.sourceCatId}`);
+                    if (sourceParent) {
+                        const sourcePageIds = Array.from(sourceParent.querySelectorAll('.drawer-page-item'))
+                            .map(el => parseInt(el.dataset.pageId))
+                            .filter(Boolean);
+                        await window.appStorage.reorderPages(parseInt(state.sourceCatId), sourcePageIds);
+                    }
+                }
+
+                if (window.appSync && window.appSync.isOnline) {
+                    try {
+                        await window.appSync.apiFetch('/notes/api/pages/reorder', {
+                            method: 'POST',
+                            body: JSON.stringify({ category_id: targetCatId, page_ids: pageIds })
+                        });
+                    } catch (e) {
+                        console.warn("Sunucu sayfa sıralama hatası:", e);
+                    }
+                }
+                window.appSync.syncNow();
+                await reloadDrawerNavigation();
+                showMobileToast(parseInt(state.sourceCatId) !== targetCatId ? 'Sayfa yeni dosyaya aktarıldı' : 'Sayfa sırası güncellendi');
+            }
+        }
+    } catch (err) {
+        console.error("Mobil sürükle-bırak hatası:", err);
+    }
+}
+
+function onMobileTouchCancel(e) {
+    if (!mobileDragState) return;
+    if (mobileDragState.ghost && mobileDragState.ghost.parentNode) {
+        mobileDragState.ghost.parentNode.removeChild(mobileDragState.ghost);
+    }
+    if (mobileDragState.itemEl) {
+        mobileDragState.itemEl.classList.remove('is-dragging');
+    }
+    clearMobileDropIndicators();
+    mobileDragState = null;
+    document.removeEventListener('touchmove', onMobileTouchMove);
+    document.removeEventListener('touchend', onMobileTouchEnd);
+    document.removeEventListener('touchcancel', onMobileTouchCancel);
+}
+
+function clearMobileDropIndicators() {
+    document.querySelectorAll('.drop-target-above, .drop-target-below, .cat-drop-hover').forEach(el => {
+        el.classList.remove('drop-target-above', 'drop-target-below', 'cat-drop-hover');
+    });
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Görünüm Değiştiriciler (View Switchers)
@@ -2329,7 +2606,7 @@ async function submitCreateCategory() {
     const colorInput = document.getElementById('new-cat-color');
     const name = nameInput ? nameInput.value.trim() : '';
     if (!name) {
-        alert('Lütfen kategori adı yazın.');
+        alert('Lütfen dosya adı yazın.');
         return;
     }
 
@@ -2374,7 +2651,7 @@ async function submitEditCategory() {
     const color = document.getElementById('edit-cat-color').value || '#3b82f6';
 
     if (!name || !catId) {
-        alert('Lütfen kategori adı yazın.');
+        alert('Lütfen dosya adı yazın.');
         return;
     }
 
@@ -2393,7 +2670,7 @@ async function submitEditCategory() {
         await renderActivePage();
     }
     window.appSync.syncNow();
-    showMobileToast('Kategori güncellendi');
+    showMobileToast('Dosya güncellendi');
 }
 
 async function submitDeleteCategoryFromModal() {
@@ -2404,9 +2681,9 @@ async function submitDeleteCategoryFromModal() {
 
     const pages = await window.appStorage.getPages(catId);
     if (pages.length > 0) {
-        if (!confirm(`"${cat.name}" kategorisi içinde ${pages.length} sayfa var. Kategoriyi ve içindeki sayfaları silmek istediğinize emin misiniz?`)) return;
+        if (!confirm(`"${cat.name}" dosyası içinde ${pages.length} sayfa var. Dosyayı ve içindeki sayfaları silmek istediğinize emin misiniz?`)) return;
     } else {
-        if (!confirm(`"${cat.name}" kategorisini silmek istediğinize emin misiniz?`)) return;
+        if (!confirm(`"${cat.name}" dosyasını silmek istediğinize emin misiniz?`)) return;
     }
 
     await window.appStorage.deleteCategory(catId);
@@ -2420,7 +2697,7 @@ async function submitDeleteCategoryFromModal() {
         await openOverviewView();
     }
     window.appSync.syncNow();
-    showMobileToast('Kategori silindi');
+    showMobileToast('Dosya silindi');
 }
 
 function openAddPageModal(catId) {

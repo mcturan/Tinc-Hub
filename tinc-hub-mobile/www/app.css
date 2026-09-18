@@ -552,6 +552,77 @@ body {
     gap: 6px;
 }
 
+/* Sürükle-Bırak (Drag & Drop) Stilleri - Mobil Çekmece */
+.drawer-drag-handle {
+    cursor: grab;
+    opacity: 0.35;
+    font-size: 0.9rem;
+    user-select: none;
+    touch-action: none;
+    padding: 3px 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 2px;
+    flex-shrink: 0;
+}
+.drawer-drag-handle:active {
+    cursor: grabbing;
+    opacity: 0.85;
+}
+.drawer-cat-header .drawer-drag-handle {
+    font-size: 0.95rem;
+    padding: 2px 5px;
+}
+.drawer-page-item .drawer-drag-handle {
+    font-size: 0.82rem;
+    padding: 1px 4px;
+}
+
+.is-dragging {
+    opacity: 0.35 !important;
+    background: rgba(2, 132, 199, 0.12) !important;
+}
+
+.drop-target-above {
+    border-top: 2.5px solid var(--accent) !important;
+    box-shadow: 0 -2px 6px rgba(2, 132, 199, 0.25) !important;
+}
+
+.drop-target-below {
+    border-bottom: 2.5px solid var(--accent) !important;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25) !important;
+}
+
+.cat-drop-hover {
+    background: rgba(2, 132, 199, 0.18) !important;
+    outline: 2.5px dashed var(--accent) !important;
+    outline-offset: -2px;
+    border-radius: 8px;
+}
+
+.drag-floating-ghost {
+    position: fixed;
+    z-index: 999999;
+    pointer-events: none;
+    opacity: 0.92;
+    transform: rotate(2deg) scale(1.02);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    border: 1.5px solid var(--accent);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 8px 14px;
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+    font-size: 0.86rem;
+    color: var(--text);
+    transition: none !important;
+}
+
+
 .drawer-footer {
     padding: 10px 14px;
     border-top: 1px solid var(--border);

@@ -297,6 +297,18 @@ class TincNoteStorage {
         }
     }
 
+    async reorderCategories(catIds) {
+        for (let idx = 0; idx < catIds.length; idx++) {
+            const cat = await this.get('categories', catIds[idx]);
+            if (cat) {
+                cat.sort_order = idx + 1;
+                cat._dirty = true;
+                cat.updated_at = new Date().toISOString();
+                await this.put('categories', cat);
+            }
+        }
+    }
+
     // Pages
     async getPages(categoryId = null) {
         const pages = await this.getAll('pages');
@@ -328,6 +340,19 @@ class TincNoteStorage {
             page._deleted = true;
             page._dirty = true;
             await this.put('pages', page);
+        }
+    }
+
+    async reorderPages(categoryId, pageIds) {
+        for (let idx = 0; idx < pageIds.length; idx++) {
+            const page = await this.get('pages', pageIds[idx]);
+            if (page) {
+                page.category_id = categoryId;
+                page.sort_order = idx + 1;
+                page._dirty = true;
+                page.updated_at = new Date().toISOString();
+                await this.put('pages', page);
+            }
         }
     }
 
