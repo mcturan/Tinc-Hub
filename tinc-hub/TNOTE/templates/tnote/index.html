@@ -52,7 +52,7 @@
             </div>
             <div class="sidebar-header-actions" style="display:flex; align-items:center; gap:2px;">
                 <button class="btn-icon" onclick="addCategoryDividerWeb()" title="Araya Ayraç Çizgisi Ekle" style="font-size:0.72rem; font-weight:700; width:24px; height:24px; border-radius:4px; color:var(--muted);" aria-label="Ayraç Ekle">―</button>
-                <button class="btn-icon" onclick="openModal('modal-add-category')" title="Bu Deftere Yeni Kategori Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
+                <button class="btn-icon" onclick="openModal('modal-add-category')" title="Bu Deftere Yeni Dosya Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
                 <button class="btn-icon sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarManual()" title="Menüyü Daralt ( « )">«</button>
             </div>
         </div>
@@ -78,6 +78,7 @@
             {% for cat in categories %}
             {% if cat.is_divider or cat.icon == '―' or cat.name == '---' or (cat.name and cat.name.startswith('---')) %}
             <div class="category-divider-item" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}" draggable="true">
+                <span class="cat-drag-handle" title="Ayracı taşımak için sürükleyin" style="cursor:grab; opacity:0.4; font-size:0.8rem; user-select:none; margin-right:3px;">⠿</span>
                 <div class="cat-divider-line"></div>
                 {% if cat.name and cat.name != '---' and cat.name != 'Ayraç' %}
                     <span class="cat-divider-label">{{ cat.name }}</span>
@@ -86,9 +87,10 @@
                 <button class="btn-icon-subtle btn-danger-hover cat-divider-del-btn" onclick="deleteCategory({{ cat.id }}, 'Ayraç')" title="Ayracı Sil">✕</button>
             </div>
             {% else %}
-            <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}" style="border-left: 3.5px solid {{ cat.color or '#3b82f6' }};">
+            <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}" draggable="true" style="border-left: 3.5px solid {{ cat.color or '#3b82f6' }};">
                 <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" title="{{ cat.name }}" onclick="toggleCategoryGroup({{ cat.id }})">
                     <div class="category-title-area">
+                        <span class="cat-drag-handle" onclick="event.stopPropagation()" title="Dosyayı taşımak için sürükleyin" style="cursor:grab; opacity:0.4; font-size:0.85rem; user-select:none; margin-right:3px;">⠿</span>
                         <span class="cat-chevron" id="cat-chevron-{{ cat.id }}">▾</span>
                         <span class="cat-color-dot" style="background:{{ cat.color or '#3b82f6' }};"></span>
                         <span style="font-size:0.95rem; margin-right:3px; flex-shrink:0;">{{ cat.icon or '📁' }}</span>
@@ -96,9 +98,9 @@
                     </div>
                     <div class="category-actions" onclick="event.stopPropagation()">
                         <span class="badge-count" id="cat-badge-{{ cat.id }}" style="background:{{ cat.color or '#3b82f6' }}18; color:{{ cat.color or '#3b82f6' }}; font-weight:700;">{{ cat.page_count }}</span>
-                        <button class="btn-icon-subtle" onclick="openAddPageForCat({{ cat.id }}, '{{ cat.name|escape }}')" title="Bu Kategoriye Liste Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
-                        <button class="btn-icon-subtle" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|escape }}', '{{ cat.icon|escape }}', '{{ cat.color|escape }}')" title="Kategoriyi Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
-                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteCategory({{ cat.id }}, '{{ cat.name|escape }}')" title="Kategoriyi Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
+                        <button class="btn-icon-subtle" onclick="openAddPageForCat({{ cat.id }}, '{{ cat.name|escape }}')" title="Bu Dosyaya Sayfa Ekle"><svg class="svg-icon svg-icon-xs"><use href="#i-plus"/></svg></button>
+                        <button class="btn-icon-subtle" onclick="openEditCategoryModal({{ cat.id }}, '{{ cat.name|escape }}', '{{ cat.icon|escape }}', '{{ cat.color|escape }}')" title="Dosyayı Düzenle"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
+                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteCategory({{ cat.id }}, '{{ cat.name|escape }}')" title="Dosyayı Sil"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                     </div>
                 </div>
                 <ul class="page-list" id="cat-pages-{{ cat.id }}" data-category-id="{{ cat.id }}">
@@ -106,6 +108,7 @@
                         {% if p.category_id == cat.id %}
                         <li class="page-item" id="page-item-{{ p.id }}" data-page-id="{{ p.id }}" data-category-id="{{ cat.id }}" draggable="true" onclick="loadPage({{ p.id }})">
                             <div class="page-item-info">
+                                <span class="page-drag-handle" onclick="event.stopPropagation()" title="Sayfayı taşımak için sürükleyin" style="cursor:grab; opacity:0.35; font-size:0.75rem; user-select:none; margin-right:4px;">⠿</span>
                                 <span class="page-title-text" title="{{ p.title }}">{{ p.title }}</span>
                             </div>
                             <div class="page-item-actions">
@@ -1023,7 +1026,7 @@
 
             <div id="transfer-mode-new" style="display:none;">
                 <div class="form-group" style="margin-bottom:10px;">
-                    <label for="transfer-target-category" style="font-size:0.82rem; font-weight:600;">Hedef Kategori:</label>
+                    <label for="transfer-target-category" style="font-size:0.82rem; font-weight:600;">Hedef Dosya:</label>
                     <select id="transfer-target-category" class="form-control" style="width:100%; padding:8px;"></select>
                 </div>
                 <div class="form-group" style="margin-bottom:12px;">
@@ -1077,13 +1080,13 @@
 <div class="tnote-modal-backdrop" id="modal-add-category">
     <div class="tnote-modal">
         <div class="modal-header">
-            <span>Yeni Kategori <small style="font-size:0.75rem; color:var(--muted); font-weight:normal;">({{ current_notebook.name if current_notebook else 'Defter' }})</small></span>
+            <span>Yeni Dosya <small style="font-size:0.75rem; color:var(--muted); font-weight:normal;">({{ current_notebook.name if current_notebook else 'Defter' }})</small></span>
             <button class="btn-icon" onclick="closeModal('modal-add-category')">✕</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
-                <label>Kategori Adı</label>
-                <input type="text" id="new-cat-name" class="form-control" placeholder="Kategori adı">
+                <label>Dosya Adı</label>
+                <input type="text" id="new-cat-name" class="form-control" placeholder="Dosya adı">
             </div>
             <div class="form-group">
                 <label>İkon (Emoji)</label>
@@ -1125,7 +1128,7 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>Kategori Rengi</label>
+                <label>Dosya Rengi</label>
                 <div style="display:flex; gap:8px; align-items:center;">
                     <input type="color" id="new-cat-color" value="#0284c7" style="height:36px; width:50px; border:1px solid var(--border); border-radius:6px; cursor:pointer;">
                     <div class="color-picker-palette" style="display:flex; gap:6px;">
@@ -1156,7 +1159,7 @@
         </div>
         <div class="modal-body">
             <div class="form-group">
-                <label>Bağlı Kategori</label>
+                <label>Bağlı Dosya</label>
                 <select id="new-page-cat" class="form-control">
                     {% for cat in categories %}
                     {% if not cat.is_divider and cat.icon != '―' and cat.name != '---' and not (cat.name and cat.name.startswith('---')) %}
@@ -1246,13 +1249,13 @@
 <div class="tnote-modal-backdrop" id="modal-edit-category">
     <div class="tnote-modal">
         <div class="modal-header">
-            <span>Kategoriyi Düzenle</span>
+            <span>Dosyayı Düzenle</span>
             <button class="btn-icon" onclick="closeModal('modal-edit-category')">✕</button>
         </div>
         <div class="modal-body">
             <input type="hidden" id="edit-cat-id">
             <div class="form-group">
-                <label>Kategori Adı</label>
+                <label>Dosya Adı</label>
                 <input type="text" id="edit-cat-name" class="form-control">
             </div>
             <div class="form-group">
@@ -1285,10 +1288,10 @@
                 </div>
             </div>
             <div class="form-group">
-                <label>Renk</label>
+                <label>Dosya Rengi</label>
                 <div style="display:flex; gap:8px; align-items:center;">
                     <input type="color" id="edit-cat-color" style="height:36px; width:50px; border:1px solid var(--border); border-radius:6px; cursor:pointer;" oninput="updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview')">
-                    <span id="edit-cat-color-preview" style="font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:6px; background:#3b82f618; color:#3b82f6; border:1px solid #3b82f635;">Örnek Kategori</span>
+                    <span id="edit-cat-color-preview" style="font-size:0.75rem; font-weight:700; padding:4px 10px; border-radius:6px; background:#3b82f618; color:#3b82f6; border:1px solid #3b82f635;">Örnek Dosya</span>
                 </div>
                 <div class="color-picker-palette" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
                     <span class="color-swatch" style="background:#0284c7; width:22px; height:22px; border-radius:50%; cursor:pointer; display:inline-block;" onclick="selectPickerColor('edit-cat-color', '#0284c7', this); updateWebCatColorPreview('edit-cat-color', 'edit-cat-color-preview');" title="Açık Mavi"></span>
@@ -1321,7 +1324,7 @@
         <div class="modal-body">
             <input type="hidden" id="edit-page-id">
             <div class="form-group">
-                <label>Bağlı Kategori</label>
+                <label>Bağlı Dosya</label>
                 <select id="edit-page-cat" class="form-control">
                     {% for cat in categories %}
                     {% if not cat.is_divider and cat.icon != '―' and cat.name != '---' and not (cat.name and cat.name.startswith('---')) %}

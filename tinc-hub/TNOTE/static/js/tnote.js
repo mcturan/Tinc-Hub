@@ -151,12 +151,16 @@ window.addEventListener('beforeunload', () => {
 // ─────────────────────────────────────────────────────────────
 
 function initSidebarDragAndDrop() {
-    // 1. Sayfa Sürükleme (Yukarı/Aşağı ve Kategoriler Arası)
+    // 1. Sayfa Sürükleme (Yukarı/Aşağı ve Dosyalar Arası)
     const pageItems = document.querySelectorAll('.page-item');
     pageItems.forEach(item => {
         item.setAttribute('draggable', 'true');
 
         item.addEventListener('dragstart', (e) => {
+            if (e.target.closest('.page-item-actions')) {
+                e.preventDefault();
+                return;
+            }
             isDraggingAny = true;
             draggedPage = item;
             draggedCat = null;
@@ -221,14 +225,14 @@ function initSidebarDragAndDrop() {
             if (isCatChanged) {
                 await persistPageOrder(sourceCatId);
                 updateCategoryBadges(sourceCatId, targetCatId);
-                showToast("Sayfa yeni kategoriye aktarıldı!");
+                showToast("Sayfa yeni dosyaya aktarıldı!");
             } else {
                 showToast("Sayfa sırası güncellendi!");
             }
         });
     });
 
-    // 2. Kategori Başlığına Bırakma (Sayfayı Doğrudan Kategoriye Aktarma)
+    // 2. Dosya Başlığına ve Listesine Bırakma (Sayfayı Doğrudan Dosyaya Aktarma)
     const catHeaders = document.querySelectorAll('.category-header');
     catHeaders.forEach(catHeader => {
         catHeader.addEventListener('dragover', (e) => {
@@ -253,14 +257,14 @@ function initSidebarDragAndDrop() {
             const targetPageList = document.getElementById(`cat-pages-${targetCatId}`);
             if (!targetPageList) return;
 
-            // Kategori kapalıysa aç
+            // Dosya kapalıysa aç
             const group = document.getElementById(`cat-group-${targetCatId}`);
             if (group && group.classList.contains('collapsed')) {
                 group.classList.remove('collapsed');
                 saveCategoryCollapsedState(targetCatId, false);
             }
 
-            // Sayfayı bu kategorinin sonuna ekle
+            // Sayfayı bu dosyanın sonuna ekle
             targetPageList.appendChild(draggedPage);
             const isCatChanged = (sourceCatId != targetCatId);
             draggedPage.dataset.categoryId = targetCatId;
@@ -269,23 +273,59 @@ function initSidebarDragAndDrop() {
             if (isCatChanged) {
                 await persistPageOrder(sourceCatId);
                 updateCategoryBadges(sourceCatId, targetCatId);
-                showToast("Sayfa kategoriye aktarıldı!");
+                showToast("Sayfa yeni dosyaya aktarıldı!");
             }
         });
     });
 
-    // 3. Kategori Sıralama (Kategorileri yukarı/aşağı taşıma)
-    const catGroups = document.querySelectorAll('.category-group');
+    // Boş veya açık liste alanına sayfa bırakma
+    const pageLists = document.querySelectorAll('.page-list');
+    pageLists.forEach(list => {
+        list.addEventListener('dragover', (e) => {
+            if (!draggedPage) return;
+            if (e.target === list) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            }
+        });
+        list.addEventListener('drop', async (e) => {
+            if (!draggedPage) return;
+            if (e.target === list || !e.target.closest('.page-item')) {
+                e.preventDefault();
+                e.stopPropagation();
+                clearDropIndicators();
+                const targetCatId = list.dataset.categoryId;
+                list.appendChild(draggedPage);
+                const isCatChanged = (sourceCatId != targetCatId);
+                draggedPage.dataset.categoryId = targetCatId;
+                await persistPageOrder(targetCatId);
+                if (isCatChanged) {
+                    await persistPageOrder(sourceCatId);
+                    updateCategoryBadges(sourceCatId, targetCatId);
+                    showToast("Sayfa yeni dosyaya aktarıldı!");
+                } else {
+                    showToast("Sayfa sırası güncellendi!");
+                }
+            }
+        });
+    });
+
+    // 3. Dosya & Ayraç Sıralama (Dosyaları ve ayraçları yukarı/aşağı taşıma)
+    const catGroups = document.querySelectorAll('.category-group, .category-divider-item');
     catGroups.forEach(group => {
         const handle = group.querySelector('.cat-drag-handle');
-        if (!handle) return;
-
-        handle.addEventListener('mousedown', () => {
-            group.setAttribute('draggable', 'true');
-        });
+        if (handle) {
+            handle.addEventListener('mousedown', () => {
+                group.setAttribute('draggable', 'true');
+            });
+        }
 
         group.addEventListener('dragstart', (e) => {
             if (draggedPage) return;
+            if (e.target.closest('.page-list') || e.target.closest('.category-actions')) {
+                e.preventDefault();
+                return;
+            }
             isDraggingAny = true;
             draggedCat = group;
             group.classList.add('is-dragging');
@@ -294,7 +334,6 @@ function initSidebarDragAndDrop() {
         });
 
         group.addEventListener('dragend', () => {
-            group.removeAttribute('draggable');
             group.classList.remove('is-dragging');
             clearDropIndicators();
             draggedCat = null;
@@ -336,7 +375,7 @@ function initSidebarDragAndDrop() {
             }
 
             await persistCategoryOrder();
-            showToast("Kategori sırası güncellendi!");
+            showToast("Dosya sırası güncellendi!");
         });
     });
 }
@@ -365,7 +404,7 @@ async function persistPageOrder(categoryId) {
 async function persistCategoryOrder() {
     const container = document.getElementById('sidebar-categories');
     if (!container) return;
-    const catIds = Array.from(container.querySelectorAll('.category-group')).map(el => parseInt(el.dataset.categoryId)).filter(Boolean);
+    const catIds = Array.from(container.querySelectorAll('.category-group, .category-divider-item')).map(el => parseInt(el.dataset.categoryId)).filter(Boolean);
     try {
         await fetch('/notes/api/categories/reorder', {
             method: 'POST',
@@ -373,7 +412,7 @@ async function persistCategoryOrder() {
             body: JSON.stringify({category_ids: catIds})
         });
     } catch (e) {
-        console.error("Kategori sırası kaydetme hatası:", e);
+        console.error("Dosya sırası kaydetme hatası:", e);
     }
 }
 
@@ -2088,7 +2127,7 @@ function openAddPageForCat(catId, catName) {
 function openAddPageModal() {
     const sel = document.getElementById('new-page-cat');
     if (sel && sel.options.length === 0) {
-        alert('Bu not defterinde henüz kategori bulunmuyor. Lütfen önce bir kategori ekleyin.');
+        alert('Bu not defterinde henüz dosya bulunmuyor. Lütfen önce bir dosya ekleyin.');
         openModal('modal-add-category');
         return;
     }
@@ -2190,7 +2229,7 @@ async function submitEditCategory() {
 async function deleteCategory(catId, name) {
     const confirmMsg = (name === 'Ayraç' || name === '---') ? 
         'Bu ayracı silmek istediğinize emin misiniz?' : 
-        `"${name}" kategorisini ve içindeki tüm sayfaları silmek istediğinize emin misiniz?`;
+        `"${name}" dosyasını ve içindeki tüm sayfaları silmek istediğinize emin misiniz?`;
     if (!confirm(confirmMsg)) return;
     const res = await fetch(`/notes/api/categories/${catId}`, { method: 'DELETE' });
     const data = await res.json();
