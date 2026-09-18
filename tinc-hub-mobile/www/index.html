@@ -477,7 +477,7 @@
                 <div class="kpi-card" onclick="openSettingsView()">
                     <div class="kpi-icon-badge green">⚙️</div>
                     <div class="kpi-info">
-                        <span class="kpi-val">v1.5.9</span>
+                        <span class="kpi-val">v1.6.0</span>
                         <span class="kpi-label">Sürüm & Ayarlar</span>
                     </div>
                 </div>
@@ -692,7 +692,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <div style="font-weight:700; font-size:0.95rem;">Uygulama Sürümü</div>
-                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.5.9</div>
+                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.6.0</div>
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="window.appUpdater.checkForUpdates(false)">
                         🔍 Güncelleme Ara
@@ -1411,6 +1411,55 @@
             <div style="display:flex; gap:8px; margin-top:14px;">
                 <button class="btn btn-primary" style="flex:1;" onclick="submitTransferQuickNote()">🚀 Aktar ve Taşı</button>
                 <button class="btn btn-secondary" onclick="closeModal('modal-transfer-quick-note')">İptal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Hızlı Notu Doğrudan Düzenle -->
+    <div id="modal-edit-quick-note" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">📝 Notu Düzenle</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-edit-quick-note')">✕</button>
+            </div>
+            <input type="hidden" id="edit-quick-note-id">
+            <div class="form-group" style="margin-bottom:12px;">
+                <textarea id="edit-quick-note-content" class="input-text" rows="5" style="width:100%; font-size:0.92rem; line-height:1.45; resize:vertical;" placeholder="Notunuzu yazın..."></textarea>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteQuickNoteFromModal()">🗑️ Sil</button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-secondary" onclick="closeModal('modal-edit-quick-note')">İptal</button>
+                    <button class="btn btn-primary" onclick="submitEditQuickNote()">💾 Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Görevi / Maddeyi Doğrudan Düzenle -->
+    <div id="modal-edit-item" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">✓ Görevi Düzenle</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-edit-item')">✕</button>
+            </div>
+            <input type="hidden" id="edit-item-id">
+            <input type="hidden" id="edit-item-is-quick" value="0">
+            <div class="form-group" style="margin-bottom:12px;">
+                <label class="form-label" style="font-size:0.8rem; color:var(--muted);">Görev / Madde Başlığı:</label>
+                <input type="text" id="edit-item-title" class="input-text" style="font-size:0.92rem; font-weight:600;" placeholder="Görev başlığı...">
+            </div>
+            <div class="form-group" style="margin-bottom:14px;">
+                <button type="button" class="btn btn-secondary btn-sm" id="edit-item-reminder-btn" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.82rem; padding:8px;" onclick="openReminderFromEditModal()">
+                    ⏰ Alarm & Hatırlatıcı Ayarla
+                </button>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="deleteItemFromEditModal()">🗑️ Sil</button>
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-secondary" onclick="closeModal('modal-edit-item')">İptal</button>
+                    <button class="btn btn-primary" onclick="submitEditItem()">💾 Kaydet</button>
+                </div>
             </div>
         </div>
     </div>

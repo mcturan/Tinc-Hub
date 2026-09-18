@@ -622,6 +622,34 @@ body {
     transition: none !important;
 }
 
+/* Tamamlananlar Akordeon Başlığı */
+.completed-accordion-header {
+    margin-top: 10px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--muted);
+    transition: background 0.15s;
+}
+.completed-accordion-header:active {
+    background: var(--surface3);
+}
+
+.checklist-item-card {
+    transition: transform 0.1s, box-shadow 0.15s, background 0.15s;
+}
+.checklist-item-card:active {
+    transform: scale(0.99);
+}
 
 .drawer-footer {
     padding: 10px 14px;
