@@ -23,6 +23,71 @@ function formatMoney(amount) {
     return num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function sanitizeRichHtml(html) {
+    if (!html || typeof html !== 'string') return '';
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const dangerousTags = ['script', 'iframe', 'object', 'embed', 'form', 'link', 'style'];
+        dangerousTags.forEach(tag => {
+            const elements = doc.querySelectorAll(tag);
+            elements.forEach(el => el.remove());
+        });
+        const allElements = doc.querySelectorAll('*');
+        allElements.forEach(el => {
+            const attrs = Array.from(el.attributes);
+            for (const attr of attrs) {
+                const name = attr.name.toLowerCase();
+                const val = (attr.value || '').trim().toLowerCase();
+                if (name.startsWith('on') || val.startsWith('javascript:') || val.startsWith('data:text/html')) {
+                    el.removeAttribute(attr.name);
+                }
+            }
+        });
+        return doc.body.innerHTML;
+    } catch (e) {
+        return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    }
+}
+
+async function uploadPastedImageMobile(blob, editor) {
+    if (!blob) return;
+    showMobileToast('📷 Görsel yükleniyor...');
+    const formData = new FormData();
+    formData.append('image', blob, 'paste_mobile_' + Date.now() + '.png');
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/upload_image', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        if (data.ok && data.url) {
+            editor.focus();
+            document.execCommand('insertHTML', false, `<p><img src="${data.url}" alt="Görsel" style="max-width:100%; border-radius:8px; margin:8px 0;" /></p><p><br></p>`);
+            onRichNoteInput();
+            showMobileToast('📷 Görsel eklendi ✓');
+        } else {
+            showMobileToast('Görsel sunucuya yüklenemedi');
+        }
+    } catch (e) {
+        showMobileToast('Görsel aktarımı başarısız');
+    }
+}
+
+function exportPageToPdf() {
+    if (!activePageObj) {
+        showMobileToast('Yazdırılacak açık sayfa yok');
+        return;
+    }
+    window.print();
+}
+
+function setBottomNavActive(navId) {
+    document.querySelectorAll('.bottom-nav-item').forEach(el => el.classList.remove('active'));
+    const btn = document.getElementById(navId);
+    if (btn) btn.classList.add('active');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. IndexedDB Başlat
     await window.appStorage.init();
@@ -515,7 +580,7 @@ async function deleteItemFromEditModal() {
     const id = Number(document.getElementById('edit-item-id').value);
     const isQuick = document.getElementById('edit-item-is-quick').value === '1';
     if (!id) return;
-    if (!confirm('Bu görevi silmek istediğinize emin misiniz?')) return;
+    const item = await window.appStorage.get('items', id);
     await window.appStorage.deleteItem(id);
     closeModal('modal-edit-item');
     if (isQuick) {
@@ -524,7 +589,14 @@ async function deleteItemFromEditModal() {
         await renderChecklistItems(activePageId);
     }
     if (window.appSync) window.appSync.syncNow();
-    showMobileToast('Görev silindi');
+    if (item) {
+        pushDeletedHistory('item', item, async () => {
+            await window.appStorage.saveItem(item);
+            if (isQuick) await renderQuickNotesView();
+            else if (activePageId) await renderChecklistItems(activePageId);
+            if (window.appSync) window.appSync.syncNow();
+        });
+    }
 }
 
 async function addQuickNoteFromInput() {
@@ -540,10 +612,17 @@ async function addQuickNoteFromInput() {
 }
 
 async function deleteQuickNoteFromUI(noteId) {
-    if (!confirm('Bu hızlı notu silmek istediğinize emin misiniz?')) return;
+    const note = await window.appStorage.get('quick_notes', noteId);
     await window.appStorage.deleteQuickNote(noteId);
     await renderQuickNotesView();
     if (window.appSync) window.appSync.syncNow();
+    if (note) {
+        pushDeletedHistory('quick_note', note, async () => {
+            await window.appStorage.save('quick_notes', note);
+            await renderQuickNotesView();
+            if (window.appSync) window.appSync.syncNow();
+        });
+    }
 }
 
 async function openTransferQuickNoteModal(noteId) {
@@ -711,9 +790,17 @@ async function toggleQuickDirectItem(itemId) {
 }
 
 async function deleteQuickDirectItem(itemId) {
+    const item = await window.appStorage.get('items', itemId);
     await window.appStorage.deleteItem(itemId);
     await renderQuickNotesView();
     if (window.appSync) window.appSync.syncNow();
+    if (item) {
+        pushDeletedHistory('item', item, async () => {
+            await window.appStorage.saveItem(item);
+            await renderQuickNotesView();
+            if (window.appSync) window.appSync.syncNow();
+        });
+    }
 }
 
 async function toggleUnifiedTaskFromUI(taskType, rawId) {
@@ -932,7 +1019,6 @@ async function reloadDrawerNavigation() {
                         <span class="drawer-cat-arrow">▶</span>
                         <span style="font-size:1.05rem; line-height:1;">${cat.icon || '📁'}</span>
                         <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600;">${escapeHtml(cat.name)}</span>
-                        <span class="cat-color-dot" style="width:7px; height:7px; border-radius:50%; background:${catColor}; flex-shrink:0; display:inline-block; box-shadow:0 0 0 1.5px rgba(0,0,0,0.06);"></span>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
                         <button type="button" class="btn btn-ghost btn-xs" style="padding:2px 5px; font-size:0.75rem; color:var(--muted);" title="Dosyayı Düzenle" onclick="event.stopPropagation(); openEditCategoryModal(${cat.id})">✏️</button>
@@ -1371,11 +1457,42 @@ async function renderActivePage() {
     document.getElementById('page-view-icon').innerText = page.icon || defaultIcon;
     document.getElementById('page-view-title-input').value = page.title || '';
 
+    // Pin & Kilit Durumu
+    const pinBtn = document.getElementById('m-btn-page-pin');
+    if (pinBtn) {
+        pinBtn.style.color = page.is_pinned ? 'var(--warning, #f59e0b)' : '';
+        pinBtn.title = page.is_pinned ? 'Sabitlendi (Kaldırmak için tıkla)' : 'Başa Sabitle';
+    }
+    const lockBtn = document.getElementById('m-btn-page-lock');
+    if (lockBtn) {
+        lockBtn.style.color = page.is_locked ? 'var(--danger, #ef4444)' : '';
+        lockBtn.title = page.is_locked ? 'Sayfa Kilitli' : 'Sayfayı Kilitle';
+    }
+
+    const lockedView = document.getElementById('mobile-locked-page-view');
+    const unlocked = window[`unlocked_page_${page.id}`];
     const isChecklist = (page.type === 'checklist');
     const isNotes = (page.type === 'notes' || page.type === 'note');
     const isFinance = (page.type === 'finance');
     const isProject = (page.type === 'project');
     const isSoftware = (page.type === 'software');
+    const softContainer = document.getElementById('page-software-container');
+
+    if (page.is_locked && !unlocked) {
+        if (lockedView) lockedView.style.display = 'block';
+        document.getElementById('page-progress-wrap').style.display = 'none';
+        document.getElementById('page-quick-add-box').style.display = 'none';
+        document.getElementById('page-checklist-container').style.display = 'none';
+        document.getElementById('page-note-container').style.display = 'none';
+        document.getElementById('page-finance-container').style.display = 'none';
+        document.getElementById('page-project-container').style.display = 'none';
+        if (softContainer) softContainer.style.display = 'none';
+        const pinInp = document.getElementById('m-locked-pin-input');
+        if (pinInp) { pinInp.value = ''; pinInp.focus(); }
+        return;
+    } else {
+        if (lockedView) lockedView.style.display = 'none';
+    }
 
     document.getElementById('page-progress-wrap').style.display = isChecklist ? 'flex' : 'none';
     document.getElementById('page-quick-add-box').style.display = isChecklist ? 'flex' : 'none';
@@ -1383,7 +1500,6 @@ async function renderActivePage() {
     document.getElementById('page-note-container').style.display = isNotes ? 'block' : 'none';
     document.getElementById('page-finance-container').style.display = isFinance ? 'flex' : 'none';
     document.getElementById('page-project-container').style.display = isProject ? 'flex' : 'none';
-    const softContainer = document.getElementById('page-software-container');
     if (softContainer) softContainer.style.display = isSoftware ? 'flex' : 'none';
 
     if (isChecklist) {
@@ -1396,8 +1512,37 @@ async function renderActivePage() {
     } else if (isSoftware) {
         await renderSoftwarePage(page.id);
     } else {
-        document.getElementById('page-note-content').value = page.content || '';
+        updateMobileWordGoalStats(page);
+        loadMobileAttachmentsList(page.id);
+        const richEditor = document.getElementById('page-rich-editor');
+        const hiddenTa = document.getElementById('page-note-content');
+        const rawContent = page.content || '';
+        if (richEditor) {
+            let htmlToRender = '';
+            if (rawContent && !rawContent.trim().startsWith('<') && (rawContent.includes('**') || rawContent.includes('#') || rawContent.includes('- ') || rawContent.includes('\n'))) {
+                htmlToRender = convertMarkdownToHtml(rawContent);
+            } else {
+                htmlToRender = rawContent;
+            }
+            richEditor.innerHTML = sanitizeRichHtml(htmlToRender);
+
+            richEditor.onpaste = async (e) => {
+                const items = (e.clipboardData || window.clipboardData)?.items;
+                if (items) {
+                    for (const item of items) {
+                        if (item.type.indexOf('image') === 0) {
+                            e.preventDefault();
+                            const blob = item.getAsFile();
+                            await uploadPastedImageMobile(blob, richEditor);
+                            return;
+                        }
+                    }
+                }
+            };
+        }
+        if (hiddenTa) hiddenTa.value = rawContent;
         fetchPageDetailsFromServer(page.id);
+        fetchPageBacklinksMobile(page.id);
     }
 }
 
@@ -1577,6 +1722,295 @@ async function autoSaveCurrentNote(content, immediate = false) {
         noteSaveTimeout = setTimeout(doSave, 350);
     }
 }
+
+function handleMobileRichNoteInput() {
+    const editor = document.getElementById('page-rich-editor');
+    const hiddenTa = document.getElementById('page-note-content');
+    if (editor) {
+        const html = editor.innerHTML;
+        if (hiddenTa) hiddenTa.value = html;
+        autoSaveCurrentNote(html);
+    }
+}
+
+function formatMobileRichNote(cmd, val = null) {
+    const editor = document.getElementById('page-rich-editor');
+    if (!editor) return;
+    editor.focus();
+    document.execCommand(cmd, false, val);
+    handleMobileRichNoteInput();
+}
+
+function insertMobileChecklistItem() {
+    const editor = document.getElementById('page-rich-editor');
+    if (!editor) return;
+    editor.focus();
+    const checkHtml = '<div style="margin:4px 0;"><label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" onclick="event.stopPropagation()"> <span>Yeni görev</span></label></div>';
+    document.execCommand('insertHTML', false, checkHtml);
+    handleMobileRichNoteInput();
+}
+
+async function triggerMobileAiActionize() {
+    const editor = document.getElementById('page-rich-editor');
+    if (!editor) return;
+    const text = editor.innerText.trim();
+    if (!text) {
+        alert("Dönüştürülecek not içeriği boş!");
+        return;
+    }
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/ai/actionize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({text: text})
+        });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.ok && data.tasks && data.tasks.length > 0) {
+                let tasksHtml = '<div style="margin-top:12px; padding:10px; background:rgba(59,130,246,0.08); border-radius:8px; border-left:3px solid #3b82f6;"><p style="font-weight:700; margin:0 0 6px 0;">☑️ AI Tarafından Çıkarılan Görevler:</p><ul style="margin:0; padding-left:20px;">';
+                data.tasks.forEach(t => {
+                    tasksHtml += `<li>☐ ${escapeHtml(t.title)}</li>`;
+                });
+                tasksHtml += '</ul></div><br>';
+                editor.focus();
+                document.execCommand('insertHTML', false, tasksHtml);
+                handleMobileRichNoteInput();
+            }
+        }
+    } catch(e) {
+        console.error("AI actionize error:", e);
+    }
+}
+
+function convertMarkdownToHtml(md) {
+    if (!md) return '';
+    let html = escapeHtml(md);
+    html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^# (.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/\*\*(.*?)\*\*/gim, '<b>$1</b>');
+    html = html.replace(/\*(.*?)\*/gim, '<i>$1</i>');
+    html = html.replace(/`(.*?)`/gim, '<code>$1</code>');
+    html = html.replace(/^- \[ \] (.*$)/gim, '<div style="margin:4px 0;"><label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox"> <span>$1</span></label></div>');
+    html = html.replace(/^- \[x\] (.*$)/gim, '<div style="margin:4px 0;"><label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;"><input type="checkbox" checked> <span style="text-decoration:line-through; opacity:0.7;">$1</span></label></div>');
+    html = html.replace(/^- (.*$)/gim, '<li>$1</li>');
+    html = html.replace(/\[\[(.*?)\]\]/gim, '<a href="javascript:void(0)" onclick="openPageByTitle(\'$1\')" style="color:var(--primary); font-weight:600; text-decoration:underline;">📄 $1</a>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
+}
+
+async function openPageByTitle(pageTitle) {
+    if (!pageTitle) return;
+    const pages = await window.appStorage.getAll('pages');
+    const target = pages.find(p => p.title && p.title.toLowerCase().trim() === pageTitle.toLowerCase().trim());
+    if (target) {
+        await openPage(target.id);
+    } else {
+        alert(`"${pageTitle}" başlıklı sayfa bulunamadı.`);
+    }
+}
+
+async function fetchPageBacklinksMobile(pageId) {
+    const container = document.getElementById('page-backlinks-container');
+    const list = document.getElementById('page-backlinks-list');
+    const countEl = document.getElementById('backlinks-count');
+    if (!container || !list) return;
+
+    try {
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${pageId}/backlinks`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data.ok && data.backlinks && data.backlinks.length > 0) {
+                if (countEl) countEl.innerText = data.count;
+                list.innerHTML = data.backlinks.map(b => `
+                    <div style="padding:6px 10px; background:var(--surface2); border:1px solid var(--border); border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:space-between;" onclick="openPage(${b.id})">
+                        <span style="font-weight:600; font-size:0.85rem;">${b.icon || '📄'} ${escapeHtml(b.title)}</span>
+                        <span style="font-size:0.75rem; color:var(--muted);">${b.category_name || ''}</span>
+                    </div>
+                `).join('');
+                container.style.display = 'block';
+                return;
+            }
+        }
+    } catch(e) {}
+    container.style.display = 'none';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sesli Dikte (Speech-to-Text / Web Speech API)
+// ─────────────────────────────────────────────────────────────────────────────
+let currentSpeechRecognition = null;
+
+function toggleVoiceDictation(targetInputId, btnEl) {
+    const input = document.getElementById(targetInputId);
+    if (!input) return;
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+        alert("Cihazınızda sesli dikte (Web Speech API) desteklenmiyor.");
+        return;
+    }
+
+    if (currentSpeechRecognition) {
+        currentSpeechRecognition.stop();
+        currentSpeechRecognition = null;
+        if (btnEl) btnEl.classList.remove('listening');
+        return;
+    }
+
+    try {
+        const rec = new SpeechRec();
+        rec.lang = 'tr-TR';
+        rec.continuous = false;
+        rec.interimResults = true;
+
+        if (btnEl) btnEl.classList.add('listening');
+        currentSpeechRecognition = rec;
+
+        let initialVal = input.value ? input.value + ' ' : '';
+
+        rec.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+            input.value = initialVal + (finalTranscript || interimTranscript);
+        };
+
+        rec.onerror = (e) => {
+            if (btnEl) btnEl.classList.remove('listening');
+            currentSpeechRecognition = null;
+        };
+
+        rec.onend = () => {
+            if (btnEl) btnEl.classList.remove('listening');
+            currentSpeechRecognition = null;
+        };
+
+        rec.start();
+    } catch(err) {
+        if (btnEl) btnEl.classList.remove('listening');
+        currentSpeechRecognition = null;
+    }
+}
+
+function toggleVoiceDictationRich(editorId, btnEl) {
+    const editor = document.getElementById(editorId);
+    if (!editor) return;
+
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+        alert("Cihazınızda sesli dikte (Web Speech API) desteklenmiyor.");
+        return;
+    }
+
+    if (currentSpeechRecognition) {
+        currentSpeechRecognition.stop();
+        currentSpeechRecognition = null;
+        if (btnEl) btnEl.classList.remove('listening');
+        return;
+    }
+
+    try {
+        const rec = new SpeechRec();
+        rec.lang = 'tr-TR';
+        rec.continuous = false;
+        rec.interimResults = false;
+
+        if (btnEl) btnEl.classList.add('listening');
+        currentSpeechRecognition = rec;
+
+        rec.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            editor.focus();
+            document.execCommand('insertText', false, ' ' + transcript);
+            handleMobileRichNoteInput();
+        };
+
+        rec.onerror = (e) => {
+            if (btnEl) btnEl.classList.remove('listening');
+            currentSpeechRecognition = null;
+        };
+
+        rec.onend = () => {
+            if (btnEl) btnEl.classList.remove('listening');
+            currentSpeechRecognition = null;
+        };
+
+        rec.start();
+    } catch(err) {
+        if (btnEl) btnEl.classList.remove('listening');
+        currentSpeechRecognition = null;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mobil Geri Al (Undo / Ctrl+Z) Yöneticisi
+// ─────────────────────────────────────────────────────────────────────────────
+window._deletedHistoryStack = [];
+let undoMobileToastTimeout = null;
+
+function pushDeletedHistory(type, data, restoreFn) {
+    window._deletedHistoryStack.push({
+        type: type,
+        data: data,
+        restore: restoreFn,
+        timestamp: Date.now()
+    });
+    const label = (data.title || data.content || data.name || 'Öğe').substring(0, 22);
+    showUndoToast(`"${label}" silindi`, restoreFn);
+}
+
+function showUndoToast(msg, restoreFn) {
+    const toast = document.getElementById('undo-toast');
+    if (!toast) return;
+    toast.innerHTML = `
+        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">🗑️ ${escapeHtml(msg)}</span>
+        <button class="undo-toast-btn" onclick="undoLastDelete()">↩️ Geri Al</button>
+    `;
+    toast.style.display = 'flex';
+    clearTimeout(undoMobileToastTimeout);
+    undoMobileToastTimeout = setTimeout(() => {
+        toast.style.display = 'none';
+    }, 7000);
+}
+
+function hideUndoToast() {
+    const toast = document.getElementById('undo-toast');
+    if (toast) toast.style.display = 'none';
+    clearTimeout(undoMobileToastTimeout);
+}
+
+async function undoLastDelete() {
+    if (!window._deletedHistoryStack || window._deletedHistoryStack.length === 0) {
+        return;
+    }
+    const last = window._deletedHistoryStack.pop();
+    if (last && typeof last.restore === 'function') {
+        await last.restore();
+        hideUndoToast();
+    }
+}
+
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const active = document.activeElement;
+        const isEditing = active && (
+            active.tagName === 'INPUT' || 
+            active.tagName === 'TEXTAREA' || 
+            active.isContentEditable
+        );
+        if (!isEditing && window._deletedHistoryStack && window._deletedHistoryStack.length > 0) {
+            e.preventDefault();
+            undoLastDelete();
+        }
+    }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sunucudan Taze Veri Çekme (Live Online Fallback & Update)
@@ -2844,16 +3278,47 @@ function openAddPageModal(catId) {
     openModal('modal-add-page');
 }
 
+const ACADEMIC_THESIS_TEMPLATE = `<h2>🎓 Tez &amp; Ödev Çalışma Masası</h2>
+<p><b>Danışman / Öğretim Üyesi:</b> Prof. Dr. ...<br>
+<b>Ders / Anabilim Dalı:</b> ...<br>
+<b>Teslim Tarihi:</b> [Tarih Giriniz]<br>
+<b>Aşama:</b> 🟡 Literatür Taraması &amp; Hipotez Belirleme</p>
+<hr>
+<h3>📋 Tez &amp; Ödev Yol Haritası (Kontrol Listesi)</h3>
+<ul>
+  <li>☐ Konu tespiti, problem tanımı ve danışman onayı</li>
+  <li>☐ Literatür taraması (Yerli ve yabancı en az 15 makale incelemesi)</li>
+  <li>☐ Araştırma soruları, amaç ve metodoloji belirleme</li>
+  <li>☐ Veri toplama, anket, deney veya prototip kodlama</li>
+  <li>☐ Giriş ve Kuramsal Çerçeve taslağının yazımı</li>
+  <li>☐ Bulgular, İstatistiksel Analiz ve Tartışma yazımı</li>
+  <li>☐ Sonuç, Değerlendirme ve Gelecek Çalışmalar</li>
+  <li>☐ APA 7 / IEEE formatında kaynakça ve metin içi atıf kontrolü</li>
+  <li>☐ Danışman inceleme revizyonları ve Turnitin intihal raporu (&lt;%15)</li>
+  <li>☐ Ciltleme / PDF son teslimi ve jüri sunumu hazırlığı</li>
+</ul>
+<hr>
+<h3>📚 Kaynakça &amp; İncelenen Makaleler</h3>
+<ul>
+  <li>📖 <b>Referans 1:</b> Yazar, A. (2025). <i>"Makale Başlığı"</i>, Bilim Dergisi. [Not: Metot için temel referans]</li>
+  <li>📖 <b>Referans 2:</b> Smith, J. et al. (2024). <i>"Advanced Methodologies"</i>, IEEE Trans. [Not: İlgili çalışma]</li>
+</ul>
+<hr>
+<h3>📝 Araştırma Notları, Alıntılar &amp; Karalamalar</h3>
+<p>Laboratuvar notları, mülakat kayıtları, önemli formüller veya hocanın son geri bildirimlerini buraya yazabilirsiniz...</p>`;
+
 function selectNewPageType(type) {
     newPageType = type;
     const btnCheck = document.getElementById('btn-type-checklist');
     const btnNotes = document.getElementById('btn-type-notes');
+    const btnAcad = document.getElementById('btn-type-academic');
     const btnSoft = document.getElementById('btn-type-software');
     const btnFin = document.getElementById('btn-type-finance');
     const btnProj = document.getElementById('btn-type-project');
 
     if (btnCheck) btnCheck.classList.toggle('active', type === 'checklist');
     if (btnNotes) btnNotes.classList.toggle('active', type === 'notes');
+    if (btnAcad) btnAcad.classList.toggle('active', type === 'academic');
     if (btnSoft) btnSoft.classList.toggle('active', type === 'software');
     if (btnFin) btnFin.classList.toggle('active', type === 'finance');
     if (btnProj) btnProj.classList.toggle('active', type === 'project');
@@ -2861,6 +3326,7 @@ function selectNewPageType(type) {
     const typeIcons = {
         checklist: '🛒',
         notes: '📝',
+        academic: '🎓',
         software: '💻',
         finance: '💳',
         project: '🔬'
@@ -2904,20 +3370,29 @@ async function submitCreatePage() {
     const typeIcons = {
         checklist: '🛒',
         notes: '📝',
+        academic: '🎓',
         software: '💻',
         finance: '💳',
         project: '🔬'
     };
 
-    const chosenIcon = (iconInput ? iconInput.value.trim() : '') || typeIcons[newPageType] || '📝';
+    let finalType = newPageType;
+    let initialContent = '';
+    let chosenIcon = (iconInput ? iconInput.value.trim() : '') || typeIcons[newPageType] || '📝';
+
+    if (newPageType === 'academic') {
+        finalType = 'notes';
+        initialContent = ACADEMIC_THESIS_TEMPLATE;
+        if (!chosenIcon || chosenIcon === '📝') chosenIcon = '🎓';
+    }
 
     const newPage = {
         id: Date.now(),
         category_id: catId,
         title: title,
-        type: newPageType,
+        type: finalType,
         icon: chosenIcon,
-        content: '',
+        content: initialContent,
         sort_order: 99
     };
 
@@ -3147,15 +3622,34 @@ async function handleGlobalSearch(q) {
     const items = await window.appStorage.getAll('items');
     const vault = await window.appStorage.getAll('vault');
 
-    const matchedPages = pages.filter(p => !p._deleted && (p.title || '').toLowerCase().includes(q));
+    const matchedPages = pages.filter(p => {
+        if (p._deleted) return false;
+        const titleMatch = (p.title || '').toLowerCase().includes(q);
+        const contentMatch = (p.content || '').toLowerCase().includes(q);
+        return titleMatch || contentMatch;
+    });
     const matchedItems = items.filter(i => !i._deleted && (i.title || '').toLowerCase().includes(q));
     const matchedVault = vault.filter(v => !v._deleted && ((v.title || '').toLowerCase().includes(q) || (v.username || '').toLowerCase().includes(q)));
 
     let html = '';
     matchedPages.forEach(p => {
+        const titleMatch = (p.title || '').toLowerCase().includes(q);
+        let snippet = '';
+        if (!titleMatch && p.content) {
+            const clean = p.content.replace(/<[^>]*>/g, ' ');
+            const idx = clean.toLowerCase().indexOf(q);
+            if (idx !== -1) {
+                const start = Math.max(0, idx - 18);
+                const end = Math.min(clean.length, idx + q.length + 28);
+                snippet = `<div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">...${escapeHtml(clean.substring(start, end))}...</div>`;
+            }
+        }
         html += `
             <div class="overview-item" onclick="closeModal('modal-search'); openPage(${p.id})">
-                <span>${p.icon || '📝'} ${escapeHtml(p.title)} (Sayfa)</span>
+                <div style="text-align:left;">
+                    <span style="font-weight:600;">${p.icon || '📝'} ${escapeHtml(p.title)} (Sayfa)</span>
+                    ${snippet}
+                </div>
                 <span>➔</span>
             </div>
         `;
@@ -3229,8 +3723,16 @@ async function refreshMobileAuthUI() {
             const user = JSON.parse(userJson);
             const nameEl = document.getElementById('mobile-user-name');
             const roleEl = document.getElementById('mobile-user-role');
+            const tincIdEl = document.getElementById('mobile-tinc-id-badge');
+            const verifyBox = document.getElementById('mobile-email-verify-box');
+
             if (nameEl) nameEl.innerText = user.display_name || user.username;
             if (roleEl) roleEl.innerText = `@${user.username} (${user.role || 'Kullanıcı'})`;
+            if (tincIdEl) tincIdEl.innerText = user.tinc_id || 'TINC-DEFAULT';
+            if (verifyBox) {
+                verifyBox.style.display = (user.is_email_verified === 0 || user.is_email_verified === false) ? 'flex' : 'none';
+            }
+
             if (loggedInBox) loggedInBox.style.display = 'block';
             if (formBox) formBox.style.display = 'none';
             return;
@@ -3241,15 +3743,127 @@ async function refreshMobileAuthUI() {
     if (formBox) formBox.style.display = 'block';
 }
 
+function copyMobileTincID() {
+    const badge = document.getElementById('mobile-tinc-id-badge');
+    const id = badge ? badge.innerText.trim() : '';
+    if (id) {
+        navigator.clipboard.writeText(id).then(() => {
+            showMobileToast(`TincID panoya kopyalandı: ${id}`);
+        });
+    }
+}
+
+async function downloadMobileDataTakeout() {
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+    const url = `${sUrl}/notes/api/auth/profile/export`;
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+        window.open(url, '_system');
+    } else {
+        window.open(url, '_blank');
+    }
+    showMobileToast('Veri paketi (.ZIP) indiriliyor...');
+}
+
+async function revokeMobileOtherSessions() {
+    if (!confirm('Bu cihaz hariç diğer tüm açık oturumları sonlandırmak istediğinize emin misiniz?')) return;
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/auth/sessions/revoke', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ all_other: true })
+        });
+        showMobileToast('Diğer tüm cihaz oturumları başarıyla kapatıldı! ✓');
+    } catch (e) {
+        showMobileToast('İşlem başarısız: ' + e.message);
+    }
+}
+
+async function confirmMobileDeactivateAccount() {
+    if (!confirm('Hesabınızı dondurmak (pasife almak) istediğinize emin misiniz? Giriş yaparak dilediğiniz zaman tekrar etkinleştirebilirsiniz.')) return;
+    try {
+        await window.appSync.apiFetch('/notes/api/auth/profile/deactivate', { method: 'POST' });
+        await window.appSync.logout();
+        await refreshMobileAuthUI();
+        showMobileToast('Hesabınız donduruldu. Oturum kapatıldı.');
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+async function confirmMobileDeleteAccount() {
+    const check = prompt('DİKKAT: Hesabınız ve tüm notlarınız, defterleriniz, dosyalarınız kalıcı olarak silinecektir!\nOnaylamak için büyük harflerle "SİL" yazın:');
+    if (check !== 'SİL') {
+        alert('İşlem iptal edildi.');
+        return;
+    }
+    try {
+        await window.appSync.apiFetch('/notes/api/auth/profile/delete', { method: 'POST' });
+        await window.appSync.logout();
+        await refreshMobileAuthUI();
+        alert('Hesabınız ve tüm verileriniz kalıcı olarak silindi.');
+        window.location.reload();
+    } catch (e) {
+        alert('Hata: ' + e.message);
+    }
+}
+
+async function handleMobileGoogleSignIn() {
+    // Google Sign-In: web popup veya prompt
+    const email = prompt('Google Hesabı E-postanız:');
+    if (!email) return;
+    const name = email.split('@')[0];
+    const sub = 'g_' + Math.abs(hashCode(email));
+    const res = await window.appSync.loginWithOAuth('google', { email, name, sub });
+    if (res.ok) {
+        showMobileToast('Google ile giriş başarılı! ✓');
+        await refreshMobileAuthUI();
+        window.appSync.syncNow();
+    } else {
+        alert(res.error || 'Google girişi başarısız');
+    }
+}
+
+async function handleMobileAppleSignIn() {
+    const email = prompt('Apple Kimliği E-postanız:');
+    if (!email) return;
+    const name = email.split('@')[0];
+    const sub = 'apple_' + Math.abs(hashCode(email));
+    const res = await window.appSync.loginWithOAuth('apple', { email, name, user: sub });
+    if (res.ok) {
+        showMobileToast('Apple ile giriş başarılı! ✓');
+        await refreshMobileAuthUI();
+        window.appSync.syncNow();
+    } else {
+        alert(res.error || 'Apple girişi başarısız');
+    }
+}
+
+async function triggerMobileTincSync() {
+    const lbl = document.getElementById('tincsync-status-label');
+    if (lbl) lbl.innerText = 'Eşitleniyor...';
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/sync/tincsync/trigger', { method: 'POST' });
+        const data = await res.json();
+        if (lbl) lbl.innerText = data.synced ? '🟢 P2P Eşitlendi' : '🟡 Yerel Ağda Beklemede';
+        showMobileToast(data.message || (data.synced ? 'TincSync ile başarıyla eşitlendi!' : 'TincSync hazır.'));
+    } catch (e) {
+        if (lbl) lbl.innerText = 'P2P Bağlantısı Hazır';
+        showMobileToast('TincSync port 9015 dinlemede');
+    }
+}
+
 async function handleMobileAuthSubmit() {
     const uInput = document.getElementById('m-auth-user');
     const pInput = document.getElementById('m-auth-pass');
     const dInput = document.getElementById('m-auth-display');
+    const emailInput = document.getElementById('m-auth-email');
     const msg = document.getElementById('m-auth-msg');
 
     const u = uInput ? uInput.value.trim() : '';
     const p = pInput ? pInput.value.trim() : '';
     const displayName = dInput ? dInput.value.trim() : '';
+    const email = emailInput ? emailInput.value.trim() : '';
 
     if (!u || !p) {
         if (msg) {
@@ -3270,7 +3884,7 @@ async function handleMobileAuthSubmit() {
     if (currentMobileAuthTab === 'login') {
         res = await window.appSync.login(u, p);
     } else {
-        res = await window.appSync.register(u, p, displayName);
+        res = await window.appSync.register(u, p, displayName, email);
     }
 
     if (res.ok) {
@@ -3281,6 +3895,15 @@ async function handleMobileAuthSubmit() {
         if (pInput) pInput.value = '';
         await refreshMobileAuthUI();
         window.appSync.syncNow();
+
+        if (res.verification_required) {
+            openModal('modal-mobile-email-verify');
+            if (res.code_demo) {
+                const inp = document.getElementById('m-verify-code-input');
+                if (inp) inp.value = res.code_demo;
+                showMobileToast(`Demo Kodu: ${res.code_demo}`);
+            }
+        }
     } else {
         if (msg) {
             msg.innerText = res.error || 'İşlem başarısız';
@@ -4123,5 +4746,575 @@ function copySoftwareAgentsUrl() {
         navigator.clipboard.writeText(el.value).then(() => {
             showMobileToast('AGENTS.md bağlantısı kopyalandı!');
         });
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOBİL POWER PACKS: Pin, Kilit, Ekler, Hedef Sayacı, Zaman Tüneli, Graf
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function toggleMobilePagePin() {
+    if (!activePageId) return;
+    const page = await window.appStorage.getPage(activePageId);
+    if (!page) return;
+    const newStatus = page.is_pinned ? 0 : 1;
+    page.is_pinned = newStatus;
+    await window.appStorage.savePage(page);
+
+    const btn = document.getElementById('m-btn-page-pin');
+    if (btn) btn.style.color = newStatus ? 'var(--warning, #f59e0b)' : '';
+
+    showMobileToast(newStatus ? '📌 Sayfa başa sabitlendi' : '📌 Sabitleme kaldırıldı');
+    await reloadDrawerNavigation();
+
+    // Sunucuya senkronize et
+    window.appSync.apiFetch(`/notes/api/pages/${activePageId}/pin`, { method: 'POST' }).catch(() => {});
+}
+
+function promptMobilePageLock() {
+    if (!activePageId) return;
+    const desc = document.getElementById('m-pin-desc');
+    const remBtn = document.getElementById('m-btn-remove-lock');
+    const pinInp = document.getElementById('m-pin-set-input');
+    const errEl = document.getElementById('m-pin-set-err');
+
+    if (errEl) errEl.style.display = 'none';
+    if (pinInp) pinInp.value = '';
+
+    if (activePageObj && activePageObj.is_locked) {
+        if (desc) desc.innerText = 'Bu sayfa kilitli. PIN değiştirebilir veya kilidi kaldırabilirsiniz:';
+        if (remBtn) remBtn.style.display = 'block';
+    } else {
+        if (desc) desc.innerText = 'Bu sayfayı kilitlemek için 4 haneli PIN belirleyin:';
+        if (remBtn) remBtn.style.display = 'none';
+    }
+    openModal('modal-mobile-pin-set');
+}
+
+async function submitMobileLockSet() {
+    const pinInp = document.getElementById('m-pin-set-input');
+    const pin = pinInp ? pinInp.value.trim() : '';
+    const errEl = document.getElementById('m-pin-set-err');
+    if (!pin || pin.length < 4) {
+        if (errEl) { errEl.innerText = 'PIN en az 4 haneli olmalıdır.'; errEl.style.display = 'block'; }
+        return;
+    }
+    try {
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/lock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin, action: 'lock' })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            if (activePageObj) activePageObj.is_locked = 1;
+            window[`unlocked_page_${activePageId}`] = true;
+            closeModal('modal-mobile-pin-set');
+            await renderActivePage();
+            showMobileToast('🔒 Sayfa başarıyla kilitlendi');
+        } else {
+            if (errEl) { errEl.innerText = data.error || 'İşlem başarısız'; errEl.style.display = 'block'; }
+        }
+    } catch (e) {
+        if (errEl) { errEl.innerText = 'Bağlantı hatası'; errEl.style.display = 'block'; }
+    }
+}
+
+async function submitMobileLockRemove() {
+    if (!confirm('Sayfa kilidini kaldırmak istediğinize emin misiniz?')) return;
+    try {
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/lock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'unlock' })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            if (activePageObj) activePageObj.is_locked = 0;
+            delete window[`unlocked_page_${activePageId}`];
+            closeModal('modal-mobile-pin-set');
+            await renderActivePage();
+            showMobileToast('🔓 Sayfa kilidi kaldırıldı');
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+async function submitMobileUnlockPin() {
+    const pinInp = document.getElementById('m-locked-pin-input');
+    const pin = pinInp ? pinInp.value.trim() : '';
+    const errEl = document.getElementById('m-locked-pin-error');
+    if (!pin) return;
+
+    try {
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/verify-lock`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin })
+        });
+        const data = await res.json();
+        if (data.ok && data.page) {
+            window[`unlocked_page_${activePageId}`] = true;
+            activePageObj = data.page;
+            await window.appStorage.put('pages', { ...data.page, _dirty: false });
+            await renderActivePage();
+        } else {
+            if (errEl) {
+                errEl.innerText = data.error || 'Hatalı PIN kodu';
+                errEl.style.display = 'block';
+            }
+        }
+    } catch (e) {
+        if (errEl) {
+            errEl.innerText = 'Bağlantı hatası';
+            errEl.style.display = 'block';
+        }
+    }
+}
+
+function insertMobileToggleBlock() {
+    const editor = document.getElementById('page-rich-editor');
+    if (!editor) return;
+    const title = prompt('Katlanabilir Başlık:', '▶️ Bölüm Başlığı') || 'Bölüm';
+    const html = `<details class="note-toggle" open><summary>${escapeHtml(title)}</summary><p>Detayları buraya yazabilirsiniz...</p></details><p><br></p>`;
+    document.execCommand('insertHTML', false, html);
+    handleMobileRichNoteInput();
+    editor.focus();
+}
+
+function promptMobileSmartClip() {
+    const inp = document.getElementById('m-smart-clip-url');
+    const stat = document.getElementById('m-smart-clip-status');
+    if (inp) inp.value = '';
+    if (stat) stat.style.display = 'none';
+    openModal('modal-mobile-smart-clip');
+}
+
+async function submitMobileSmartClip() {
+    const inp = document.getElementById('m-smart-clip-url');
+    const url = inp ? inp.value.trim() : '';
+    const stat = document.getElementById('m-smart-clip-status');
+    const btn = document.getElementById('m-btn-clip-submit');
+    if (!url) return;
+
+    if (stat) { stat.innerText = 'Bağlantı ve meta veriler alınıyor...'; stat.style.display = 'block'; }
+    if (btn) btn.disabled = true;
+
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/tools/clip_url', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (data.ok && data.card) {
+            const c = data.card;
+            const thumbHtml = c.image_url ? `<div class="bookmark-card-thumb" style="background-image:url('${c.image_url}');"></div>` : '';
+            const cardHtml = `
+                <a href="${escapeHtml(c.url)}" target="_blank" class="bookmark-card">
+                    ${thumbHtml}
+                    <div class="bookmark-card-info">
+                        <div class="bookmark-card-title">${escapeHtml(c.title || c.url)}</div>
+                        <div class="bookmark-card-desc">${escapeHtml(c.description || '')}</div>
+                        <div class="bookmark-card-source">🔗 ${escapeHtml(c.site_name || 'Web')}</div>
+                    </div>
+                </a><p><br></p>
+            `;
+            const editor = document.getElementById('page-rich-editor');
+            if (editor) {
+                editor.focus();
+                document.execCommand('insertHTML', false, cardHtml);
+                handleMobileRichNoteInput();
+            }
+            closeModal('modal-mobile-smart-clip');
+            showMobileToast('🔗 Yer imi notunuza eklendi');
+        } else {
+            if (stat) stat.innerText = data.error || 'Bağlantı alınamadı.';
+        }
+    } catch (e) {
+        if (stat) stat.innerText = 'Hata: URL çözümlenemedi.';
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function toggleMobileAttachmentsTray(forceState) {
+    const bar = document.getElementById('mobile-attachments-bar');
+    if (!bar) return;
+    if (forceState !== undefined) {
+        bar.style.display = forceState ? 'block' : 'none';
+    } else {
+        bar.style.display = (bar.style.display === 'none' || !bar.style.display) ? 'block' : 'none';
+    }
+    if (bar.style.display === 'block' && activePageId) {
+        loadMobileAttachmentsList(activePageId);
+    }
+}
+
+async function loadMobileAttachmentsList(pageId) {
+    if (!pageId) return;
+    try {
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${pageId}/attachments`);
+        const data = await res.json();
+        if (data.ok && data.attachments) {
+            const listEl = document.getElementById('mobile-attachments-list');
+            const countEl = document.getElementById('mobile-attachments-count');
+            if (countEl) countEl.innerText = data.attachments.length;
+            if (listEl) {
+                if (data.attachments.length === 0) {
+                    listEl.innerHTML = '<span style="font-size:0.72rem; color:var(--muted); font-style:italic;">Ekli belge yok.</span>';
+                    return;
+                }
+                const sUrl = await window.appSync.getServerUrl();
+                listEl.innerHTML = data.attachments.map(att => {
+                    const isPdf = att.filename.toLowerCase().endsWith('.pdf') || att.mime_type.includes('pdf');
+                    const icon = isPdf ? '📄' : (att.filename.match(/\.(zip|tar|gz)$/i) ? '📦' : '📎');
+                    const sizeKb = Math.round((att.file_size || 0) / 1024);
+                    const fullUrl = att.file_url.startsWith('http') ? att.file_url : `${sUrl}${att.file_url}`;
+                    const clickAction = isPdf ? `openMobilePdfViewer('${fullUrl}', '${escapeHtml(att.original_name)}')` : `window.open('${fullUrl}', '_system')`;
+                    return `
+                        <div class="attachment-chip">
+                            <span onclick="${clickAction}">${icon} ${escapeHtml(att.original_name)} (${sizeKb}K)</span>
+                            <span class="att-del-btn" onclick="deleteMobileAttachment(${att.id})">✕</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    } catch (e) {
+        console.warn("loadMobileAttachmentsList error:", e);
+    }
+}
+
+async function handleMobileAttachmentSelected(event) {
+    const file = event.target.files[0];
+    if (!file || !activePageId) return;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const sUrl = await window.appSync.getServerUrl();
+        const token = await window.appStorage.getSetting('auth_token', '');
+        const res = await fetch(`${sUrl}/notes/api/pages/${activePageId}/attachments`, {
+            method: 'POST',
+            headers: { 'Authorization': token ? `Bearer ${token}` : '', 'X-Auth-Token': token || '' },
+            body: formData
+        });
+        const data = await res.json();
+        if (data.ok) {
+            showMobileToast(`📎 ${file.name} başarıyla eklendi`);
+            loadMobileAttachmentsList(activePageId);
+            document.getElementById('mobile-attachments-bar').style.display = 'block';
+        } else {
+            alert(data.error || 'Yüklenemedi');
+        }
+    } catch (e) {
+        alert('Dosya yükleme hatası: ' + e.message);
+    }
+    event.target.value = '';
+}
+
+async function deleteMobileAttachment(attId) {
+    if (!confirm('Bu eki silmek istediğinize emin misiniz?')) return;
+    try {
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/attachments/${attId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+            loadMobileAttachmentsList(activePageId);
+            showMobileToast('Ek silindi');
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+function openMobilePdfViewer(fileUrl, filename) {
+    const frame = document.getElementById('m-pdf-iframe');
+    const titleEl = document.getElementById('m-pdf-title');
+    const dl = document.getElementById('m-pdf-download');
+    if (frame) frame.src = fileUrl;
+    if (titleEl) titleEl.innerText = filename || 'PDF Belge';
+    if (dl) dl.href = fileUrl;
+    openModal('modal-mobile-pdf-viewer');
+}
+
+function promptMobileWordGoal() {
+    if (!activePageId || !activePageObj) return;
+    const curTarget = activePageObj.target_word_count || 0;
+    const val = prompt('Hedef kelime sayısı girin (Kaldırmak için 0):', curTarget > 0 ? curTarget : '1000');
+    if (val === null) return;
+    const target = parseInt(val, 10);
+    if (isNaN(target) || target < 0) return;
+
+    activePageObj.target_word_count = target;
+    window.appStorage.savePage(activePageObj);
+    updateMobileWordGoalStats(activePageObj);
+    showMobileToast(target > 0 ? `🎯 Hedef belirlendi: ${target} kelime` : '🎯 Hedef kaldırıldı');
+
+    window.appSync.apiFetch(`/notes/api/pages/${activePageId}/word-count-target`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target })
+    }).catch(() => {});
+}
+
+function updateMobileWordGoalStats(page) {
+    const richEditor = document.getElementById('page-rich-editor');
+    const hiddenTa = document.getElementById('page-note-content');
+    const text = richEditor ? richEditor.innerText.trim() : (hiddenTa ? hiddenTa.value.trim() : '');
+    const len = text.length;
+    const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+
+    const statsEl = document.getElementById('mobile-note-stats');
+    if (statsEl) statsEl.innerText = `${len} karakter • ${words} kelime`;
+
+    const target = (page && page.target_word_count) ? page.target_word_count : 0;
+    const wrap = document.getElementById('mobile-word-goal-wrap');
+    const textEl = document.getElementById('mobile-word-goal-text');
+    const fillEl = document.getElementById('mobile-word-goal-fill');
+    const pctEl = document.getElementById('mobile-word-goal-pct');
+
+    if (target > 0) {
+        const pct = Math.min(100, Math.round((words / target) * 100));
+        if (textEl) textEl.innerText = `🎯 ${words} / ${target} kelime (${pct >= 100 ? '🎉 Tamam' : `%${pct}`})`;
+        if (fillEl) {
+            fillEl.style.width = `${pct}%`;
+            fillEl.style.backgroundColor = pct >= 100 ? 'var(--success)' : 'var(--primary)';
+        }
+        if (pctEl) pctEl.innerText = `%${pct}`;
+        if (wrap) wrap.style.display = 'flex';
+    } else {
+        if (wrap) wrap.style.display = 'none';
+    }
+}
+
+async function openMobileTimeMachine() {
+    if (!activePageId) return;
+    openModal('modal-mobile-time-machine');
+    const listEl = document.getElementById('m-time-machine-list');
+    if (listEl) listEl.innerHTML = '<div style="text-align:center; padding:16px; color:var(--muted);">Versiyonlar yükleniyor...</div>';
+
+    try {
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/versions`);
+        const data = await res.json();
+        if (data.ok && data.versions) {
+            if (data.versions.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; padding:16px; color:var(--muted); font-size:0.8rem;">Bu sayfa için henüz kaydedilmiş bir önceki versiyon yok.</div>';
+                return;
+            }
+            listEl.innerHTML = data.versions.map(v => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; background:var(--surface2); border-radius:6px; font-size:0.8rem;">
+                    <div>
+                        <div style="font-weight:700;">${escapeHtml(v.title || 'Başlıksız')}</div>
+                        <div style="font-size:0.7rem; color:var(--muted);">${v.created_at} &bull; ${v.char_count || 0} karakter</div>
+                    </div>
+                    <button class="btn btn-primary btn-xs" onclick="restoreMobilePageVersion(${v.id})">↩️ Geri Yükle</button>
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        if (listEl) listEl.innerHTML = '<div style="color:var(--danger); text-align:center; padding:16px;">Alınamadı: ' + e.message + '</div>';
+    }
+}
+
+async function restoreMobilePageVersion(versionId) {
+    if (!confirm('Bu versiyonu geri yüklemek istediğinize emin misiniz?')) return;
+    try {
+        const res = await window.appSync.apiFetch(`/notes/api/pages/${activePageId}/versions/${versionId}/restore`, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok && data.page) {
+            activePageObj = data.page;
+            await window.appStorage.put('pages', { ...data.page, _dirty: false });
+            closeModal('modal-mobile-time-machine');
+            await renderActivePage();
+            showMobileToast('⏳ Sayfa önceki versiyona geri yüklendi!');
+        }
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOBİL ZİHİN AĞI GRAFİĞİ (Mobile Mind Map / Graph View)
+// ─────────────────────────────────────────────────────────────────────────────
+
+let mGraphAnimationId = null;
+
+async function openMobileGraphView() {
+    toggleSidebar(false);
+    openModal('modal-mobile-graph-view');
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/graph');
+        const data = await res.json();
+        if (data.ok && data.graph) {
+            renderMobileGraphCanvas(data.graph);
+        }
+    } catch (e) {
+        showMobileToast('Graf verisi alınamadı: ' + e.message);
+    }
+}
+
+function renderMobileGraphCanvas(graph) {
+    const canvas = document.getElementById('m-graph-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const nodes = graph.nodes.map((n, i) => {
+        const angle = (i / graph.nodes.length) * 2 * Math.PI;
+        const radius = 60 + Math.random() * 60;
+        return {
+            ...n,
+            x: width / 2 + Math.cos(angle) * radius,
+            y: height / 2 + Math.sin(angle) * radius,
+            vx: 0,
+            vy: 0,
+            r: Math.max(7, Math.min(18, 5 + (n.val || 1) * 2.5))
+        };
+    });
+
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+    const links = graph.links.map(l => ({
+        source: nodeMap.get(l.source),
+        target: nodeMap.get(l.target)
+    })).filter(l => l.source && l.target);
+
+    canvas.onclick = (e) => {
+        const r = canvas.getBoundingClientRect();
+        const mx = e.clientX - r.left;
+        const my = e.clientY - r.top;
+        const clicked = nodes.find(n => Math.hypot(n.x - mx, n.y - my) <= n.r + 5);
+        if (clicked) {
+            closeModal('modal-mobile-graph-view');
+            openPage(clicked.id);
+        }
+    };
+
+    if (mGraphAnimationId) cancelAnimationFrame(mGraphAnimationId);
+
+    function step() {
+        for (let i = 0; i < nodes.length; i++) {
+            const a = nodes[i];
+            a.vx += (width / 2 - a.x) * 0.0008;
+            a.vy += (height / 2 - a.y) * 0.0008;
+            for (let j = i + 1; j < nodes.length; j++) {
+                const b = nodes[j];
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const dist = Math.hypot(dx, dy) || 1;
+                if (dist < 160) {
+                    const force = (160 - dist) / dist * 0.05;
+                    a.vx -= dx * force;
+                    a.vy -= dy * force;
+                    b.vx += dx * force;
+                    b.vy += dy * force;
+                }
+            }
+        }
+        for (const l of links) {
+            const dx = l.target.x - l.source.x;
+            const dy = l.target.y - l.source.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            const force = (dist - 60) * 0.006;
+            l.source.vx += dx * force;
+            l.source.vy += dy * force;
+            l.target.vx -= dx * force;
+            l.target.vy -= dy * force;
+        }
+        for (const n of nodes) {
+            n.x += n.vx;
+            n.y += n.vy;
+            n.vx *= 0.86;
+            n.vy *= 0.86;
+        }
+
+        ctx.clearRect(0, 0, width, height);
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+        ctx.lineWidth = 1.2;
+        for (const l of links) {
+            ctx.beginPath();
+            ctx.moveTo(l.source.x, l.source.y);
+            ctx.lineTo(l.target.x, l.target.y);
+            ctx.stroke();
+        }
+        for (const n of nodes) {
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, n.r, 0, 2 * Math.PI);
+            ctx.fillStyle = n.id == activePageId ? '#3b82f6' : (n.group || '#94a3b8');
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.font = '10px sans-serif';
+            ctx.fillStyle = '#f8fafc';
+            ctx.textAlign = 'center';
+            ctx.fillText(n.label, n.x, n.y + n.r + 12);
+        }
+        mGraphAnimationId = requestAnimationFrame(step);
+    }
+    step();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MOBİL E-POSTA DOĞRULAMA (6 Haneli Kod)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function submitMobileEmailCode() {
+    const inp = document.getElementById('m-verify-code-input');
+    const code = inp ? inp.value.trim() : '';
+    const stat = document.getElementById('m-verify-code-status');
+    if (!code || code.length < 6) {
+        if (stat) { stat.innerText = 'Lütfen 6 haneli kodu girin.'; stat.style.color = 'var(--danger)'; stat.style.display = 'block'; }
+        return;
+    }
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/auth/verify-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (data.ok) {
+            if (stat) { stat.innerText = '✓ E-posta başarıyla doğrulandı!'; stat.style.color = 'var(--success)'; stat.style.display = 'block'; }
+            const uJson = await window.appStorage.getSetting('user_profile', '');
+            if (uJson) {
+                const u = JSON.parse(uJson);
+                u.is_email_verified = 1;
+                await window.appStorage.setSetting('user_profile', JSON.stringify(u));
+            }
+            setTimeout(() => {
+                closeModal('modal-mobile-email-verify');
+                refreshMobileAuthUI();
+            }, 1000);
+        } else {
+            if (stat) { stat.innerText = data.error || 'Hatalı kod'; stat.style.color = 'var(--danger)'; stat.style.display = 'block'; }
+        }
+    } catch (e) {
+        if (stat) { stat.innerText = 'Hata: ' + e.message; stat.style.color = 'var(--danger)'; stat.style.display = 'block'; }
+    }
+}
+
+async function resendMobileEmailCode() {
+    const stat = document.getElementById('m-verify-code-status');
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/auth/resend-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        const data = await res.json();
+        if (data.ok) {
+            const demoHint = data.code_demo ? ` (Demo Kodu: ${data.code_demo})` : '';
+            if (stat) { stat.innerText = `Kod tekrar gönderildi!${demoHint}`; stat.style.color = 'var(--primary)'; stat.style.display = 'block'; }
+            if (data.code_demo) {
+                const inp = document.getElementById('m-verify-code-input');
+                if (inp) inp.value = data.code_demo;
+            }
+        }
+    } catch (e) {
+        if (stat) { stat.innerText = 'Kod gönderilemedi: ' + e.message; stat.style.color = 'var(--danger)'; stat.style.display = 'block'; }
     }
 }

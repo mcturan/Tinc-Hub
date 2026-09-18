@@ -78,12 +78,31 @@ class TincNoteSync {
         }
     }
 
-    async register(username, password, displayName) {
+    async register(username, password, displayName, email) {
         try {
             const res = await this.apiFetch('/notes/api/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, display_name: displayName })
+                body: JSON.stringify({ username, password, display_name: displayName, email: email || '' })
+            });
+            const data = await res.json();
+            if (data.ok && data.token) {
+                await this.storage.setSetting('auth_token', data.token);
+                await this.storage.setSetting('user_profile', JSON.stringify(data.user));
+                return { ok: true, user: data.user, verification_required: data.verification_required, code_demo: data.verification_code_demo };
+            }
+            return { ok: false, error: data.error || 'Kayıt başarısız' };
+        } catch (e) {
+            return { ok: false, error: e.message };
+        }
+    }
+
+    async loginWithOAuth(provider, payload) {
+        try {
+            const res = await this.apiFetch(`/notes/api/auth/oauth/${provider}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
             if (data.ok && data.token) {
@@ -91,7 +110,7 @@ class TincNoteSync {
                 await this.storage.setSetting('user_profile', JSON.stringify(data.user));
                 return { ok: true, user: data.user };
             }
-            return { ok: false, error: data.error || 'Kayıt başarısız' };
+            return { ok: false, error: data.error || `${provider} ile giriş başarısız` };
         } catch (e) {
             return { ok: false, error: e.message };
         }
@@ -436,10 +455,27 @@ class TincNoteSync {
                         });
                         const data = await res.json();
                         if (data.ok && data.page_id) {
-                            await this.storage.delete('pages', p.id);
+                            const oldPageId = p.id;
+                            await this.storage.delete('pages', oldPageId);
                             p.id = data.page_id;
                             p._dirty = false;
                             await this.storage.put('pages', p);
+
+                            // Yereldeki maddeleri ve finans kayıtlarını yeni sunucu page_id'sine eşle
+                            const allLocalItems = await this.storage.getAll('items');
+                            for (const item of allLocalItems) {
+                                if (item.page_id === oldPageId) {
+                                    item.page_id = data.page_id;
+                                    await this.storage.put('items', item);
+                                }
+                            }
+                            const allLocalFinances = await this.storage.getAll('finances');
+                            for (const fin of allLocalFinances) {
+                                if (fin.page_id === oldPageId) {
+                                    fin.page_id = data.page_id;
+                                    await this.storage.put('finances', fin);
+                                }
+                            }
                         }
                     } else {
                         // Var olan sayfayı güncelleme
@@ -503,6 +539,55 @@ class TincNoteSync {
                     }
                 } catch (e) {
                     console.warn("Madde eşitleme hatası:", e);
+                }
+            }
+        }
+
+        // Yerelde değişen / eklenen finans kayıtları (finances)
+        const allFinances = await this.storage.getAll('finances');
+        for (const fn of allFinances) {
+            if (fn._deleted && typeof fn.id === 'number' && fn.id < 1000000000) {
+                try {
+                    await this.apiFetch(`/notes/api/finance/${fn.id}`, { method: 'DELETE' });
+                    await this.storage.delete('finances', fn.id);
+                } catch (e) {}
+            } else if (fn._dirty && !fn._deleted) {
+                // Eğer sayfa henüz sunucuda oluşmamışsa geç
+                if (typeof fn.page_id === 'number' && fn.page_id >= 1000000000) continue;
+                try {
+                    const payload = {
+                        title: fn.title,
+                        amount: fn.amount,
+                        type: fn.entry_type || fn.type || 'expense',
+                        category: fn.category || 'Genel',
+                        period: fn.period,
+                        due_day: fn.due_day,
+                        notes: fn.notes || ''
+                    };
+                    if (typeof fn.id === 'number' && fn.id >= 1000000000) {
+                        const res = await this.apiFetch(`/notes/api/pages/${fn.page_id}/finance`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const data = await res.json();
+                        if (data.ok && (data.entry_id || data.id)) {
+                            await this.storage.delete('finances', fn.id);
+                            fn.id = data.entry_id || data.id;
+                            fn._dirty = false;
+                            await this.storage.put('finances', fn);
+                        }
+                    } else {
+                        await this.apiFetch(`/notes/api/finance/${fn.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        fn._dirty = false;
+                        await this.storage.put('finances', fn);
+                    }
+                } catch (e) {
+                    console.warn("Finans eşitleme hatası:", e);
                 }
             }
         }

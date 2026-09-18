@@ -1,19 +1,38 @@
 package com.tinchub.manager;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Base64;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
+import androidx.core.app.NotificationCompat;
 import com.getcapacitor.BridgeActivity;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 
 public class MainActivity extends BridgeActivity {
 
+    public static final String STICKY_CHANNEL_ID = "tincnote_sticky_tasks";
+    public static final int STICKY_NOTIFICATION_ID = 9013;
+
     public static volatile String sPendingAction = null;
     public static volatile long sPendingPageId = 0;
+
+    public static volatile String sPendingShareType = null;
+    public static volatile String sPendingShareTitle = null;
+    public static volatile String sPendingShareContent = null;
+
+    public static int getSafeAlarmId(long taskId) {
+        return (int) (taskId ^ (taskId >>> 32)) & 0x7FFFFFFF;
+    }
 
     public class WebAppInterface {
         Context mContext;
@@ -87,6 +106,91 @@ public class MainActivity extends BridgeActivity {
         }
 
         @JavascriptInterface
+        public String consumePendingShare() {
+            JSONObject obj = new JSONObject();
+            try {
+                if (sPendingShareType != null) {
+                    obj.put("type", sPendingShareType);
+                    obj.put("title", sPendingShareTitle != null ? sPendingShareTitle : "");
+                    obj.put("content", sPendingShareContent != null ? sPendingShareContent : "");
+                    sPendingShareType = null;
+                    sPendingShareTitle = null;
+                    sPendingShareContent = null;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return obj.toString();
+        }
+
+        @JavascriptInterface
+        public void updateStickyTasksNotification(String tasksJson, boolean enabled) {
+            try {
+                NotificationManager nm = (NotificationManager) mContext.getSystemService(Context.NOTIFICATION_SERVICE);
+                if (nm == null) return;
+
+                if (!enabled || tasksJson == null || tasksJson.trim().isEmpty()) {
+                    nm.cancel(STICKY_NOTIFICATION_ID);
+                    return;
+                }
+
+                createStickyNotificationChannel(mContext);
+
+                JSONArray arr = new JSONArray(tasksJson);
+                int totalPending = 0;
+                java.util.List<String> topTasks = new java.util.ArrayList<>();
+
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject t = arr.getJSONObject(i);
+                    boolean done = t.optBoolean("is_completed", false) || t.optInt("is_completed", 0) == 1;
+                    if (!done) {
+                        totalPending++;
+                        if (topTasks.size() < 3) {
+                            String title = t.optString("title", "").trim();
+                            if (!title.isEmpty()) topTasks.add(title);
+                        }
+                    }
+                }
+
+                if (totalPending == 0) {
+                    nm.cancel(STICKY_NOTIFICATION_ID);
+                    return;
+                }
+
+                Intent openIntent = new Intent(mContext, MainActivity.class);
+                openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                PendingIntent pi = PendingIntent.getActivity(
+                    mContext,
+                    STICKY_NOTIFICATION_ID,
+                    openIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+
+                NotificationCompat.InboxStyle inboxStyle = new NotificationCompat.InboxStyle();
+                for (String task : topTasks) {
+                    inboxStyle.addLine("▫️ " + task);
+                }
+                if (totalPending > topTasks.size()) {
+                    inboxStyle.setSummaryText("+ " + (totalPending - topTasks.size()) + " diğer görev");
+                }
+
+                NotificationCompat.Builder builder = new NotificationCompat.Builder(mContext, STICKY_CHANNEL_ID)
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setContentTitle("📋 TincNote • Yapılacaklar (" + totalPending + ")")
+                    .setContentText(topTasks.isEmpty() ? "Bekleyen görevleriniz var" : topTasks.get(0))
+                    .setStyle(inboxStyle)
+                    .setOngoing(true)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setContentIntent(pi)
+                    .setAutoCancel(false);
+
+                nm.notify(STICKY_NOTIFICATION_ID, builder.build());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        @JavascriptInterface
         public void openBrowserUrl(String url) {
             try {
                 if (url != null && !url.trim().isEmpty()) {
@@ -99,17 +203,17 @@ public class MainActivity extends BridgeActivity {
             }
         }
         @JavascriptInterface
-        public void scheduleTaskAlarm(long taskId, String title, String remindAtStr, String recurrence, long pageId) {
+        public void scheduleTaskAlarm(long taskId, String title, long pageId, String reminderIso, String recurrence) {
             try {
-                if (remindAtStr == null || remindAtStr.trim().isEmpty()) return;
-                String clean = remindAtStr.trim().replace("T", " ");
-                if (clean.length() == 16) clean = clean + ":00";
-                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault());
-                java.util.Date d = sdf.parse(clean);
-                if (d == null) return;
-                long triggerMillis = d.getTime();
+                if (reminderIso == null || reminderIso.trim().isEmpty()) return;
+                String clean = reminderIso.replace("Z", "");
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", java.util.Locale.getDefault());
+                java.util.Date date = sdf.parse(clean);
+                if (date == null) return;
+                long triggerMillis = date.getTime();
+
                 if (triggerMillis <= System.currentTimeMillis()) {
-                    android.util.Log.w("TincNoteAlarm", "Alarm time in past: " + clean);
+                    android.util.Log.w("TincNoteAlarm", "Alarm time is in the past: " + clean);
                     return;
                 }
 
@@ -122,9 +226,10 @@ public class MainActivity extends BridgeActivity {
                     alarmIntent.putExtra("page_id", pageId);
                     alarmIntent.putExtra("recurrence", recurrence != null ? recurrence : "none");
 
+                    int alarmId = getSafeAlarmId(taskId);
                     PendingIntent pi = PendingIntent.getBroadcast(
                         mContext,
-                        (int) taskId,
+                        alarmId,
                         alarmIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
@@ -134,7 +239,7 @@ public class MainActivity extends BridgeActivity {
                     } else {
                         am.setExact(android.app.AlarmManager.RTC_WAKEUP, triggerMillis, pi);
                     }
-                    android.util.Log.i("TincNoteAlarm", "Alarm scheduled for task " + taskId + " at " + clean);
+                    android.util.Log.i("TincNoteAlarm", "Alarm scheduled for task " + taskId + " (id " + alarmId + ") at " + clean);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -144,34 +249,54 @@ public class MainActivity extends BridgeActivity {
         @JavascriptInterface
         public void cancelTaskAlarm(long taskId) {
             try {
+                int alarmId = getSafeAlarmId(taskId);
                 android.app.AlarmManager am = (android.app.AlarmManager) mContext.getSystemService(Context.ALARM_SERVICE);
                 if (am != null) {
                     Intent alarmIntent = new Intent(mContext, TincNoteAlarmReceiver.class);
                     alarmIntent.setAction(TincNoteAlarmReceiver.ACTION_TASK_ALARM);
                     PendingIntent pi = PendingIntent.getBroadcast(
                         mContext,
-                        (int) taskId,
+                        alarmId,
                         alarmIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
                     am.cancel(pi);
                     pi.cancel();
                 }
-                androidx.core.app.NotificationManagerCompat.from(mContext).cancel((int) taskId);
-                android.util.Log.i("TincNoteAlarm", "Alarm cancelled for task " + taskId);
+                androidx.core.app.NotificationManagerCompat.from(mContext).cancel(alarmId);
+                android.util.Log.i("TincNoteAlarm", "Alarm cancelled for task " + taskId + " (id " + alarmId + ")");
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
     }
 
+    public static void createStickyNotificationChannel(Context context) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                NotificationChannel channel = new NotificationChannel(
+                    STICKY_CHANNEL_ID,
+                    "Sabit Görevler",
+                    NotificationManager.IMPORTANCE_LOW
+                );
+                channel.setDescription("Bildirim çekmecesinde sabit acil görevler");
+                channel.setShowBadge(false);
+                channel.enableLights(false);
+                channel.enableVibration(false);
+                nm.createNotificationChannel(channel);
+            }
+        }
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        handleWidgetIntent(getIntent());
+        handleIncomingIntent(getIntent());
         super.onCreate(savedInstanceState);
 
-        // Bildirim kanalını oluştur
+        // Bildirim kanallarını oluştur
         TincNoteAlarmReceiver.createNotificationChannel(this);
+        createStickyNotificationChannel(this);
 
         // Android 13+ bildirim izni kontrolü
         if (android.os.Build.VERSION.SDK_INT >= 33) {
@@ -205,33 +330,96 @@ public class MainActivity extends BridgeActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        handleWidgetIntent(intent);
+        handleIncomingIntent(intent);
     }
 
     @Override
     public void onResume() {
         super.onResume();
         TincNoteWidgetProvider.updateAllWidgets(this);
+        handleIncomingIntent(getIntent());
     }
 
-    private void handleWidgetIntent(Intent intent) {
-        if (intent != null && intent.hasExtra("action")) {
+    private void handleIncomingIntent(Intent intent) {
+        if (intent == null) return;
+
+        // 1. Widget Aksiyonu
+        if (intent.hasExtra("action")) {
             final String action = intent.getStringExtra("action");
             final long pageId = intent.getLongExtra("open_page_id", 0);
             sPendingAction = action;
             sPendingPageId = pageId;
+            intent.removeExtra("action");
+            intent.removeExtra("open_page_id");
 
             if (this.bridge != null && this.bridge.getWebView() != null) {
                 this.bridge.getWebView().post(new Runnable() {
                     @Override
                     public void run() {
+                        String safeAction = JSONObject.quote(action != null ? action : "");
                         bridge.getWebView().evaluateJavascript(
-                            "window.handleWidgetAction && window.handleWidgetAction('" + action + "', " + pageId + ");",
+                            "window.handleWidgetAction && window.handleWidgetAction(" + safeAction + ", " + pageId + ");",
                             null
                         );
                     }
                 });
             }
+        }
+
+        // 2. Android Paylaşım (Share Intent: Twitter / X, Metin, Görsel)
+        String action = intent.getAction();
+        String type = intent.getType();
+        if (Intent.ACTION_SEND.equals(action) && type != null) {
+            if (type.startsWith("text/")) {
+                String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);
+                String sharedSubject = intent.getStringExtra(Intent.EXTRA_SUBJECT);
+                if (sharedText != null && !sharedText.trim().isEmpty()) {
+                    sPendingShareType = "text";
+                    sPendingShareTitle = sharedSubject != null ? sharedSubject : "";
+                    sPendingShareContent = sharedText;
+                    notifyShareReady();
+                }
+            } else if (type.startsWith("image/")) {
+                Uri imageUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+                if (imageUri != null) {
+                    try {
+                        InputStream is = getContentResolver().openInputStream(imageUri);
+                        if (is != null) {
+                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                            byte[] buffer = new byte[8192];
+                            int bytesRead;
+                            while ((bytesRead = is.read(buffer)) != -1) {
+                                baos.write(buffer, 0, bytesRead);
+                            }
+                            is.close();
+                            byte[] imageBytes = baos.toByteArray();
+                            String base64 = Base64.encodeToString(imageBytes, Base64.NO_WRAP);
+                            String mime = type.contains("/") ? type : "image/jpeg";
+
+                            sPendingShareType = "image";
+                            sPendingShareTitle = "Paylaşılan Görsel";
+                            sPendingShareContent = "data:" + mime + ";base64," + base64;
+                            notifyShareReady();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+    }
+
+    private void notifyShareReady() {
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            this.bridge.getWebView().post(new Runnable() {
+                @Override
+                public void run() {
+                    bridge.getWebView().evaluateJavascript(
+                        "window.handleIncomingShare && window.handleIncomingShare();",
+                        null
+                    );
+                }
+            });
         }
     }
 }

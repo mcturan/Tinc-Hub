@@ -43,9 +43,11 @@ public class TincNoteAlarmReceiver extends BroadcastReceiver {
         openIntent.putExtra("task_id", taskId);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
+        int notificationId = MainActivity.getSafeAlarmId(taskId);
+
         PendingIntent contentPending = PendingIntent.getActivity(
             context,
-            (int) taskId,
+            notificationId,
             openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
@@ -62,7 +64,7 @@ public class TincNoteAlarmReceiver extends BroadcastReceiver {
             .setDefaults(NotificationCompat.DEFAULT_ALL);
 
         try {
-            NotificationManagerCompat.from(context).notify((int) taskId, builder.build());
+            NotificationManagerCompat.from(context).notify(notificationId, builder.build());
         } catch (SecurityException e) {
             e.printStackTrace();
         }
@@ -91,7 +93,7 @@ public class TincNoteAlarmReceiver extends BroadcastReceiver {
 
                     PendingIntent pendingRepeat = PendingIntent.getBroadcast(
                         context,
-                        (int) taskId,
+                        MainActivity.getSafeAlarmId(taskId),
                         repeatIntent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );

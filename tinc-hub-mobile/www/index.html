@@ -80,7 +80,11 @@
                 </div>
                 <div class="drawer-nav-link" id="drawer-nav-quick" onclick="openQuickNotesView()">
                     <span style="font-size:1.1rem;">⚡</span>
-                    <span>Hızlı Notlar & Görevler</span>
+                    <span>Hızlı Notlar &amp; Görevler</span>
+                </div>
+                <div class="drawer-nav-link" id="drawer-nav-graph" onclick="openMobileGraphView()">
+                    <span style="font-size:1.1rem;">🕸️</span>
+                    <span>Zihin Ağı Grafiği</span>
                 </div>
             </div>
 
@@ -126,6 +130,15 @@
                 <div class="page-header-top">
                     <span class="page-badge-category" id="page-view-cat-badge">Genel</span>
                     <div style="display:flex; gap:6px;">
+                        <button class="icon-btn" id="m-btn-page-pin" onclick="toggleMobilePagePin()" title="Sayfayı Başa Sabitle (Pin)" style="width:30px; height:30px; font-size:0.85rem;">
+                            📌
+                        </button>
+                        <button class="icon-btn" id="m-btn-page-lock" onclick="promptMobilePageLock()" title="Sayfa Kilidi (PIN)" style="width:30px; height:30px; font-size:0.85rem;">
+                            🔒
+                        </button>
+                        <button class="icon-btn" onclick="exportPageToPdf()" title="Yazdır / PDF Dışa Aktar" style="width:30px; height:30px; font-size:0.85rem;">
+                            🖨️
+                        </button>
                         <button class="icon-btn" onclick="openPageOptionsModal()" title="Seçenekler" style="width:30px; height:30px; font-size:0.85rem;">
                             ⋮
                         </button>
@@ -147,6 +160,18 @@
                         <span id="page-progress-percent">%0</span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Mobil Kilitli Sayfa Görünümü (PIN Koruması) -->
+            <div id="mobile-locked-page-view" style="display:none; text-align:center; padding:30px 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; margin-bottom:14px;">
+                <div style="font-size:2.8rem; margin-bottom:10px;">🔒</div>
+                <h3 style="margin-bottom:6px; font-size:1.1rem; font-weight:700;">Bu Sayfa PIN ile Kilitli</h3>
+                <p style="font-size:0.8rem; color:var(--muted); margin-bottom:14px;">İçeriği görmek için 4 haneli PIN kodunuzu girin:</p>
+                <div style="display:flex; justify-content:center; gap:8px; max-width:240px; margin:0 auto;">
+                    <input type="password" id="m-locked-pin-input" maxlength="6" class="form-control" placeholder="••••" style="font-size:1.3rem; letter-spacing:6px; text-align:center; font-weight:700;" onkeydown="if(event.key==='Enter') submitMobileUnlockPin()">
+                    <button class="btn btn-primary btn-sm" onclick="submitMobileUnlockPin()">Aç</button>
+                </div>
+                <div id="m-locked-pin-error" style="color:var(--danger); font-size:0.78rem; margin-top:8px; display:none;"></div>
             </div>
 
             <!-- Checklist Hızlı Madde Ekleme Kutusu -->
@@ -173,10 +198,58 @@
                 </div>
             </div>
 
-            <!-- Not (Serbest Metin) Düzenleyici Alanı -->
+            <!-- Not (Serbest Metin) Düzenleyici Alanı (WYSIWYG Zengin Metin) -->
             <div id="page-note-container" style="display:none;">
+                <!-- Zengin Metin & Akıllı Araç Çubuğu -->
+                <div class="note-smart-toolbar" style="display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; align-items:center;">
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="formatMobileRichNote('bold')" title="Kalın (Ctrl+B)"><b>B</b></button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="formatMobileRichNote('italic')" title="İtalik (Ctrl+I)"><i>I</i></button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="formatMobileRichNote('formatBlock', 'h3')" title="Alt Başlık"><b>H</b></button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="formatMobileRichNote('insertUnorderedList')" title="Madde İşaretli Liste">• Liste</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="insertMobileChecklistItem()" title="Yapılacak Kutusu">☑ Görev</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="insertMobileToggleBlock()" title="Katlanabilir Bölüm (Toggle)">▶️ Bölüm</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="promptMobileSmartClip()" title="Web / X Gönderisi Kırp">🔗 Kırp</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="toggleMobileAttachmentsTray()" title="Ekli Belgeler ve PDF">📎 Ekler</button>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="openMobileTimeMachine()" title="Zaman Tüneli (Versiyonlar)">⏳ Geçmiş</button>
+                    <span style="border-left:1px solid var(--border); height:16px; margin:0 2px;"></span>
+                    <button type="button" class="btn btn-secondary btn-xs" onclick="triggerMobileAiActionize()" title="Notu Yapılacak Görevlere Dönüştür" style="color:var(--primary); font-weight:700;">🤖 Görev Yap</button>
+                    <button type="button" class="btn btn-secondary btn-xs mic-btn" id="mic-btn-page-note" onclick="toggleVoiceDictationRich('page-rich-editor', this)" title="Sesle Dikte">🎙️</button>
+                </div>
+
+                <!-- Ekler ve Belgeler Şeridi (Attachments Tray) -->
+                <div id="mobile-attachments-bar" style="display:none; padding:8px 10px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <span style="font-size:0.75rem; font-weight:700;">📎 Ekler (<span id="mobile-attachments-count">0</span>)</span>
+                        <div style="display:flex; gap:4px;">
+                            <input type="file" id="mobile-attachment-file-input" style="display:none;" onchange="handleMobileAttachmentSelected(event)">
+                            <button type="button" class="btn btn-xs btn-outline" onclick="document.getElementById('mobile-attachment-file-input').click()">+ Ekle</button>
+                            <button type="button" class="btn btn-xs btn-subtle" onclick="toggleMobileAttachmentsTray(false)">✕</button>
+                        </div>
+                    </div>
+                    <div id="mobile-attachments-list" style="display:flex; flex-wrap:wrap; gap:6px;"></div>
+                </div>
+
+                <!-- Kelime Hedefi İlerleme Çubuğu -->
+                <div id="mobile-word-goal-wrap" style="display:none; align-items:center; gap:8px; padding:4px 8px; margin-bottom:6px; background:var(--surface2); border-radius:6px;">
+                    <span id="mobile-word-goal-text" style="font-size:0.72rem; font-weight:600; color:var(--primary); cursor:pointer;" onclick="promptMobileWordGoal()">🎯 Hedef Belirle</span>
+                    <div style="flex:1; height:5px; background:var(--border); border-radius:3px; overflow:hidden;">
+                        <div id="mobile-word-goal-fill" style="width:0%; height:100%; background:var(--primary); transition:width 0.3s ease;"></div>
+                    </div>
+                    <span id="mobile-word-goal-pct" style="font-size:0.70rem; font-weight:700; color:var(--muted);">%0</span>
+                </div>
+
                 <div class="note-editor-card">
-                    <textarea id="page-note-content" class="note-textarea" placeholder="Notlarınızı buraya yazın..." oninput="autoSaveCurrentNote(this.value)"></textarea>
+                    <div id="page-rich-editor" class="note-rich-editor" contenteditable="true" oninput="handleMobileRichNoteInput()" placeholder="Notlarınızı buraya yazın..."></div>
+                    <textarea id="page-note-content" style="display:none;"></textarea>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 2px; font-size:0.72rem; color:var(--muted);">
+                    <span id="mobile-note-stats">0 karakter • 0 kelime</span>
+                    <span id="mobile-note-goal-btn" style="cursor:pointer; color:var(--primary); font-weight:600;" onclick="promptMobileWordGoal()">🎯 Hedef Belirle</span>
+                </div>
+                <!-- Çift Yönlü Bağlantılar (Backlinks) Kutusu -->
+                <div id="page-backlinks-container" class="page-backlinks-card" style="display:none; margin-top:12px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px;">
+                    <div style="font-weight:700; font-size:0.8rem; color:var(--text); margin-bottom:6px;">🔗 Bu Notu Referans Gösteren Sayfalar (<span id="backlinks-count">0</span>)</div>
+                    <div id="page-backlinks-list" style="display:flex; flex-direction:column; gap:4px;"></div>
                 </div>
             </div>
 
@@ -477,7 +550,7 @@
                 <div class="kpi-card" onclick="openSettingsView()">
                     <div class="kpi-icon-badge green">⚙️</div>
                     <div class="kpi-info">
-                        <span class="kpi-val">v1.6.0</span>
+                        <span class="kpi-val">v1.8.0</span>
                         <span class="kpi-label">Sürüm & Ayarlar</span>
                     </div>
                 </div>
@@ -534,6 +607,7 @@
                 <!-- Hızlı Not Ekleme Kutusu -->
                 <div style="display:flex; gap:6px; margin-bottom:8px;">
                     <input type="text" id="input-quick-note" class="input-text" placeholder="Aklınıza gelen hızlı bir not yazın..." onkeydown="if(event.key==='Enter') addQuickNoteFromInput()">
+                    <button class="btn btn-secondary btn-sm mic-btn" id="mic-btn-quick-note" onclick="toggleVoiceDictation('input-quick-note', this)" title="Sesle Dikte Et">🎙️</button>
                     <button class="btn btn-primary btn-sm" onclick="addQuickNoteFromInput()" style="padding:0 14px; font-weight:700;">➕</button>
                 </div>
                 <div id="quick-notes-list" class="overview-list" style="display:flex; flex-direction:column; gap:6px;">
@@ -550,6 +624,7 @@
                 <!-- Hızlı Görev Ekleme Kutusu -->
                 <div style="display:flex; gap:6px; margin-bottom:8px;">
                     <input type="text" id="input-quick-task" class="input-text" placeholder="Yeni bir hızlı görev yazın..." onkeydown="if(event.key==='Enter') addQuickTaskFromInput()">
+                    <button class="btn btn-secondary btn-sm mic-btn" id="mic-btn-quick-task" onclick="toggleVoiceDictation('input-quick-task', this)" title="Sesle Dikte Et">🎙️</button>
                     <button class="btn btn-primary btn-sm" onclick="addQuickTaskFromInput()" style="padding:0 14px; font-weight:700;">➕</button>
                 </div>
                 <div id="quick-direct-tasks-list" class="overview-list">
@@ -645,16 +720,33 @@
                 <div id="connection-diag-box" style="display:none; margin-top:10px; font-size:0.82rem; padding:8px; border-radius:8px; background:var(--surface2);"></div>
             </div>
 
-            <!-- Kullanıcı Hesabı & Oturum -->
+            <!-- Kullanıcı Hesabı & Oturum (TincID SSO) -->
             <div class="settings-section">
-                <h4 class="settings-section-title">👤 Kullanıcı Hesabı (Çoklu Kullanıcı)</h4>
-                <div id="mobile-auth-logged-in" style="display:none; padding:10px; background:var(--surface2); border-radius:8px; margin-bottom:10px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h4 class="settings-section-title">👤 TincID Kimlik &amp; Ekosistem</h4>
+                <div id="mobile-auth-logged-in" style="display:none; padding:12px; background:var(--surface2); border-radius:8px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                         <div>
                             <div id="mobile-user-name" style="font-weight:700; font-size:1rem;">Kullanıcı</div>
                             <div id="mobile-user-role" style="font-size:0.75rem; color:var(--muted);">Giriş Yapıldı</div>
                         </div>
-                        <button class="btn btn-secondary btn-sm" onclick="handleMobileLogout()">🚪 Çıkış Yap</button>
+                        <button class="btn btn-secondary btn-sm" onclick="handleMobileLogout()">🚪 Çıkış</button>
+                    </div>
+                    <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:var(--surface); border:1px solid var(--border); border-radius:6px; margin-bottom:8px;">
+                        <span style="font-size:0.75rem; font-weight:700; color:var(--muted);">TincID:</span>
+                        <code id="mobile-tinc-id-badge" style="font-size:0.85rem; font-weight:700; color:var(--primary); cursor:pointer;" onclick="copyMobileTincID()" title="Kopyalamak için tıkla">TINC-XXXXXXXX</code>
+                    </div>
+                    <div id="mobile-email-verify-box" style="display:none; padding:6px 10px; background:#fef3c7; color:#92400e; border-radius:6px; font-size:0.75rem; margin-bottom:8px; justify-content:space-between; align-items:center;">
+                        <span>⚠️ E-posta doğrulanmadı</span>
+                        <button class="btn btn-xs btn-primary" onclick="openModal('modal-mobile-email-verify')">Kodu Gir</button>
+                    </div>
+                    <!-- Kullanıcı Yaşam Döngüsü ve Veri Dışa Aktarım Eylemleri -->
+                    <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+                        <button class="btn btn-secondary btn-xs" onclick="downloadMobileDataTakeout()" style="width:100%; justify-content:center;">📦 Tüm Verilerimi İndir (.ZIP)</button>
+                        <button class="btn btn-secondary btn-xs" onclick="revokeMobileOtherSessions()" style="width:100%; justify-content:center;">📱 Diğer Cihaz Oturumlarını Kapat</button>
+                        <div style="display:flex; gap:6px; margin-top:4px;">
+                            <button class="btn btn-ghost btn-xs" style="flex:1; color:var(--warning);" onclick="confirmMobileDeactivateAccount()">❄️ Dondur</button>
+                            <button class="btn btn-ghost btn-xs" style="flex:1; color:var(--danger);" onclick="confirmMobileDeleteAccount()">🗑️ Hesabı Sil</button>
+                        </div>
                     </div>
                 </div>
 
@@ -664,14 +756,29 @@
                         <button class="btn btn-sm btn-secondary" id="btn-m-tab-reg" onclick="switchMobileAuthTab('reg')" style="flex:1;">Kayıt Ol</button>
                     </div>
 
+                    <!-- Hızlı SSO Giriş Butonları -->
+                    <div style="display:flex; gap:6px; margin-bottom:10px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="handleMobileGoogleSignIn()" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.78rem;">
+                            🌐 Google
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="handleMobileAppleSignIn()" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.78rem;">
+                            🍎 Apple
+                        </button>
+                    </div>
+
                     <div id="mobile-reg-group" style="display:none; margin-bottom:8px;">
                         <label class="form-label">Ad Soyad</label>
                         <input type="text" id="m-auth-display" class="input-text" placeholder="Adınız">
                     </div>
 
+                    <div id="mobile-reg-email-group" style="display:none; margin-bottom:8px;">
+                        <label class="form-label">E-posta Adresi</label>
+                        <input type="email" id="m-auth-email" class="input-text" placeholder="ornek@tinc.com">
+                    </div>
+
                     <div class="form-group" style="margin-bottom:8px;">
-                        <label class="form-label">Kullanıcı Adı</label>
-                        <input type="text" id="m-auth-user" class="input-text" placeholder="Kullanıcı Adı">
+                        <label class="form-label">Kullanıcı Adı veya E-posta</label>
+                        <input type="text" id="m-auth-user" class="input-text" placeholder="Kullanıcı Adı / E-posta">
                     </div>
 
                     <div class="form-group" style="margin-bottom:12px;">
@@ -686,13 +793,27 @@
                 </div>
             </div>
 
+            <!-- TincSync P2P Yerel Ağ Köprüsü -->
+            <div class="settings-section">
+                <h4 class="settings-section-title">🔄 TincSync Yerel Ağ Köprüsü (Port 9015)</h4>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-weight:700; font-size:0.95rem;" id="tincsync-status-label">P2P Senkronizasyon</div>
+                        <div style="font-size:0.78rem; color:var(--muted);">Yerel ağdaki cihazlar arası anlık eşitleme</div>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="triggerMobileTincSync()">
+                        ⚡ Şimdi Eşitle
+                    </button>
+                </div>
+            </div>
+
             <!-- Güncellemeler -->
             <div class="settings-section">
                 <h4 class="settings-section-title">🚀 Sürüm & Güncellemeler</h4>
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <div style="font-weight:700; font-size:0.95rem;">Uygulama Sürümü</div>
-                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.6.0</div>
+                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.8.0</div>
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="window.appUpdater.checkForUpdates(false)">
                         🔍 Güncelleme Ara
@@ -846,11 +967,14 @@
                     <button type="button" class="btn btn-secondary" id="btn-type-notes" onclick="selectNewPageType('notes')">
                         📝 Not
                     </button>
+                    <button type="button" class="btn btn-secondary" id="btn-type-academic" onclick="selectNewPageType('academic')">
+                        🎓 Tez &amp; Ödev
+                    </button>
                     <button type="button" class="btn btn-secondary" id="btn-type-software" onclick="selectNewPageType('software')">
                         💻 Yazılım Projesi
                     </button>
                     <button type="button" class="btn btn-secondary" id="btn-type-finance" onclick="selectNewPageType('finance')">
-                        💳 Finans & Fatura
+                        💳 Finans &amp; Fatura
                     </button>
                     <button type="button" class="btn btn-secondary" id="btn-type-project" onclick="selectNewPageType('project')">
                         🔬 Proje Atölyesi
@@ -1463,6 +1587,136 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal: Mobil Zihin Ağı Grafiği (Graph View) -->
+    <div id="modal-mobile-graph-view" class="modal-overlay">
+        <div class="modal-card" style="max-width:96%; width:96%; height:82vh; display:flex; flex-direction:column; padding:12px;">
+            <div class="modal-header" style="margin-bottom:8px;">
+                <h3 class="modal-title">🕸️ Zihin Ağı Grafiği</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-mobile-graph-view')">✕</button>
+            </div>
+            <div style="flex:1; position:relative; overflow:hidden; background:var(--bg-main, #0f172a); border-radius:8px;">
+                <canvas id="m-graph-canvas" style="width:100%; height:100%; display:block;"></canvas>
+                <div style="position:absolute; bottom:8px; left:8px; font-size:0.7rem; color:var(--muted); background:rgba(0,0,0,0.5); padding:2px 8px; border-radius:4px; pointer-events:none;">
+                    Nota gitmek için dokunun
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Mobil Zaman Tüneli (Time Machine) -->
+    <div id="modal-mobile-time-machine" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">⏳ Sayfa Versiyon Geçmişi</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-mobile-time-machine')">✕</button>
+            </div>
+            <p style="font-size:0.78rem; color:var(--muted); margin-bottom:10px;">Önceki anlık kopyalardan birini geri yükleyin:</p>
+            <div id="m-time-machine-list" style="display:flex; flex-direction:column; gap:6px; max-height:300px; overflow-y:auto;">
+                <div style="text-align:center; padding:16px; color:var(--muted);">Versiyonlar yükleniyor...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Mobil PDF Belge Görüntüleyici -->
+    <div id="modal-mobile-pdf-viewer" class="modal-overlay">
+        <div class="modal-card" style="max-width:98%; width:98%; height:88vh; display:flex; flex-direction:column; padding:10px;">
+            <div class="modal-header" style="margin-bottom:8px;">
+                <h3 class="modal-title" id="m-pdf-title">📄 Belge Önizleme</h3>
+                <div style="display:flex; gap:6px;">
+                    <a id="m-pdf-download" href="#" target="_blank" class="btn btn-xs btn-outline" download>İndir</a>
+                    <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-mobile-pdf-viewer')">✕</button>
+                </div>
+            </div>
+            <div style="flex:1; overflow:hidden; background:#222; border-radius:6px;">
+                <iframe id="m-pdf-iframe" style="width:100%; height:100%; border:none;" src="about:blank"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Mobil PIN Belirleme -->
+    <div id="modal-mobile-pin-set" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">🔒 Sayfa Kilidi (PIN)</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-mobile-pin-set')">✕</button>
+            </div>
+            <p id="m-pin-desc" style="font-size:0.8rem; color:var(--muted); margin-bottom:10px;">4 haneli kilit kodu belirleyin:</p>
+            <div style="margin-bottom:12px; text-align:center;">
+                <input type="password" id="m-pin-set-input" maxlength="6" class="form-control" placeholder="••••" style="font-size:1.4rem; letter-spacing:6px; text-align:center; font-weight:700; width:150px; margin:0 auto;">
+            </div>
+            <div id="m-pin-set-err" style="color:var(--danger); font-size:0.75rem; text-align:center; display:none; margin-bottom:8px;"></div>
+            <div style="display:flex; justify-content:space-between; gap:6px;">
+                <button class="btn btn-ghost btn-xs text-danger" id="m-btn-remove-lock" style="display:none;" onclick="submitMobileLockRemove()">Kilidi Kaldır</button>
+                <div style="display:flex; gap:6px; margin-left:auto;">
+                    <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-mobile-pin-set')">İptal</button>
+                    <button class="btn btn-primary btn-sm" onclick="submitMobileLockSet()">Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Mobil Akıllı Web/X Kırpıcı -->
+    <div id="modal-mobile-smart-clip" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">🔗 Web / X Gönderisi Kırp</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-mobile-smart-clip')">✕</button>
+            </div>
+            <p style="font-size:0.78rem; color:var(--muted); margin-bottom:8px;">Bağlantı adresi (URL) yapıştırın:</p>
+            <input type="url" id="m-smart-clip-url" class="input-text" placeholder="https://x.com/... veya https://..." style="margin-bottom:8px;">
+            <div id="m-smart-clip-status" style="font-size:0.75rem; color:var(--primary); margin-bottom:8px; display:none;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:6px;">
+                <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-mobile-smart-clip')">İptal</button>
+                <button class="btn btn-primary btn-sm" id="m-btn-clip-submit" onclick="submitMobileSmartClip()">Kırp &amp; Ekle</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: 6 Haneli Mobil E-posta Doğrulama -->
+    <div id="modal-mobile-email-verify" class="modal-overlay">
+        <div class="modal-card" style="text-align:center;">
+            <div class="modal-header">
+                <h3 class="modal-title">✉️ E-posta Doğrulama</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-mobile-email-verify')">✕</button>
+            </div>
+            <p style="font-size:0.82rem; color:var(--muted); margin-bottom:12px;">E-postanıza gelen 6 haneli kodu girin:</p>
+            <input type="text" id="m-verify-code-input" maxlength="6" class="input-text" placeholder="••••••" style="font-size:1.5rem; letter-spacing:8px; text-align:center; font-weight:700; width:160px; margin:0 auto 10px auto;">
+            <div id="m-verify-code-status" style="font-size:0.78rem; margin-bottom:10px; display:none;"></div>
+            <div style="display:flex; justify-content:center; gap:8px;">
+                <button class="btn btn-secondary btn-sm" onclick="resendMobileEmailCode()">Tekrar Gönder</button>
+                <button class="btn btn-primary btn-sm" onclick="submitMobileEmailCode()">Doğrula</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Geri Al (Undo / Ctrl+Z) Bildirim Çubuğu -->
+    <div id="undo-toast" class="undo-toast-container" style="display:none;"></div>
+
+    <!-- ─────────────────────────────────────────────────────────────────────────
+         Modern Alt Gezinme Çubuğu (Bottom Navigation Bar - %90 Mobil Thumb Zone)
+         ───────────────────────────────────────────────────────────────────────── -->
+    <nav class="bottom-nav-bar" id="bottom-nav-bar">
+        <button class="bottom-nav-item active" id="bnav-overview" onclick="openOverviewView(); setBottomNavActive('bnav-overview')">
+            <span class="bnav-icon">📊</span>
+            <span class="bnav-label">Özet</span>
+        </button>
+        <button class="bottom-nav-item" id="bnav-drawer" onclick="toggleSidebar(true)">
+            <span class="bnav-icon">📁</span>
+            <span class="bnav-label">Dosyalar</span>
+        </button>
+        <button class="bottom-nav-item bnav-center-action" id="bnav-quick" onclick="handleTopAddClick()" title="Hızlı Ekle">
+            <span class="bnav-add-icon">＋</span>
+        </button>
+        <button class="bottom-nav-item" id="bnav-vault" onclick="openVaultView(); setBottomNavActive('bnav-vault')">
+            <span class="bnav-icon">🔐</span>
+            <span class="bnav-label">Kasa</span>
+        </button>
+        <button class="bottom-nav-item" id="bnav-search" onclick="openSearchModal()">
+            <span class="bnav-icon">🔍</span>
+            <span class="bnav-label">Arama</span>
+        </button>
+    </nav>
 
     <!-- Scriptler -->
     <script src="storage.js"></script>

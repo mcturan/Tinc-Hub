@@ -1237,13 +1237,13 @@ body {
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.45);
+    background: rgba(15, 23, 42, 0.55);
     backdrop-filter: blur(4px);
     z-index: 200;
     display: none;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
-    padding: 16px;
+    padding: 0;
 }
 
 .modal-overlay.active {
@@ -1253,16 +1253,32 @@ body {
 .modal-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 16px;
+    border-radius: 20px 20px 0 0;
     box-shadow: var(--shadow-lg);
     width: 100%;
-    max-width: 480px;
-    max-height: 88vh;
+    max-width: 520px;
+    max-height: 86vh;
     overflow-y: auto;
-    padding: 18px;
+    padding: 20px 18px calc(env(safe-area-inset-bottom, 16px) + 12px) 18px;
     display: flex;
     flex-direction: column;
-    animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: slideUpBottom 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpBottom {
+    from { transform: translateY(100%); opacity: 0.5; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@media (min-width: 640px) {
+    .modal-overlay {
+        align-items: center;
+        padding: 16px;
+    }
+    .modal-card {
+        border-radius: 16px;
+        animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
 }
 
 @keyframes scaleIn {
@@ -1624,5 +1640,340 @@ body {
     background: var(--success-light);
     color: var(--success);
     border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Mobil Zengin Metin WYSIWYG Editörü & Araçları
+   ───────────────────────────────────────────────────────────────────────────── */
+.note-rich-editor {
+    min-height: 260px;
+    padding: 12px 14px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    outline: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow-y: auto;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.note-rich-editor:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.note-rich-editor:empty:before {
+    content: attr(placeholder);
+    color: var(--muted);
+    pointer-events: none;
+    display: block;
+}
+
+.note-rich-editor h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 14px 0 6px 0;
+    color: var(--text);
+}
+
+.note-rich-editor h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 10px 0 4px 0;
+    color: var(--text);
+}
+
+.note-rich-editor b, .note-rich-editor strong {
+    font-weight: 700;
+}
+
+.note-rich-editor i, .note-rich-editor em {
+    font-style: italic;
+}
+
+.note-rich-editor ul, .note-rich-editor ol {
+    margin-left: 20px;
+    margin-bottom: 8px;
+}
+
+.note-rich-editor li {
+    margin-bottom: 4px;
+}
+
+.note-rich-editor code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.88em;
+    color: var(--danger);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Geri Al (Undo / Ctrl+Z) Yüzen Mobil Bildirim Çubuğu
+   ───────────────────────────────────────────────────────────────────────────── */
+.undo-toast-container {
+    position: fixed;
+    bottom: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 10px 16px;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    z-index: 99999;
+    font-size: 0.84rem;
+    max-width: 90vw;
+    animation: slideUpMobileToast 0.2s ease-out;
+}
+
+@keyframes slideUpMobileToast {
+    from { transform: translate(-50%, 30px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+}
+
+.undo-toast-btn {
+    background: #38bdf8;
+    color: #0f172a;
+    border: none;
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* Mikrofon Dinleme Animasyonu */
+.mic-btn.listening {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    border-color: #ef4444 !important;
+    animation: pulseMic 1.2s infinite;
+}
+
+@keyframes pulseMic {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Modern Alt Gezinme Çubuğu (Bottom Navigation Bar — %90 Mobil Ergonomi)
+   ───────────────────────────────────────────────────────────────────────────── */
+.main-view, .overview-container, .page-container, .vault-container {
+    padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 68px) !important;
+}
+
+.bottom-nav-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(env(safe-area-inset-bottom, 12px) + 56px);
+    padding-bottom: env(safe-area-inset-bottom, 12px);
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    z-index: 95;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.05);
+}
+
+.bottom-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: none;
+    border: none;
+    padding: 6px 0;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.bottom-nav-item .bnav-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+    transition: transform 0.15s ease;
+}
+
+.bottom-nav-item.active {
+    color: var(--primary);
+}
+
+.bottom-nav-item.active .bnav-icon {
+    transform: scale(1.12);
+}
+
+.bottom-nav-item.bnav-center-action {
+    flex: 0 0 52px;
+    height: 44px;
+    background: linear-gradient(135deg, var(--primary), #2563eb);
+    color: #ffffff;
+    border-radius: 22px;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    margin-top: -12px;
+    padding: 0;
+}
+
+.bottom-nav-item.bnav-center-action .bnav-add-icon {
+    font-size: 1.4rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.bottom-nav-item.bnav-center-action:active {
+    transform: scale(0.92);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   PDF & Yazdırma Stilleri (@media print)
+   ───────────────────────────────────────────────────────────────────────────── */
+@media print {
+    .top-bar, .bottom-nav-bar, .sidebar-drawer, .sidebar-backdrop,
+    .quick-add-box, .note-actions-bar, .modal-overlay, .undo-toast-container,
+    .icon-btn, .btn, .sync-badge, .menu-toggle-btn {
+        display: none !important;
+    }
+
+    body, html, .main-view, .page-container {
+        background: #ffffff !important;
+        color: #000000 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+        box-shadow: none !important;
+    }
+
+    .page-header-card {
+        border: none !important;
+        border-bottom: 2px solid #000000 !important;
+        box-shadow: none !important;
+        padding: 10px 0 !important;
+        margin-bottom: 20px !important;
+    }
+
+    .page-rich-editor, .checklist-items-wrap {
+        border: none !important;
+        box-shadow: none !important;
+        font-size: 12pt !important;
+        line-height: 1.6 !important;
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Mobil Power Packs: Toggle, Ekler ve Zengin Yer İmi Kartları
+   ───────────────────────────────────────────────────────────────────────────── */
+details.note-toggle {
+    background: var(--surface2, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 6px 0;
+    font-size: 0.88rem;
+}
+details.note-toggle[open] {
+    background: var(--surface, #ffffff);
+    border-color: var(--primary, #3b82f6);
+}
+details.note-toggle summary {
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    list-style-type: '▶ ';
+}
+details.note-toggle[open] summary {
+    list-style-type: '▼ ';
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    padding-bottom: 4px;
+    color: var(--primary, #3b82f6);
+}
+
+.attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2, #f1f5f9);
+    border: 1px solid var(--border, #cbd5e1);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text, #334155);
+}
+.attachment-chip .att-del-btn {
+    cursor: pointer;
+    opacity: 0.6;
+    padding-left: 2px;
+}
+
+.bookmark-card {
+    display: flex;
+    gap: 8px;
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 8px 0;
+    text-decoration: none;
+    color: var(--text, #1e293b);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+.bookmark-card-thumb {
+    width: 90px;
+    min-width: 90px;
+    height: 75px;
+    background-size: cover;
+    background-position: center;
+    background-color: var(--surface2, #f8fafc);
+}
+.bookmark-card-info {
+    padding: 6px 8px 6px 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+}
+.bookmark-card-title {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--text, #0f172a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.bookmark-card-desc {
+    font-size: 0.72rem;
+    color: var(--muted, #64748b);
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.bookmark-card-source {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--primary, #3b82f6);
 }
 
