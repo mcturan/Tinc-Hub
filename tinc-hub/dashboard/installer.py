@@ -5,11 +5,6 @@ import uuid
 from registry import load_apps, save_apps
 
 def install_app_from_store(store_app_id: str) -> dict:
-    import subprocess
-    import os
-    import json
-    from registry import load_apps, save_apps
-    
     logs = []
     store_file = os.path.join(os.path.dirname(__file__), "store.json")
     try:
@@ -176,6 +171,7 @@ def check_system_update() -> dict:
     """GitHub üzerinden yeni commit olup olmadığını denetler."""
     import urllib.request
     local_info = get_git_info()
+    repo_dir = local_info.get("dir") or "/home/turan/101"
     try:
         url = "https://api.github.com/repos/mcturan/tinc-hub/commits?per_page=1"
         req = urllib.request.Request(url, headers={"User-Agent": "TincHub-AutoUpdater"})
@@ -184,7 +180,21 @@ def check_system_update() -> dict:
             if data and isinstance(data, list):
                 remote_sha = data[0]["sha"]
                 remote_short = remote_sha[:7]
-                has_update = (remote_short != local_info["hash"] and not remote_sha.startswith(local_info["hash"]))
+
+                # Git merge-base ile kontrol et: remote_sha yerelde zaten var mı (yerel commit ileride veya eşit mi)?
+                is_ancestor = False
+                for gd in [repo_dir, "/home/turan/101", "/home/turan/101/tinc-hub"]:
+                    if os.path.exists(os.path.join(gd, ".git")):
+                        r_anc = subprocess.run(
+                            ["git", "-C", gd, "merge-base", "--is-ancestor", remote_sha, "HEAD"],
+                            capture_output=True
+                        )
+                        if r_anc.returncode == 0:
+                            is_ancestor = True
+                            break
+
+                # Eğer remote commit zaten yerelde mevcutsa (veya yerel commit ilerideyse), güncelleme yoktur
+                has_update = (not is_ancestor and remote_short != local_info["hash"])
                 return {
                     "ok": True,
                     "has_update": has_update,

@@ -36,4 +36,34 @@ def verify_user(username, password) -> dict:
     u = users.get(username)
     if u and bcrypt.checkpw(password.encode(), u.get("password", "").encode()):
         return u
+
+    # TincID Tekil Kimlik Doğrulaması (notes.db users tablosu ile SSO)
+    try:
+        from werkzeug.security import check_password_hash
+        import sqlite3
+        candidates = ["/opt/tinc-hub/TNOTE/data/notes.db", "/home/turan/101/tinc-hub/TNOTE/data/notes.db"]
+        for db_path in candidates:
+            if os.path.exists(db_path):
+                conn = sqlite3.connect(db_path)
+                cur = conn.cursor()
+                clean = (username or "").strip().lower()
+                cur.execute("""
+                    SELECT id, username, email, password_hash, role, tinc_id 
+                    FROM users 
+                    WHERE LOWER(username) = ? OR LOWER(email) = ? OR UPPER(tinc_id) = ?
+                """, (clean, clean, clean.upper()))
+                row = cur.fetchone()
+                conn.close()
+                if row:
+                    pwd_hash = row[3]
+                    if check_password_hash(pwd_hash, password):
+                        return {
+                            "username": row[1],
+                            "email": row[2],
+                            "role": row[4] or "admin",
+                            "tinc_id": row[5]
+                        }
+    except Exception:
+        pass
+
     return None

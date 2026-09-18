@@ -1,3 +1,4 @@
+import threading
 from flask import Blueprint, render_template, jsonify, request, redirect, url_for, session, Response, stream_with_context
 from app import *
 
@@ -150,6 +151,11 @@ def _enrich_apps(apps: list[dict]) -> list[dict]:
                     if hist["ram_min"] is None or app["ram_mb"] < hist["ram_min"]: hist["ram_min"] = app["ram_mb"]
                     if hist["ram_max"] is None or app["ram_mb"] > hist["ram_max"]: hist["ram_max"] = app["ram_mb"]
             app["metrics_history"] = _metrics_history[app_id]
+        # Bellek sızıntısı önlemi: 500'den fazla app geçmişi birikirse ilk 200'ü temizle
+        if len(_metrics_history) > 500:
+            keys_to_delete = list(_metrics_history.keys())[:200]
+            for k in keys_to_delete:
+                del _metrics_history[k]
 
         # Port bilgisi discovery'den tamamla
         if not app.get("port") and svc:
@@ -171,21 +177,24 @@ def _enrich_apps(apps: list[dict]) -> list[dict]:
 
 # Discovery cache (60 saniyede yenile)
 _disc_cache = {"data": None, "at": None}
+_disc_lock = threading.Lock()
 _DISC_TTL = 60
 
 
 def _get_discovery() -> dict:
     now = datetime.now()
-    if _disc_cache["at"] and (now - _disc_cache["at"]).seconds < _DISC_TTL:
-        return _disc_cache["data"]
+    with _disc_lock:
+        if _disc_cache["at"] and (now - _disc_cache["at"]).seconds < _DISC_TTL:
+            return _disc_cache["data"]
     try:
-        _disc_cache["data"] = discover_all()
-        _disc_cache["at"]   = now
+        data = discover_all()
     except Exception as e:
         log.error(f"Discovery hatası: {e}")
-        _disc_cache["data"] = {"services": [], "ports": {}, "docker": []}
+        data = {"services": [], "ports": {}, "docker": []}
+    with _disc_lock:
+        _disc_cache["data"] = data
         _disc_cache["at"]   = now
-    return _disc_cache["data"]
+    return data
 
 
 def _format_uptime(since_str: str) -> str:

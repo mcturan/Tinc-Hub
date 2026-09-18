@@ -353,10 +353,18 @@ def api_system_backup():
             tar.add(str(tincproc_cfg), arcname="tincprocess/config.json")
 
         # 5. Metadata JSON
+        # Versiyonu version.json'dan oku
+        _ver = "unknown"
+        try:
+            _ver_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "version.json")
+            with open(_ver_path) as _vf:
+                _ver = json.load(_vf).get("version", "unknown")
+        except Exception:
+            pass
         meta = {
             "created_at": datetime.now().isoformat(),
             "hostname": os.uname().nodename,
-            "version": "2.0.0",
+            "version": _ver,
             "type": "tinchub_disaster_recovery"
         }
         meta_bytes = json.dumps(meta, indent=2).encode('utf-8')
@@ -394,7 +402,15 @@ def api_system_restore():
                 if "backup_meta.json" not in names:
                     return jsonify({"ok": False, "error": "Geçersiz TincHub yedeği (metadata eksik)"}), 400
 
-                tar.extractall(path=tmpdir)
+                # Path traversal koruması: her üyenin yolu tmpdir dışına çıkmamalı
+                import os as _os
+                safe_members = []
+                for member in tar.getmembers():
+                    member_path = _os.path.abspath(_os.path.join(tmpdir, member.name))
+                    if not member_path.startswith(_os.path.abspath(tmpdir) + _os.sep):
+                        return jsonify({"ok": False, "error": f"Güvensiz yedek: path traversal tespit edildi ({member.name})"}), 400
+                    safe_members.append(member)
+                tar.extractall(path=tmpdir, members=safe_members)
 
             # Restore etc files
             extracted_etc = Path(tmpdir) / "etc/tinc-hub"

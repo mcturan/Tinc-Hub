@@ -1,0 +1,1059 @@
+{% extends 'base.html' %}
+{% block head %}
+<style>
+.packages-container {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 1.5rem 2rem;
+}
+
+/* Header & Banner */
+.packages-header {
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.packages-title-wrap h1 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text, #0f172a);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.packages-subtitle {
+    font-size: 0.85rem;
+    color: var(--muted, #64748b);
+    margin-top: 4px;
+}
+
+.packages-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.btn-scan {
+    background: var(--accent, #2563eb);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+.btn-scan:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+.btn-scan:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Stats Pill Bar */
+.stats-strip {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.stat-pill {
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 170px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.stat-pill:hover, .stat-pill.active {
+    border-color: var(--accent, #2563eb);
+    background: #f0f7ff;
+}
+.stat-icon {
+    font-size: 1.5rem;
+}
+.stat-val {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text, #0f172a);
+    line-height: 1.1;
+}
+.stat-lbl {
+    font-size: 0.75rem;
+    color: var(--muted, #64748b);
+    font-weight: 500;
+}
+
+/* Filter and Search Bar */
+.filter-bar {
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.search-input-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 240px;
+}
+.search-input-wrap input {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    background: var(--surface2, #f8fafc);
+    color: var(--text, #0f172a);
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+.search-input-wrap input:focus {
+    border-color: var(--accent, #2563eb);
+    background: #fff;
+}
+.search-icon {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted, #94a3b8);
+    font-size: 0.95rem;
+}
+
+.type-tabs {
+    display: flex;
+    gap: 6px;
+    background: var(--surface2, #f1f5f9);
+    padding: 4px;
+    border-radius: 8px;
+}
+
+.tab-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--muted, #64748b);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.tab-btn.active {
+    background: #fff;
+    color: var(--accent, #2563eb);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.controls-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-select {
+    padding: 7px 12px;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    background: #fff;
+    color: var(--text, #0f172a);
+    outline: none;
+    cursor: pointer;
+    font-weight: 500;
+}
+.filter-select:focus {
+    border-color: var(--accent, #2563eb);
+}
+
+.sort-select {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* App List / Grid */
+.app-items-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 16px;
+}
+
+.pkg-card {
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+}
+.pkg-card:hover {
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.pkg-header {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.pkg-icon-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.04);
+}
+.pkg-icon-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.pkg-icon-fallback {
+    font-size: 1.5rem;
+}
+
+.pkg-meta {
+    flex: 1;
+    min-width: 0;
+}
+.pkg-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text, #0f172a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pkg-id-line {
+    font-size: 0.75rem;
+    color: var(--muted, #64748b);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
+    font-family: monospace;
+}
+
+.pkg-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.badge-tag {
+    font-size: 0.7rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+.badge-apt { background: #fee2e2; color: #991b1b; }
+.badge-flatpak { background: #e0f2fe; color: #0369a1; }
+.badge-snap { background: #ffedd5; color: #c2410c; }
+.badge-ver { background: #f1f5f9; color: #475569; }
+.badge-cat { background: #f3e8ff; color: #7e22ce; }
+.badge-size { background: #ecfdf5; color: #047857; font-weight: 700; }
+.badge-time { background: #eff6ff; color: #1d4ed8; }
+.badge-installed { background: #f8fafc; color: #475569; border: 1px solid #e2e8f0; }
+.badge-protected { background: #fef3c7; color: #92400e; }
+
+.pkg-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted, #475569);
+    line-height: 1.4;
+    margin-bottom: 12px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.2em;
+}
+
+.pkg-timeline-strip {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.72rem;
+    color: var(--muted, #64748b);
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 12px;
+    border: 1px solid #f1f5f9;
+}
+.timeline-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.timeline-item strong {
+    color: var(--text, #1e293b);
+}
+
+.pkg-card-actions {
+    display: flex;
+    gap: 8px;
+    border-top: 1px solid var(--border, #f1f5f9);
+    padding-top: 12px;
+    margin-top: auto;
+}
+
+.btn-card-action {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+}
+.btn-card-action:hover {
+    transform: translateY(-1px);
+}
+.btn-card-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-upgrade { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+.btn-upgrade:hover:not(:disabled) { background: #dbeafe; }
+
+.btn-reinstall { background: #f8fafc; color: #334155; border-color: #cbd5e1; }
+.btn-reinstall:hover:not(:disabled) { background: #f1f5f9; }
+
+.btn-uninstall { background: #fff1f2; color: #e11d48; border-color: #fecdd3; }
+.btn-uninstall:hover:not(:disabled) { background: #ffe4e6; }
+
+/* Table View for Raw APT Packages */
+.pkg-table-wrap {
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    overflow-x: auto;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.pkg-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.83rem;
+}
+.pkg-table th {
+    background: var(--surface2, #f8fafc);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--muted, #64748b);
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    user-select: none;
+}
+.pkg-table th.sortable {
+    cursor: pointer;
+}
+.pkg-table th.sortable:hover {
+    color: var(--accent, #2563eb);
+    background: #f1f5f9;
+}
+.pkg-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border, #f1f5f9);
+    vertical-align: middle;
+}
+.pkg-table tr:hover td {
+    background: #f8fafc;
+}
+
+/* Modal */
+.pkg-modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+.pkg-modal-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+.pkg-modal {
+    background: #ffffff;
+    border-radius: 14px;
+    width: 90%;
+    max-width: 650px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.pkg-modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.pkg-modal-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pkg-modal-body {
+    padding: 20px;
+    max-height: 480px;
+    overflow-y: auto;
+}
+.pkg-terminal-box {
+    background: #0f172a;
+    color: #38bdf8;
+    border-radius: 8px;
+    padding: 14px;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    max-height: 280px;
+    overflow-y: auto;
+    border: 1px solid #1e293b;
+}
+.pkg-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Spinner */
+.spinner-inline {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+}
+.spinner-dark {
+    border: 2px solid rgba(0,0,0,0.1);
+    border-top-color: var(--accent, #2563eb);
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Pagination */
+.pagination-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding: 10px 4px;
+    font-size: 0.85rem;
+    color: var(--muted, #64748b);
+}
+.pagination-btns {
+    display: flex;
+    gap: 8px;
+}
+.btn-page {
+    padding: 6px 12px;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-weight: 600;
+}
+.btn-page:hover:not(:disabled) {
+    border-color: var(--accent, #2563eb);
+    color: var(--accent, #2563eb);
+}
+.btn-page:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--muted, #64748b);
+    grid-column: 1 / -1;
+}
+.empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 10px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="packages-container">
+    <!-- Header -->
+    <div class="packages-header">
+        <div class="packages-title-wrap">
+            <h1>📦 Yüklü Uygulamalar & Paket Yöneticisi</h1>
+            <div class="packages-subtitle">
+                Bilgisayardaki masaüstü programları, sistem paketleri (APT), Flatpak ve Snap uygulamalarını görüntüleyin, boyuta veya kullanım sıklığına göre sıralayın ve yönetin.
+            </div>
+        </div>
+        <div class="packages-actions">
+            <button class="btn-scan" style="background:#0f172a;" onclick="openAIAgentModal()" title="TincOps Ajanı ile Doğal Dilde Uygulama Kur veya Yönet">
+                <span>🤖</span>
+                <span>TincOps Ajanı</span>
+            </button>
+            <button id="btnScan" class="btn-scan" onclick="refreshScan()">
+                <span id="scanIcon">🔄</span>
+                <span id="scanText">PC'yi Yeniden Tara</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-strip">
+        <div class="stat-pill active" id="stat-desktop" onclick="switchTab('desktop')">
+            <div class="stat-icon">🖥️</div>
+            <div>
+                <div class="stat-val" id="cnt-desktop">-</div>
+                <div class="stat-lbl">Masaüstü Uygulaması</div>
+            </div>
+        </div>
+        <div class="stat-pill" id="stat-flatpak" onclick="switchTab('flatpak')">
+            <div class="stat-icon">🔷</div>
+            <div>
+                <div class="stat-val" id="cnt-flatpak">-</div>
+                <div class="stat-lbl">Flatpak Uygulaması</div>
+            </div>
+        </div>
+        <div class="stat-pill" id="stat-snap" onclick="switchTab('snap')">
+            <div class="stat-icon">🟠</div>
+            <div>
+                <div class="stat-val" id="cnt-snap">-</div>
+                <div class="stat-lbl">Snap Paketi</div>
+            </div>
+        </div>
+        <div class="stat-pill" id="stat-apt" onclick="switchTab('apt')">
+            <div class="stat-icon">📦</div>
+            <div>
+                <div class="stat-val" id="cnt-apt">-</div>
+                <div class="stat-lbl">Tüm APT Paketleri</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div class="filter-bar">
+        <div class="type-tabs">
+            <button class="tab-btn active" id="tab-desktop" onclick="switchTab('desktop')">🖥️ Masaüstü</button>
+            <button class="tab-btn" id="tab-flatpak" onclick="switchTab('flatpak')">🔷 Flatpak</button>
+            <button class="tab-btn" id="tab-snap" onclick="switchTab('snap')">🟠 Snap</button>
+            <button class="tab-btn" id="tab-apt" onclick="switchTab('apt')">📦 Tüm APT</button>
+        </div>
+
+        <div class="controls-group">
+            <!-- Sıralama Menüsü -->
+            <select id="sortFilter" class="filter-select sort-select" onchange="applyFilters()">
+                <option value="last_used">🕒 En Son Kullanılanlar</option>
+                <option value="size_desc">📏 Boyuta Göre (En Büyük)</option>
+                <option value="size_asc">📏 Boyuta Göre (En Küçük)</option>
+                <option value="installed_desc">📅 Yükleme Tarihi (En Yeni)</option>
+                <option value="installed_asc">📅 Yükleme Tarihi (En Eski)</option>
+                <option value="name_asc">🔤 İsim (A - Z)</option>
+                <option value="name_desc">🔤 İsim (Z - A)</option>
+            </select>
+
+            <!-- Kategori Filtresi (Masaüstü için) -->
+            <select id="categoryFilter" class="filter-select" onchange="applyFilters()">
+                <option value="">Tüm Kategoriler</option>
+                <option value="Ofis">Ofis</option>
+                <option value="İnternet">İnternet</option>
+                <option value="Medya / Ses">Medya / Ses</option>
+                <option value="Geliştirme">Geliştirme</option>
+                <option value="Grafik / Tasarım">Grafik / Tasarım</option>
+                <option value="Sistem">Sistem</option>
+                <option value="Araçlar">Araçlar</option>
+                <option value="Oyun">Oyun</option>
+            </select>
+        </div>
+
+        <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Uygulama veya paket ara..." oninput="handleSearchInput()">
+        </div>
+    </div>
+
+    <!-- Content Area: Grid for Desktop/Flatpak/Snap, Table for APT -->
+    <div id="gridContainer" class="app-items-container">
+        <!-- Javascript populates this -->
+    </div>
+
+    <div id="tableContainer" class="pkg-table-wrap" style="display: none;">
+        <table class="pkg-table">
+            <thead>
+                <tr>
+                    <th class="sortable" onclick="setSort('name_asc')">Paket Adı ↕</th>
+                    <th>Sürüm</th>
+                    <th class="sortable" onclick="setSort('size_desc')">Diskteki Boyut ↕</th>
+                    <th class="sortable" onclick="setSort('installed_desc')">Kurulum Tarihi ↕</th>
+                    <th class="sortable" onclick="setSort('last_used')">Son Erişim ↕</th>
+                    <th>Bölüm</th>
+                    <th style="text-align: right;">İşlemler</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <!-- Javascript populates this -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination for APT packages -->
+    <div id="paginationBar" class="pagination-bar" style="display: none;">
+        <div id="paginationInfo">Görüntülenen: 0 / 0</div>
+        <div class="pagination-btns">
+            <button id="btnPrev" class="btn-page" onclick="changePage(-1)">◀ Önceki</button>
+            <span id="pageCurrent" style="align-self: center; font-weight: 600; padding: 0 4px;">1</span>
+            <button id="btnNext" class="btn-page" onclick="changePage(1)">Sonraki ▶</button>
+        </div>
+    </div>
+</div>
+
+<!-- Action Execution Modal -->
+<div class="pkg-modal-backdrop" id="actionModal">
+    <div class="pkg-modal">
+        <div class="pkg-modal-header">
+            <div class="pkg-modal-title" id="modalTitle">
+                <span class="spinner-inline spinner-dark" id="modalSpinner"></span>
+                <span id="modalTitleText">İşlem Yapılıyor...</span>
+            </div>
+            <button onclick="closeActionModal()" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:#94a3b8;">&times;</button>
+        </div>
+        <div class="pkg-modal-body">
+            <div id="modalDesc" style="margin-bottom:12px; font-size:0.88rem; color:#334155;">
+                Paket üzerinde işlem yürütülüyor. Lütfen pencereyi kapatmayın...
+            </div>
+            <div class="pkg-terminal-box" id="modalTerminal">Komut başlatılıyor...</div>
+        </div>
+        <div class="pkg-modal-footer">
+            <button id="modalCloseBtn" class="btn btn-secondary" onclick="closeActionModal()" disabled>Kapat</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTab = 'desktop';
+let currentPage = 1;
+const pageSize = 50;
+let searchTimer = null;
+let currentSearch = '';
+let currentCategory = '';
+let currentSort = 'last_used';
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadPackages();
+});
+
+function switchTab(tab) {
+    currentTab = tab;
+    currentPage = 1;
+
+    // Update tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.stat-pill').forEach(pill => pill.classList.remove('active'));
+
+    const activeTabBtn = document.getElementById(`tab-${tab}`);
+    if (activeTabBtn) activeTabBtn.classList.add('active');
+
+    const activeStat = document.getElementById(`stat-${tab}`);
+    if (activeStat) activeStat.classList.add('active');
+
+    // Show/hide category filter only for desktop
+    const catSelect = document.getElementById('categoryFilter');
+    catSelect.style.display = (tab === 'desktop') ? 'block' : 'none';
+
+    // Set sensible default sort for APT vs Desktop
+    const sortSelect = document.getElementById('sortFilter');
+    if (tab === 'apt' && sortSelect.value === 'last_used') {
+        sortSelect.value = 'size_desc';
+        currentSort = 'size_desc';
+    }
+
+    loadPackages();
+}
+
+function handleSearchInput() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        currentSearch = document.getElementById('searchInput').value.trim();
+        currentPage = 1;
+        loadPackages();
+    }, 300);
+}
+
+function applyFilters() {
+    currentCategory = document.getElementById('categoryFilter').value;
+    currentSort = document.getElementById('sortFilter').value;
+    currentPage = 1;
+    loadPackages();
+}
+
+function setSort(sortKey) {
+    const sortSelect = document.getElementById('sortFilter');
+    sortSelect.value = sortKey;
+    applyFilters();
+}
+
+function changePage(delta) {
+    currentPage += delta;
+    if (currentPage < 1) currentPage = 1;
+    loadPackages();
+}
+
+async function loadPackages() {
+    const grid = document.getElementById('gridContainer');
+    const tableWrap = document.getElementById('tableContainer');
+    const pagination = document.getElementById('paginationBar');
+
+    const params = new URLSearchParams({
+        type: currentTab,
+        q: currentSearch,
+        page: currentPage,
+        limit: (currentTab === 'apt') ? pageSize : 0,
+        category: currentCategory,
+        sort: currentSort
+    });
+
+    try {
+        const resp = await fetch(`/api/packages/list?${params.toString()}`);
+        const data = await resp.json();
+
+        if (!data.ok) {
+            alert("Paket listesi yüklenemedi: " + (data.error || "Bilinmeyen hata"));
+            return;
+        }
+
+        // Update counts
+        if (data.counts) {
+            document.getElementById('cnt-desktop').textContent = data.counts.desktop || 0;
+            document.getElementById('cnt-flatpak').textContent = data.counts.flatpak || 0;
+            document.getElementById('cnt-snap').textContent = data.counts.snap || 0;
+            document.getElementById('cnt-apt').textContent = data.counts.apt || 0;
+        }
+
+        const items = data.items || [];
+
+        if (currentTab === 'apt') {
+            grid.style.display = 'none';
+            tableWrap.style.display = 'block';
+            pagination.style.display = 'flex';
+            renderTable(items, data.total);
+        } else {
+            grid.style.display = 'grid';
+            tableWrap.style.display = 'none';
+            pagination.style.display = 'none';
+            renderGrid(items);
+        }
+    } catch (e) {
+        console.error("Paket yükleme hatası:", e);
+    }
+}
+
+function renderGrid(items) {
+    const grid = document.getElementById('gridContainer');
+    grid.innerHTML = '';
+
+    if (items.length === 0) {
+        grid.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🔍</div>
+                <h3>Eşleşen uygulama bulunamadı</h3>
+                <p>Arama teriminizi değiştirip tekrar deneyin veya sistemi yeniden tarayın.</p>
+            </div>
+        `;
+        return;
+    }
+
+    items.forEach(app => {
+        const card = document.createElement('div');
+        card.className = 'pkg-card';
+
+        const typeBadge = (app.type === 'flatpak') ? '<span class="badge-tag badge-flatpak">Flatpak</span>' :
+                          (app.type === 'snap') ? '<span class="badge-tag badge-snap">Snap</span>' :
+                          '<span class="badge-tag badge-apt">APT</span>';
+
+        const catBadge = app.category ? `<span class="badge-tag badge-cat">${app.category}</span>` : '';
+        const sizeBadge = app.size ? `<span class="badge-tag badge-size" title="Diskteki Boyut">💾 ${app.size}</span>` : '';
+        const verBadge = app.version ? `<span class="badge-tag badge-ver">v${app.version}</span>` : '';
+        const protectedBadge = app.is_protected ? `<span class="badge-tag badge-protected">🔒 Sistem</span>` : '';
+
+        const iconName = app.icon || app.package || 'package';
+        const iconUrl = `/api/packages/icon/${encodeURIComponent(iconName)}`;
+
+        const uninstallDisabled = app.is_protected ? 'disabled title="Kritik sistem bileşeni kaldırılamaz"' : '';
+
+        const lastUsedText = app.last_used_str || 'Henüz kullanılmadı';
+        const installedText = app.installed_str || '-';
+
+        card.innerHTML = `
+            <div>
+                <div class="pkg-header">
+                    <div class="pkg-icon-box">
+                        <img src="${iconUrl}" class="pkg-icon-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" alt="" />
+                        <span class="pkg-icon-fallback" style="display:none;">📦</span>
+                    </div>
+                    <div class="pkg-meta">
+                        <div class="pkg-name" title="${escapeHtml(app.name)}">${escapeHtml(app.name)}</div>
+                        <div class="pkg-id-line">${escapeHtml(app.package || app.id)}</div>
+                        <div class="pkg-badges">
+                            ${typeBadge}
+                            ${verBadge}
+                            ${sizeBadge}
+                            ${catBadge}
+                            ${protectedBadge}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pkg-desc" title="${escapeHtml(app.comment || app.summary || 'Açıklama yok')}">
+                    ${escapeHtml(app.comment || app.summary || 'Açıklama bulunmuyor.')}
+                </div>
+
+                <div class="pkg-timeline-strip">
+                    <div class="timeline-item" title="En son kullanılma tarihi">
+                        <span>🕒 Son:</span>
+                        <strong>${escapeHtml(lastUsedText)}</strong>
+                    </div>
+                    <div class="timeline-item" title="Kurulum / güncelleme tarihi">
+                        <span>📅 Kurulum:</span>
+                        <strong>${escapeHtml(installedText)}</strong>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="pkg-card-actions">
+                <button class="btn-card-action btn-upgrade" onclick="executeAction('${escapeHtml(app.package)}', '${app.type}', 'upgrade', '${escapeHtml(app.name)}')">
+                    ⬆️ Güncelle
+                </button>
+                <button class="btn-card-action btn-reinstall" onclick="executeAction('${escapeHtml(app.package)}', '${app.type}', 'reinstall', '${escapeHtml(app.name)}')">
+                    🔄 Yeniden
+                </button>
+                <button class="btn-card-action btn-uninstall" ${uninstallDisabled} onclick="executeAction('${escapeHtml(app.package)}', '${app.type}', 'uninstall', '${escapeHtml(app.name)}')">
+                    🗑️ Kaldır
+                </button>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function renderTable(items, total) {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+
+    const start = (currentPage - 1) * pageSize + 1;
+    const end = Math.min(currentPage * pageSize, total);
+    document.getElementById('paginationInfo').textContent = `Görüntülenen: ${start} - ${end} / ${total}`;
+    document.getElementById('pageCurrent').textContent = currentPage;
+
+    document.getElementById('btnPrev').disabled = (currentPage <= 1);
+    document.getElementById('btnNext').disabled = (end >= total);
+
+    if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">Eşleşen paket bulunamadı.</td></tr>`;
+        return;
+    }
+
+    items.forEach(pkg => {
+        const tr = document.createElement('tr');
+        const uninstallDisabled = pkg.is_protected ? 'disabled title="Kritik sistem bileşeni kaldırılamaz"' : '';
+        const protectedTag = pkg.is_protected ? '<span class="badge-tag badge-protected" style="margin-left:6px;">🔒</span>' : '';
+
+        tr.innerHTML = `
+            <td>
+                <strong>${escapeHtml(pkg.package)}</strong>${protectedTag}
+                <div style="font-size:0.73rem; color:#64748b; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(pkg.summary)}">
+                    ${escapeHtml(pkg.summary || '-')}
+                </div>
+            </td>
+            <td><code>${escapeHtml(pkg.version)}</code></td>
+            <td><strong style="color:#047857;">${escapeHtml(pkg.size || '-')}</strong></td>
+            <td><span style="font-size:0.75rem; color:#475569;">${escapeHtml(pkg.installed_str || '-')}</span></td>
+            <td><span style="font-size:0.75rem; color:#1d4ed8;">${escapeHtml(pkg.last_used_str || '-')}</span></td>
+            <td><span class="badge-tag badge-cat">${escapeHtml(pkg.section || 'misc')}</span></td>
+            <td style="text-align: right; white-space: nowrap;">
+                <button class="btn-card-action btn-upgrade" style="flex:none; padding:3px 8px;" onclick="executeAction('${escapeHtml(pkg.package)}', '${pkg.type}', 'upgrade', '${escapeHtml(pkg.package)}')">
+                    ⬆️ Güncelle
+                </button>
+                <button class="btn-card-action btn-reinstall" style="flex:none; padding:3px 8px;" onclick="executeAction('${escapeHtml(pkg.package)}', '${pkg.type}', 'reinstall', '${escapeHtml(pkg.package)}')">
+                    🔄 Yeniden
+                </button>
+                <button class="btn-card-action btn-uninstall" style="flex:none; padding:3px 8px;" ${uninstallDisabled} onclick="executeAction('${escapeHtml(pkg.package)}', '${pkg.type}', 'uninstall', '${escapeHtml(pkg.package)}')">
+                    🗑️ Kaldır
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function refreshScan() {
+    const btn = document.getElementById('btnScan');
+    const icon = document.getElementById('scanIcon');
+    const text = document.getElementById('scanText');
+
+    btn.disabled = true;
+    icon.innerHTML = '<span class="spinner-inline"></span>';
+    text.textContent = 'PC Taranıyor...';
+
+    try {
+        const resp = await fetch('/api/packages/refresh', { method: 'POST' });
+        const data = await resp.json();
+        if (data.ok) {
+            await loadPackages();
+        } else {
+            alert("Tarama hatası: " + (data.error || "Bilinmeyen hata"));
+        }
+    } catch (e) {
+        alert("Bağlantı hatası: " + e);
+    } finally {
+        btn.disabled = false;
+        icon.textContent = '🔄';
+        text.textContent = "PC'yi Yeniden Tara";
+    }
+}
+
+async function executeAction(pkg, type, action, displayName) {
+    const actionNames = {
+        'upgrade': 'Güncelleme',
+        'reinstall': 'Yeniden Yükleme',
+        'uninstall': 'Kaldırma'
+    };
+
+    if (action === 'uninstall') {
+        const confirmed = confirm(`"${displayName}" (${pkg}) paketini sistemden KALDIRMAK istediğinize emin misiniz?`);
+        if (!confirmed) return;
+    }
+
+    const modal = document.getElementById('actionModal');
+    const modalSpinner = document.getElementById('modalSpinner');
+    const modalTitle = document.getElementById('modalTitleText');
+    const modalDesc = document.getElementById('modalDesc');
+    const modalTerminal = document.getElementById('modalTerminal');
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+
+    modalTitle.textContent = `${displayName}: ${actionNames[action]} Başlatılıyor...`;
+    modalDesc.textContent = `${pkg} paketi için ${actionNames[action].toLowerCase()} komutu çalıştırılıyor. Lütfen bekleyin...`;
+    modalTerminal.textContent = `Komut başlatıldı: [${type.toUpperCase()}] ${action.toUpperCase()} ${pkg} ...\n`;
+    modalSpinner.style.display = 'inline-block';
+    modalCloseBtn.disabled = true;
+    modal.classList.add('show');
+
+    try {
+        const resp = await fetch('/api/packages/action', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ package: pkg, type: type, action: action })
+        });
+
+        const data = await resp.json();
+        modalSpinner.style.display = 'none';
+        modalCloseBtn.disabled = false;
+
+        if (data.ok) {
+            modalTitle.textContent = `✅ ${displayName} ${actionNames[action]} Başarılı!`;
+            modalDesc.textContent = data.message || "İşlem başarıyla tamamlandı.";
+            modalTerminal.textContent += "\n" + (data.output || "İşlem başarıyla bitti.");
+            loadPackages();
+        } else {
+            modalTitle.textContent = `❌ ${displayName} ${actionNames[action]} Hatası!`;
+            modalDesc.textContent = data.error || data.message || "İşlem sırasında bir hata meydana geldi.";
+            modalTerminal.textContent += "\n" + (data.output || data.error || "Hata oluştu.");
+        }
+    } catch (e) {
+        modalSpinner.style.display = 'none';
+        modalCloseBtn.disabled = false;
+        modalTitle.textContent = `❌ Bağlantı Hatası!`;
+        modalDesc.textContent = "İşlem sunucuya iletilemedi: " + e;
+        modalTerminal.textContent += "\nBağlantı hatası: " + e;
+    }
+}
+
+function closeActionModal() {
+    document.getElementById('actionModal').classList.remove('show');
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.toString().replace(/[&<>"']/g, m => map[m]);
+}
+</script>
+{% endblock %}

@@ -10,7 +10,6 @@ import re
 import os
 
 from dotenv import dotenv_values
-import os
 _config = dotenv_values("/etc/tinc-hub/config.env") if os.path.exists("/etc/tinc-hub/config.env") else {}
 RUN_USER = _config.get("RUN_USER", "turan")
 RUN_UID = _config.get("RUN_UID", "1000")

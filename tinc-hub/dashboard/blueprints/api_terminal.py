@@ -19,10 +19,21 @@ def api_terminal_exec():
     if len(cmd) > 500:
         return jsonify({'error': 'Komut uzunluğu 500 karakter sınırını aşıyor.'}), 400
 
-    BLOCKED = ['rm -rf', 'mkfs', ':(){', 'dd if=', 'wget ', 'curl ', '> /dev', 'nc ', 'ncat', 'python3 -c', 'python -c', 'bash -i', '/dev/tcp', '/dev/udp']
+    BLOCKED = [
+        'rm -rf', 'rm -fr', 'mkfs', ':(){', 'dd if=',
+        '> /dev', 'bash -i', 'bash -c', '/dev/tcp', '/dev/udp',
+        'ncat', 'python3 -c', 'python -c',
+        'base64 -d', 'base64 -D',        # encoded payload execution
+        'chmod 777', 'chmod +s',          # dangerous permission changes
+        '/etc/shadow', '/etc/passwd',     # sensitive file access
+        'systemctl disable tinc-hub',     # self-destruct
+        '$(', '`',                        # command substitution
+    ]
+    # Normalize: boşluk eki, büyük/küçük harf varyantları
+    cmd_check = ' '.join(cmd.split())  # çoklu boşlukları normalize et
     for b in BLOCKED:
-        if b in cmd:
-            return jsonify({'error': f'Güvenlik kısıtlaması: "{b}" komut kalıbı engellendi.'}), 403
+        if b in cmd_check or b in cmd_check.lower():
+            return jsonify({'error': f'Güvenlik kısıtlaması: Bu komut kalıbı engellendi.'}), 403
     
     try:
         r = subprocess.run(

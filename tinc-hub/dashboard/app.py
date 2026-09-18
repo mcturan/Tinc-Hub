@@ -76,6 +76,7 @@ log = logging.getLogger("tinc-hub-hub")
 app = Flask(__name__)
 app.secret_key = SECRET
 app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Strict"
 
 @app.context_processor
 def inject_global_vars():
@@ -150,11 +151,25 @@ def register_blueprints():
     app.register_blueprint(auth_bp)
     from blueprints.api_agent_ops import bp as api_agent_ops_bp
     app.register_blueprint(api_agent_ops_bp)
+    from blueprints.api_packages import bp as api_packages_bp
+    app.register_blueprint(api_packages_bp)
+    from blueprints.api_sync import bp as api_sync_bp
+    app.register_blueprint(api_sync_bp)
     try:
         from TNOTE.blueprint import tnote_bp
         app.register_blueprint(tnote_bp, url_prefix='/notes')
     except Exception as e:
         log.warning(f"TNOTE Blueprint yüklenemedi: {e}")
+
+
+def create_app():
+    """WSGI sunucuları (gunicorn, uwsgi) için application factory."""
+    register_blueprints()
+    return app
+
+
+# Not: Döngüsel import nedeniyle (blueprints 'from app import *' kullandığından)
+# register_blueprints() module seviyesinde değil, __main__ veya create_app() içinden çağrılır.
 
 if __name__ == "__main__":
     register_blueprints()
@@ -180,5 +195,21 @@ if __name__ == "__main__":
     metrics_collector.start_metrics_collector(get_monitored_ips)
 
     start_background_checker(load_apps, interval=30)
+
+    # ── Tinc Autopilot kural motoru ──────────────────────────────────────────
+    try:
+        from rules_engine import start_autopilot
+        def _autopilot_extra():
+            """Autopilot'a dışarıdan metrik besle (ping verileri vb.)."""
+            try:
+                import json as _j
+                with open("/opt/tinc-hub/shared/metrics.json") as _f:
+                    return _j.load(_f)
+            except Exception:
+                return {}
+        start_autopilot(interval=60, extra_metrics_fn=_autopilot_extra)
+        log.info("Tinc Autopilot başlatıldı.")
+    except Exception as _ae:
+        log.warning(f"Tinc Autopilot başlatılamadı: {_ae}")
 
     app.run(host=HOST, port=PORT, debug=False, threaded=True)

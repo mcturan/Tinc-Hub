@@ -206,13 +206,15 @@ def api_test_ai():
 
 def _update_turan_crontab(hour: int, minute: int, enabled: bool):
     try:
-        user = "turan"
+        from dotenv import dotenv_values as _dv
+        _cfg = _dv("/etc/tinc-hub/config.env") if os.path.exists("/etc/tinc-hub/config.env") else {}
+        user = _cfg.get("RUN_USER", "turan")
         r = subprocess.run(["crontab", "-u", user, "-l"], capture_output=True, text=True)
         lines = r.stdout.splitlines() if r.returncode == 0 else []
         new_lines = []
         found = False
-        target_cmd = "/home/turan/router_reboot.py"
-        new_cron_line = f"{minute} {hour} * * * {target_cmd} >> /home/turan/router_reboot.log 2>&1"
+        target_cmd = f"/home/{user}/router_reboot.py"
+        new_cron_line = f"{minute} {hour} * * * {target_cmd} >> /home/{user}/router_reboot.log 2>&1"
         if not enabled:
             new_cron_line = f"# DISABLED {new_cron_line}"
 

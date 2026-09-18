@@ -35,7 +35,7 @@ fi
 # 3. Gereksinimleri yükle
 info "Python paketleri yükleniyor..."
 /opt/tinc-hub/venv/bin/pip install --quiet --upgrade pip
-/opt/tinc-hub/venv/bin/pip install --quiet flask python-dotenv requests psutil PyYAML beautifulsoup4 SpeechRecognition
+/opt/tinc-hub/venv/bin/pip install --quiet flask python-dotenv requests psutil PyYAML beautifulsoup4 SpeechRecognition cryptography
 
 # 4. Shared modülü kopyala
 mkdir -p /opt/tinc-hub/shared

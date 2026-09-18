@@ -8,8 +8,17 @@ bp = Blueprint('api_remote', __name__, url_prefix='/api/remote')
 @bp.route('/summary')
 def api_remote_summary():
     token = request.headers.get('X-Hub-Token')
-    if config.get('HUB_API_TOKEN') and token != config.get('HUB_API_TOKEN'):
-        return jsonify({'error': 'Unauthorized'}), 401
+    hub_token = config.get('HUB_API_TOKEN', '')
+    if hub_token:
+        # Token konfigüre edilmiş — token doğrula
+        if token != hub_token:
+            return jsonify({'error': 'Unauthorized'}), 401
+    else:
+        # Token yok — session auth'a bak (dashboard oturumu)
+        from flask import session as _session
+        from app import PASSWORD
+        if PASSWORD and not _session.get('authenticated'):
+            return jsonify({'error': 'Unauthorized: HUB_API_TOKEN tanımlanmamış ve oturum açık değil'}), 401
     
     from health import get_cached_health
     apps_data = []

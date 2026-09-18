@@ -1,32 +1,118 @@
 {% extends 'base.html' %}
 {% block head %}
 <style>
-.rules-container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+.rules-container { max-width: 960px; margin: 0 auto; padding: 2rem; }
+
+/* Autopilot Banner */
+.autopilot-banner {
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #dee2e6);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.autopilot-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.autopilot-dot {
+    width: 8px;
+    height: 8px;
+    background: #10b981;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+}
+
 .rule-card {
     background: var(--surface, #ffffff);
     border: 1px solid var(--border, #dee2e6);
     border-radius: 10px;
-    padding: 16px 20px;
-    margin-bottom: 12px;
+    padding: 18px 22px;
+    margin-bottom: 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    transition: transform 0.15s ease, border-color 0.15s ease;
 }
-.rule-card.disabled { opacity: 0.5; }
+.rule-card:hover {
+    border-color: #94a3b8;
+}
+.rule-card.disabled {
+    opacity: 0.55;
+    background: #f8fafc;
+}
 .rule-info { flex: 1; }
-.rule-name { font-weight: 600; font-size: 1rem; margin-bottom: 4px; color: var(--text, #212529); }
-.rule-desc { font-size: 0.8rem; color: var(--muted, #6c757d); }
-.rule-actions { display: flex; gap: 8px; align-items: center; }
+.rule-header-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+.rule-name {
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: var(--text, #1e293b);
+}
+.rule-badge {
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #e2e8f0;
+    color: #475569;
+    font-weight: 500;
+}
+.rule-badge.cond { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.rule-badge.act { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+
+.rule-desc {
+    font-size: 0.85rem;
+    color: var(--muted, #64748b);
+    line-height: 1.4;
+}
+.rule-meta {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+.rule-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-left: 16px;
+}
+
 .toggle-switch {
-    position: relative; width: 44px; height: 24px;
-    background: var(--border, #cbd5e1); border-radius: 12px; cursor: pointer;
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--border, #cbd5e1);
+    border-radius: 12px;
+    cursor: pointer;
     transition: background 0.2s;
 }
 .toggle-switch.on { background: #22c55e; }
 .toggle-switch::after {
-    content: ''; position: absolute; top: 3px; left: 3px;
-    width: 18px; height: 18px; background: white; border-radius: 50%;
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
     transition: left 0.2s;
     box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
@@ -34,14 +120,25 @@
 
 /* Modal */
 .rule-modal-overlay {
-    display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5); z-index: 1000;
-    justify-content: center; align-items: center;
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
 }
 .rule-modal-overlay.show { display: flex; }
 .rule-modal {
-    background: var(--surface, #ffffff); border-radius: 12px;
-    padding: 24px; width: 500px; max-height: 80vh; overflow-y: auto;
+    background: var(--surface, #ffffff);
+    border-radius: 12px;
+    padding: 24px;
+    width: 540px;
+    max-height: 85vh;
+    overflow-y: auto;
     border: 1px solid var(--border, #dee2e6);
     color: var(--text, #212529);
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
@@ -60,13 +157,30 @@
 
 {% block content %}
 <div class="rules-container">
-    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2>⚡ Otomasyon Kuralları</h2>
-        <button class="btn btn-primary" onclick="openAddRule()">+ Yeni Kural</button>
+    <!-- Autopilot Banner -->
+    <div class="autopilot-banner">
+        <div>
+            <div style="font-weight: 700; font-size: 1.15rem; color: var(--text, #0f172a); margin-bottom: 4px;">
+                🤖 Tinc Autopilot — Sistem Otomasyonu
+            </div>
+            <div style="font-size: 0.85rem; color: var(--muted, #64748b);">
+                Kurallar her 60 saniyede bir otonom olarak denetlenir ve gereken eylemler icra edilir.
+            </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <div class="autopilot-status-badge">
+                <span class="autopilot-dot"></span>
+                <span>Aktif (60s döngü)</span>
+            </div>
+            <button class="btn btn-sm" onclick="runAllRulesNow()" title="Tüm kuralları hemen değerlendir">⚡ Şimdi Değerlendir</button>
+            <button class="btn btn-sm" onclick="loadExampleRules()" title="Hazır şablonları ekle">📦 Şablonlar</button>
+            <button class="btn btn-primary btn-sm" onclick="openAddRule()">+ Yeni Kural</button>
+        </div>
     </div>
 
+    <!-- Kural Listesi -->
     <div id="rules-list">
-        <div style="color: var(--muted); padding: 20px;">Yükleniyor...</div>
+        <div style="color: var(--muted); padding: 20px; text-align: center;">Yükleniyor...</div>
     </div>
 </div>
 
@@ -88,16 +202,18 @@
             <label>Koşul Tipi</label>
             <select id="rule-cond-type" onchange="updateCondFields()">
                 <option value="metric_threshold">Metrik Eşik (CPU, RAM, Disk vb.)</option>
-                <option value="service_down">Servis Düştüğünde</option>
+                <option value="service_down">Servis Düştüğünde (systemd)</option>
+                <option value="time_match">Belirli Saatte (örn: 04:00)</option>
             </select>
         </div>
         <div id="cond-threshold-fields">
             <div class="form-group">
                 <label>Metrik Adı</label>
                 <select id="rule-metric">
-                    <option value="cpu_percent">CPU %</option>
-                    <option value="ram_percent">RAM %</option>
-                    <option value="disk_percent">Disk %</option>
+                    <option value="disk_percent">Disk Kullanımı (%)</option>
+                    <option value="ram_percent">RAM Kullanımı (%)</option>
+                    <option value="cpu_percent">CPU Kullanımı (%)</option>
+                    <option value="swap_percent">Swap Kullanımı (%)</option>
                 </select>
             </div>
             <div class="form-group">
@@ -116,7 +232,13 @@
         <div id="cond-service-fields" style="display:none;">
             <div class="form-group">
                 <label>Servis Adı</label>
-                <input type="text" id="rule-service-name" placeholder="plexmediaserver">
+                <input type="text" id="rule-service-name" placeholder="nginx veya firinna-pos">
+            </div>
+        </div>
+        <div id="cond-time-fields" style="display:none;">
+            <div class="form-group">
+                <label>Çalışma Saati (HH:MM)</label>
+                <input type="text" id="rule-time-val" placeholder="04:00">
             </div>
         </div>
         <div class="form-group">
@@ -125,15 +247,16 @@
                 <option value="restart_service">Servisi Yeniden Başlat</option>
                 <option value="stop_service">Servisi Durdur</option>
                 <option value="start_service">Servisi Başlat</option>
-                <option value="run_commands">Komut Çalıştır</option>
+                <option value="run_commands">Kabuk Komutu Çalıştır</option>
+                <option value="telegram">Telegram Bildirimi Gönder</option>
             </select>
         </div>
         <div class="form-group">
-            <label>Aksiyon Hedefi (servis adı veya komut)</label>
-            <input type="text" id="rule-action-target" placeholder="plexmediaserver veya apt autoremove -y">
+            <label>Aksiyon Hedefi (servis adı, komut veya mesaj)</label>
+            <input type="text" id="rule-action-target" placeholder="nginx veya journalctl --vacuum-time=7d">
         </div>
         <div class="form-group">
-            <label>Cooldown (saniye — tekrar tetiklenmeden önce bekleme)</label>
+            <label>Soğuma Süresi (Cooldown - saniye)</label>
             <input type="number" id="rule-cooldown" value="300">
         </div>
         
@@ -151,39 +274,132 @@ function updateCondFields() {
     const type = document.getElementById('rule-cond-type').value;
     document.getElementById('cond-threshold-fields').style.display = type === 'metric_threshold' ? '' : 'none';
     document.getElementById('cond-service-fields').style.display = type === 'service_down' ? '' : 'none';
+    document.getElementById('cond-time-fields').style.display = type === 'time_match' ? '' : 'none';
+}
+
+function formatCondition(c) {
+    if (!c) return 'Tanımsız';
+    if (c.type === 'metric_threshold') {
+        return `Eşik: ${c.metric} ${c.operator} %${c.value}`;
+    } else if (c.type === 'service_down') {
+        return `Servis Kapalıysa: ${c.service}`;
+    } else if (c.type === 'time_match') {
+        return `Saat: ${c.time}`;
+    }
+    return c.type;
+}
+
+function formatAction(a) {
+    if (!a) return 'Tanımsız';
+    if (a.type === 'restart_service') return `Yeniden Başlat: ${a.service}`;
+    if (a.type === 'stop_service') return `Durdur: ${a.service}`;
+    if (a.type === 'start_service') return `Başlat: ${a.service}`;
+    if (a.type === 'run_commands') return `Komut: ${(a.commands || []).join('; ')}`;
+    if (a.type === 'run_command') return `Komut: ${a.command}`;
+    if (a.type === 'telegram') return `Telegram: ${a.message}`;
+    return a.type;
 }
 
 async function loadRules() {
     try {
-        const r = await fetch('/api/rules');
-        const rules = await r.json();
+        const [rRules, rStatus] = await Promise.all([
+            fetch('/api/rules').then(r => r.json()),
+            fetch('/api/rules/status').then(r => r.json()).catch(() => ({}))
+        ]);
+
+        const rules = rRules || [];
         const container = document.getElementById('rules-list');
-        
+        const triggeredMap = (rStatus && rStatus.last_triggered) ? rStatus.last_triggered : {};
+
         if (rules.length === 0) {
-            container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--muted);">Henüz kural tanımlanmamış.<br>Sağ üstteki "Yeni Kural" butonuyla başlayın.</div>';
+            container.innerHTML = `
+                <div style="text-align:center; padding:50px; background:var(--surface,#fff); border-radius:12px; border:1px dashed var(--border,#cbd5e1);">
+                    <div style="font-size:2rem; margin-bottom:10px;">⚡</div>
+                    <div style="font-weight:600; font-size:1.1rem; margin-bottom:6px;">Henüz kural tanımlanmamış</div>
+                    <div style="color:var(--muted); font-size:0.9rem; margin-bottom:16px;">
+                        Tinc Autopilot sistem sağlığını korumak için hazır kurallarla hemen başlatılabilir.
+                    </div>
+                    <button class="btn btn-primary" onclick="loadExampleRules()">📦 Hazır Şablonları Yükle</button>
+                    <button class="btn" onclick="openAddRule()" style="margin-left:8px;">+ Sıfırdan Kural Ekle</button>
+                </div>`;
             return;
         }
         
-        container.innerHTML = rules.map(r => `
-            <div class="rule-card ${r.enabled ? '' : 'disabled'}">
+        container.innerHTML = rules.map(r => {
+            const condStr = formatCondition(r.condition);
+            const actStr = formatAction(r.action || (r.actions ? r.actions[0] : null));
+            const lastTrig = triggeredMap[r.id] ? `· Son Çalışma: ${triggeredMap[r.id].last_triggered_human}` : '';
+            return `
+            <div class="rule-card ${r.enabled !== false ? '' : 'disabled'}">
                 <div class="rule-info">
-                    <div class="rule-name">${r.name || r.id}</div>
+                    <div class="rule-header-line">
+                        <span class="rule-name">${r.name || r.id}</span>
+                        <span class="rule-badge cond">${condStr}</span>
+                        <span class="rule-badge act">${actStr}</span>
+                    </div>
                     <div class="rule-desc">
-                        Koşul: <strong>${r.condition?.type}</strong> · 
-                        Aksiyon: <strong>${r.action?.type}</strong> · 
-                        Cooldown: ${r.cooldown || 60}s
+                        ${condStr} &nbsp;➜&nbsp; ${actStr}
+                    </div>
+                    <div class="rule-meta">
+                        Cooldown: ${r.cooldown || 300}sn ${lastTrig}
                     </div>
                 </div>
                 <div class="rule-actions">
+                    <button class="btn btn-sm" onclick="runRuleNow('${r.id}')" title="Kuralı anında çalıştır / test et">▶️ Çalıştır</button>
                     <div class="toggle-switch ${r.enabled !== false ? 'on' : ''}" 
-                         onclick="toggleRule('${r.id}', ${r.enabled === false})"></div>
-                    <button class="btn btn-sm" onclick="editRule('${r.id}')">✏️</button>
-                    <button class="btn btn-sm" onclick="deleteRule('${r.id}')" style="color:#ef4444;">🗑️</button>
+                         onclick="toggleRule('${r.id}', ${r.enabled === false})" title="Aç/Kapat"></div>
+                    <button class="btn btn-sm" onclick="editRule('${r.id}')" title="Düzenle">✏️</button>
+                    <button class="btn btn-sm" onclick="deleteRule('${r.id}')" style="color:#ef4444;" title="Sil">🗑️</button>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
     } catch(e) {
-        document.getElementById('rules-list').innerHTML = '<div style="color:red;">Kurallar yüklenemedi: ' + e + '</div>';
+        document.getElementById('rules-list').innerHTML = '<div style="color:red; padding:20px;">Kurallar yüklenemedi: ' + e + '</div>';
+    }
+}
+
+async function runRuleNow(id) {
+    try {
+        const r = await fetch(`/api/rules/${id}/run`, { method: 'POST' });
+        const res = await r.json();
+        if(res.ok) {
+            alert(`✅ '${res.rule}' kuralı başarıyla icra edildi!`);
+            loadRules();
+        } else {
+            alert(`❌ Kural çalıştırma hatası: ${res.error || 'Bilinmeyen hata'}`);
+        }
+    } catch(e) {
+        alert('İşlem hatası: ' + e);
+    }
+}
+
+async function runAllRulesNow() {
+    try {
+        const r = await fetch('/api/rules/run-all', { method: 'POST' });
+        const res = await r.json();
+        alert(res.message || 'Tüm kurallar değerlendirildi.');
+        loadRules();
+    } catch(e) {
+        alert('Hata: ' + e);
+    }
+}
+
+async function loadExampleRules() {
+    if(!confirm("Varsayılan hazır otomasyon şablonları yüklensin mi?")) return;
+    try {
+        const r = await fetch('/api/rules/examples');
+        const examples = await r.json();
+        for(const ex of examples) {
+            await fetch('/api/rules', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(ex)
+            });
+        }
+        alert('✅ Şablon kurallar başarıyla eklendi!');
+        loadRules();
+    } catch(e) {
+        alert('Şablon ekleme hatası: ' + e);
     }
 }
 
@@ -194,7 +410,9 @@ function openAddRule() {
     document.getElementById('rule-id').disabled = false;
     document.getElementById('rule-name').value = '';
     document.getElementById('rule-cooldown').value = '300';
+    document.getElementById('rule-action-target').value = '';
     document.getElementById('ruleModal').classList.add('show');
+    updateCondFields();
 }
 
 function closeModal() {
@@ -211,16 +429,20 @@ async function saveRule() {
     if (condType === 'metric_threshold') {
         condition.metric = document.getElementById('rule-metric').value;
         condition.operator = document.getElementById('rule-operator').value;
-        condition.value = parseFloat(document.getElementById('rule-value').value);
+        condition.value = parseFloat(document.getElementById('rule-value').value) || 0;
     } else if (condType === 'service_down') {
-        condition.service = document.getElementById('rule-service-name').value;
+        condition.service = document.getElementById('rule-service-name').value.trim();
+    } else if (condType === 'time_match') {
+        condition.time = document.getElementById('rule-time-val').value.trim();
     }
     
     const actionType = document.getElementById('rule-action-type').value;
-    const target = document.getElementById('rule-action-target').value;
+    const target = document.getElementById('rule-action-target').value.trim();
     let action = { type: actionType };
     if (actionType === 'run_commands') {
         action.commands = [target];
+    } else if (actionType === 'telegram') {
+        action.message = target;
     } else {
         action.service = target;
     }
@@ -247,16 +469,14 @@ async function deleteRule(id) {
 }
 
 async function toggleRule(id, enable) {
-    await fetch(`/api/rules/${id}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ enabled: enable })
+    await fetch(`/api/rules/${id}/toggle`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
     });
     loadRules();
 }
 
 async function editRule(id) {
-    // Kural verilerini çek ve modal'ı doldur
     const r = await fetch('/api/rules');
     const rules = await r.json();
     const rule = rules.find(r => r.id === id);
@@ -271,15 +491,17 @@ async function editRule(id) {
     updateCondFields();
     
     if (rule.condition?.type === 'metric_threshold') {
-        document.getElementById('rule-metric').value = rule.condition.metric || 'cpu_percent';
+        document.getElementById('rule-metric').value = rule.condition.metric || 'disk_percent';
         document.getElementById('rule-operator').value = rule.condition.operator || '>';
         document.getElementById('rule-value').value = rule.condition.value || '';
     } else if (rule.condition?.type === 'service_down') {
         document.getElementById('rule-service-name').value = rule.condition.service || '';
+    } else if (rule.condition?.type === 'time_match') {
+        document.getElementById('rule-time-val').value = rule.condition.time || '';
     }
     
     document.getElementById('rule-action-type').value = rule.action?.type || 'restart_service';
-    document.getElementById('rule-action-target').value = rule.action?.service || (rule.action?.commands || [''])[0];
+    document.getElementById('rule-action-target').value = rule.action?.service || rule.action?.message || (rule.action?.commands || [''])[0];
     document.getElementById('rule-cooldown').value = rule.cooldown || 300;
     
     document.getElementById('ruleModal').classList.add('show');

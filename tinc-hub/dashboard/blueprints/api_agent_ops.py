@@ -55,7 +55,10 @@ def api_uninstall_stream(app_id):
 
             yield _send_sse({"type": "log", "level": "INFO", "text": f"🛑 Servis otomatik başlatma kapatılıyor (disable)..."})
             p_dis = subprocess.run(["systemctl", "disable", service_name], capture_output=True, text=True)
-            yield _send_sse({"type": "log", "level": "OK", "text": f"✅ {service_name} devre dışı bırakıldı."})
+            if p_dis.returncode == 0:
+                yield _send_sse({"type": "log", "level": "OK", "text": f"✅ {service_name} devre dışı bırakıldı."})
+            else:
+                yield _send_sse({"type": "log", "level": "INFO", "text": f"ℹ️ {service_name} servisi otomatik başlatmada bulunamadı veya yüklü değildi."})
 
         # SEVİYE 3: Kökten Temizleme (Purge)
         if level == "purge":
@@ -78,6 +81,22 @@ def api_uninstall_stream(app_id):
             subprocess.run(["systemctl", "daemon-reload"], capture_output=True, text=True)
             subprocess.run(["systemctl", "reset-failed"], capture_output=True, text=True)
             yield _send_sse({"type": "log", "level": "OK", "text": "✅ Systemd yöneticisi yenilendi."})
+
+            # Snap paket tespiti ve kaldırma (Örn: cctv-viewer)
+            try:
+                snap_candidates = [app_id, f"{app_id}-viewer", f"{app_id}_viewer", service_name]
+                for sc in set(snap_candidates):
+                    if not sc: continue
+                    s_chk = subprocess.run(["snap", "list", sc], capture_output=True, text=True)
+                    if s_chk.returncode == 0 and sc in s_chk.stdout:
+                        yield _send_sse({"type": "log", "level": "INFO", "text": f"📦 Snap paketi tespit edildi ({sc}), sistemden kaldırılıyor..."})
+                        s_rem = subprocess.run(["sudo", "snap", "remove", sc], capture_output=True, text=True)
+                        if s_rem.returncode == 0:
+                            yield _send_sse({"type": "log", "level": "OK", "text": f"✅ Snap paketi ({sc}) sistemden başarıyla kaldırıldı."})
+                        else:
+                            yield _send_sse({"type": "log", "level": "WARN", "text": f"⚠️ Snap kaldırma hatası: {s_rem.stderr.strip()}"})
+            except Exception as ex:
+                yield _send_sse({"type": "log", "level": "WARN", "text": f"Snap kontrol hatası: {ex}"})
 
             # Özel servis temizlikleri
             if app_id == "ollama" or service_name == "ollama":
@@ -127,7 +146,21 @@ def api_task_stream():
         yield _send_sse({"type": "init", "title": title, "total": len(commands)})
         time.sleep(0.1)
 
+        # Tehlikeli komut kalıpları
+        _BLOCKED_PATTERNS = [
+            'mkfs', ':(){', 'dd if=/dev', '> /dev/', 'bash -i',
+            '/dev/tcp', '/dev/udp', 'base64 -d', 'chmod 777',
+            'chmod +s', '/etc/passwd', '/etc/shadow'
+        ]
+
         for i, cmd in enumerate(commands, 1):
+            # Güvenlik kontrolü
+            _cmd_lower = cmd.lower()
+            _blocked = next((p for p in _BLOCKED_PATTERNS if p in _cmd_lower), None)
+            if _blocked:
+                yield _send_sse({"type": "log", "level": "ERROR", "text": f"❌ Güvenlik kısıtlaması: '{_blocked}' kalıbı bu endpoint'te engellidir."})
+                continue
+
             yield _send_sse({"type": "cmd_start", "index": i, "cmd": cmd})
             yield _send_sse({"type": "log", "level": "CMD", "text": f"$ {cmd}"})
 
@@ -212,7 +245,7 @@ def api_port_check(port):
     })
 
 
-# ── 4. TINCOPS AI GÖREV AJANI (DOĞAL DİL -> EYLEM & BASH) ─────────────────────
+# ── 4. TINCOPS KURAL TABANLI OTOMASYON (ANAHTAR KELİME -> EYLEM & BASH) ────────
 @bp.route("/api/ai/agent-task", methods=["POST"])
 @admin_required
 def api_ai_agent_task():
@@ -223,11 +256,15 @@ def api_ai_agent_task():
 
     p_lower = prompt.lower()
 
-    # Akıllı Intent / Kural Motoru (Anlık 0ms gecikme ile %100 güvenilir)
+    # Kural Tabanlı Otomasyon Motoru — anahtar kelime eşleştirmesiyle görev üretir
     # 1. Kaldırma İstekleri
     if any(w in p_lower for w in ["kaldır", "sil", "temizle", "purge", "uninstall", "remove"]):
         target = None
-        for app in ["ollama", "plex", "nginx", "samba", "anydesk", "docker", "cctv", "aprs", "socies"]:
+        # Kayıtlı uygulamalardan id listesini dinamik olarak oluştur
+        _registered_ids = [a.get("id", "") for a in load_apps()]
+        _registered_services = [a.get("service", "") for a in load_apps() if a.get("service")]
+        _all_targets = list(set(_registered_ids + _registered_services + ["nginx", "docker"]))
+        for app in _all_targets:
             if app in p_lower:
                 target = app
                 break
@@ -265,7 +302,46 @@ def api_ai_agent_task():
                     ]
                 })
 
-    # 3. Port Dedektifi / Port Sorgusu
+    # 3.1. Akıllı Uygulama Kurma / Yükleme İstekleri (TincOps Kurulum Motoru)
+    if any(w in p_lower for w in ["kur", "yükle", "install", "getir", "ekle"]):
+        import re
+        # "X uygulamasını kur", "install X", "X kur"
+        clean_text = p_lower
+        for w in ["uygulamayı", "uygulamasını", "programını", "paketini", "lütfen", "hemen", "sisteme", "kur", "yükle", "install", "ekle"]:
+            clean_text = clean_text.replace(w, " ")
+        candidate = clean_text.strip().split()
+        app_target = candidate[0] if candidate else ""
+
+        if app_target:
+            # 1. Özel TincSuite kontrolü (tincsync, tincnet, tincprocess, tnote vb.)
+            if "sync" in app_target or "tincsync" in app_target:
+                return jsonify({
+                    "ok": True,
+                    "title": "TincSync Bulut Motoru Kurulumu",
+                    "explanation": "TincSync servisi systemd altında etkinleştirilecek ve Port 9015 üzerinde çalıştırılacaktır.",
+                    "risk_level": "low",
+                    "commands": [
+                        "systemctl enable --now tincsync",
+                        "systemctl status tincsync --no-pager"
+                    ]
+                })
+
+            # 2. Genel Linux Paket Yöneticisi (APT / Flatpak / Snap)
+            return jsonify({
+                "ok": True,
+                "title": f"'{app_target}' Uygulamasını Sisteme Kurma",
+                "explanation": f"Pardus / Debian depolarından '{app_target}' paketi taranacak ve otomatik kurulacaktır.",
+                "risk_level": "medium",
+                "commands": [
+                    "echo '📦 [TincOps] Paket depoları güncelleniyor...'",
+                    "apt-get update",
+                    f"echo '⬇️ [TincOps] {app_target} kuruluyor...'",
+                    f"DEBIAN_FRONTEND=noninteractive apt-get install -y {app_target}",
+                    f"which {app_target} || echo 'Kurulum tamamlandı.'"
+                ]
+            })
+
+    # 4. Port Dedektifi / Port Sorgusu
     if "port" in p_lower:
         import re
         port_match = re.search(r'\b(90\d\d|\d{2,5})\b', prompt)

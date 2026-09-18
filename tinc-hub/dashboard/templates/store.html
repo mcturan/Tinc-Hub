@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+{% block head %}
+<style>
+.store-container {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 1.5rem 2rem;
+}
+
+.store-header {
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.store-title-wrap h1 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--text, #0f172a);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.store-subtitle {
+    font-size: 0.85rem;
+    color: var(--muted, #64748b);
+    margin-top: 4px;
+}
+
+.store-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 18px;
+}
+
+.store-card {
+    background: var(--surface, #ffffff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.store-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.store-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 12px;
+}
+
+.store-card-icon {
+    width: 48px;
+    height: 48px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.store-card-info h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text, #0f172a);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.store-tag {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    color: #475569;
+    text-transform: uppercase;
+}
+
+.store-card-desc {
+    font-size: 0.85rem;
+    color: var(--muted, #64748b);
+    line-height: 1.5;
+    margin-bottom: 16px;
+    flex: 1;
+}
+
+.store-card-footer {
+    border-top: 1px solid #f1f5f9;
+    padding-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.store-port-tag {
+    font-family: monospace;
+    font-size: 0.75rem;
+    color: #64748b;
+    background: #f8fafc;
+    padding: 3px 6px;
+    border-radius: 4px;
+}
+
+.btn-installed {
+    background: #f1f5f9;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: default;
+}
+
+.btn-install {
+    background: #0f172a;
+    color: #fff;
+    border: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.btn-install:hover {
+    background: #1e293b;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="store-container">
+
+    <div class="store-header">
+        <div class="store-title-wrap">
+            <h1><span>🛒</span> TincStore</h1>
+            <div class="store-subtitle">TincHub ekosistemi için özel geliştirilmiş resmi TincSuite mikroservisleri ve uygulamaları.</div>
+        </div>
+        <div>
+            <button class="btn btn-secondary" onclick="loadStoreData()">⚡ Yenile</button>
+        </div>
+    </div>
+
+    <div class="store-grid" id="storeAppsGrid">
+        <div style="grid-column: 1/-1; text-align:center; padding: 40px; color:#64748b;">Mağaza taranıyor...</div>
+    </div>
+
+</div>
+
+<script>
+async function loadStoreData() {
+    const grid = document.getElementById('storeAppsGrid');
+    grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:#64748b;">Yükleniyor...</div>';
+    
+    try {
+        const r = await fetch('/api/store');
+        const apps = await r.json();
+        
+        if (!apps || apps.length === 0) {
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:#64748b;">Mağazada uygulama bulunamadı.</div>';
+            return;
+        }
+        
+        grid.innerHTML = '';
+        apps.forEach(app => {
+            const card = document.createElement('div');
+            card.className = 'store-card';
+            
+            let btnHtml = app.is_installed 
+                ? `<span class="btn-installed">✓ Yüklü</span>`
+                : `<button class="btn-install" onclick="installApp('${app.id}', '${app.name}')">⬇️ Ekle / Kur</button>`;
+                
+            card.innerHTML = `
+                <div>
+                    <div class="store-card-header">
+                        <div class="store-card-icon">${app.icon || '📦'}</div>
+                        <div class="store-card-info">
+                            <h3>${app.name}</h3>
+                            <span class="store-tag">${app.category || 'Servis'}</span>
+                        </div>
+                    </div>
+                    <div class="store-card-desc">${app.description || ''}</div>
+                </div>
+                <div class="store-card-footer">
+                    <span class="store-port-tag">${app.port ? 'Port :' + app.port : 'Dahili'}</span>
+                    ${btnHtml}
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    } catch(e) {
+        grid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; padding: 40px; color:#dc2626;">Hata: ${e}</div>`;
+    }
+}
+
+async function installApp(appId, appName) {
+    if (!confirm(`${appName} uygulamasını TincHub paneline eklemek istiyor musunuz?`)) return;
+    try {
+        const r = await fetch('/api/store/install', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id: appId})
+        });
+        const res = await r.json();
+        if (res.ok) {
+            alert(res.message || `${appName} başarıyla eklendi!`);
+            loadStoreData();
+        } else {
+            alert('Hata: ' + (res.error || 'Eklenemedi'));
+        }
+    } catch(e) {
+        alert('İstek hatası: ' + e);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadStoreData);
+</script>
+{% endblock %}
