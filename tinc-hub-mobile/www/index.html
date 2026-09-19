@@ -553,7 +553,7 @@
                 <div class="kpi-card" onclick="openSettingsView()">
                     <div class="kpi-icon-badge green">⚙️</div>
                     <div class="kpi-info">
-                        <span class="kpi-val">v1.8.4</span>
+                        <span class="kpi-val">v1.8.5</span>
                         <span class="kpi-label">Sürüm & Ayarlar</span>
                     </div>
                 </div>
@@ -816,7 +816,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <div style="font-weight:700; font-size:0.95rem;">Uygulama Sürümü</div>
-                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.8.4</div>
+                        <div style="font-size:0.8rem; color:var(--muted);" id="app-version-label">v1.8.5</div>
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="window.appUpdater.checkForUpdates(false)">
                         🔍 Güncelleme Ara
@@ -1622,15 +1622,22 @@
 
     <!-- Modal: Mobil Zihin Ağı Grafiği (Graph View) -->
     <div id="modal-mobile-graph-view" class="modal-overlay">
-        <div class="modal-card" style="max-width:96%; width:96%; height:82vh; display:flex; flex-direction:column; padding:12px;">
-            <div class="modal-header" style="margin-bottom:8px;">
-                <h3 class="modal-title">🕸️ Zihin Ağı Grafiği</h3>
+        <div class="modal-card" style="max-width:96%; width:96%; height:84vh; display:flex; flex-direction:column; padding:12px;">
+            <div class="modal-header" style="margin-bottom:6px;">
+                <div>
+                    <h3 class="modal-title" style="display:flex; align-items:center; gap:6px;">
+                        <span>🕸️</span> Zihin Ağı Grafiği
+                    </h3>
+                    <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">
+                        Notlarınız ve bağlantılarınızı gösteren zihin haritası. Açmak istediğiniz nota dokunun.
+                    </div>
+                </div>
                 <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-mobile-graph-view')">✕</button>
             </div>
-            <div style="flex:1; position:relative; overflow:hidden; background:var(--bg-main, #0f172a); border-radius:8px;">
+            <div style="flex:1; position:relative; overflow:hidden; background:var(--bg-main, #0f172a); border-radius:8px; border:1px solid var(--border, #334155);">
                 <canvas id="m-graph-canvas" style="width:100%; height:100%; display:block;"></canvas>
-                <div style="position:absolute; bottom:8px; left:8px; font-size:0.7rem; color:var(--muted); background:rgba(0,0,0,0.5); padding:2px 8px; border-radius:4px; pointer-events:none;">
-                    Nota gitmek için dokunun
+                <div style="position:absolute; bottom:8px; left:8px; font-size:0.7rem; color:#94a3b8; background:rgba(15,23,42,0.75); padding:3px 8px; border-radius:4px; pointer-events:none; border:1px solid rgba(255,255,255,0.1);">
+                    💡 İpucu: Notların içine [[Sayfa Adı]] yazarak sayfaları bağlayabilirsiniz
                 </div>
             </div>
         </div>

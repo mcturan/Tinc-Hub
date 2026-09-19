@@ -180,11 +180,11 @@ function initSidebarDragAndDrop() {
 
             holdTimer = setTimeout(() => {
                 isLongPress = true;
-                window._suppressWebClickUntil = Date.now() + 600;
-                if (navigator.vibrate) try { navigator.vibrate([50, 40, 50]); } catch(err) {}
+                window._suppressWebClickUntil = Date.now() + 400;
+                if (navigator.vibrate) try { navigator.vibrate([40, 30, 40]); } catch(err) {}
                 item.classList.add('android-lifted-item');
                 item.setAttribute('draggable', 'true');
-            }, 1500);
+            }, 500);
         };
 
         const onHoldMove = (e) => {
@@ -389,11 +389,11 @@ function initSidebarDragAndDrop() {
 
             holdTimer = setTimeout(() => {
                 isLongPress = true;
-                window._suppressWebClickUntil = Date.now() + 600;
-                if (navigator.vibrate) try { navigator.vibrate([50, 40, 50]); } catch(err) {}
+                window._suppressWebClickUntil = Date.now() + 400;
+                if (navigator.vibrate) try { navigator.vibrate([40, 30, 40]); } catch(err) {}
                 group.classList.add('android-lifted-item');
                 group.setAttribute('draggable', 'true');
-            }, 1500);
+            }, 500);
         };
 
         const onHoldMove = (e) => {
@@ -1809,11 +1809,11 @@ function renderChecklist() {
 
             holdTimer = setTimeout(() => {
                 isLongPress = true;
-                window._suppressWebClickUntil = Date.now() + 600;
-                if (navigator.vibrate) try { navigator.vibrate([50, 40, 50]); } catch(err) {}
+                window._suppressWebClickUntil = Date.now() + 400;
+                if (navigator.vibrate) try { navigator.vibrate([40, 30, 40]); } catch(err) {}
                 li.classList.add('android-lifted-item');
                 li.setAttribute('draggable', 'true');
-            }, 1500);
+            }, 500);
         };
 
         const onHoldMove = (e) => {

@@ -1247,18 +1247,18 @@ function attachLongPressDragHandler(element, onActivate) {
 
         holdTimer = setTimeout(() => {
             isFired = true;
-            window._suppressClickUntil = Date.now() + 600;
+            window._suppressClickUntil = Date.now() + 400;
             if (navigator.vibrate) {
-                try { navigator.vibrate([50, 40, 50]); } catch(err) {}
+                try { navigator.vibrate([40, 30, 40]); } catch(err) {}
             }
             onActivate(element, pt.clientX, pt.clientY);
-        }, 1500); // Tam 1.5 saniye
+        }, 500); // Android launcher tarzı hızlı basılı tutma (500ms)
     };
 
     const onMove = (e) => {
         if (isFired) return;
         const pt = e.touches ? e.touches[0] : e;
-        if (Math.hypot(pt.clientX - startX, pt.clientY - startY) > 8) {
+        if (Math.hypot(pt.clientX - startX, pt.clientY - startY) > 10) {
             clearTimeout(holdTimer);
         }
     };
@@ -3091,18 +3091,28 @@ async function renderOverview() {
         if (pendingItems.length === 0) {
             taskListEl.innerHTML = `<div class="empty-hint">Bekleyen yapılacak görev yok ✨</div>`;
         } else {
-            taskListEl.innerHTML = pendingItems.slice(0, 8).map(it => {
+            const pageMap = {};
+            activePages.forEach(p => { pageMap[p.id] = p; });
+
+            taskListEl.innerHTML = pendingItems.slice(0, 10).map(it => {
+                const targetPage = pageMap[it.page_id];
+                const pageTitle = targetPage ? targetPage.title : '';
+                const clickAction = it.page_id ? `openPage(${it.page_id})` : `openQuickTasksView()`;
+
                 return `
-                <div class="overview-item" style="cursor:pointer;" onclick="openEditItemModal(${it.id}, null, false)">
+                <div class="overview-item" style="cursor:pointer;" onclick="${clickAction}" title="${pageTitle ? escapeHtml(pageTitle) + ' listesine git' : 'Listeye git'}">
                     <div style="display:flex; align-items:center; gap:10px; overflow:hidden; flex:1;">
                         <div class="checkbox-custom ${it.is_done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleOverviewItemDone(${it.id})">
                             ${it.is_done ? '✓' : ''}
                         </div>
-                        <div style="overflow:hidden; display:flex; flex-direction:column; gap:1px;">
+                        <div style="overflow:hidden; display:flex; flex-direction:column; gap:2px;">
                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; font-size:0.9rem; ${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
                                 ${escapeHtml(it.title)}
                             </span>
-                            ${it.remind_at ? `<span style="font-size:0.72rem; color:#7c3aed; font-weight:600;">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span>` : ''}
+                            <div style="display:flex; align-items:center; gap:6px; font-size:0.72rem;">
+                                ${pageTitle ? `<span style="color:var(--primary); font-weight:600;">📁 ${escapeHtml(pageTitle)}</span>` : ''}
+                                ${it.remind_at ? `<span style="color:#7c3aed; font-weight:600;">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span>` : ''}
+                            </div>
                         </div>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
@@ -5471,26 +5481,26 @@ async function openMobileGraphView() {
         }
 
         // Çevrimdışı / Yerel Depolama yedeği
-        if (!graphData && window.appStorage) {
-            const pages = await window.appStorage.getAllPages();
+        if ((!graphData || !graphData.nodes || graphData.nodes.length === 0) && window.appStorage) {
+            const pages = await window.appStorage.getAll('pages');
+            const activePages = (pages || []).filter(p => !p._deleted && !p.is_archived);
             const nodes = [];
             const edges = [];
             const titleToId = {};
-            for (const p of pages) {
-                if (p.is_archived) continue;
+            for (const p of activePages) {
                 titleToId[(p.title || '').trim().toLowerCase()] = p.id;
                 nodes.push({
                     id: p.id,
                     label: p.title || 'İsimsiz',
                     icon: p.icon || '📝',
                     type: p.type || 'notes',
-                    color: p.color || '#3b82f6'
+                    color: p.color || (p.type === 'checklist' ? '#10b981' : p.type === 'finance' ? '#f59e0b' : '#3b82f6')
                 });
             }
             const linkPattern = /\[\[(.*?)\]\]/g;
             const seen = new Set();
-            for (const p of pages) {
-                const content = p.content || '';
+            for (const p of activePages) {
+                const content = (p.content || '') + ' ' + (p.title || '');
                 let m;
                 while ((m = linkPattern.exec(content)) !== null) {
                     const targetId = titleToId[(m[1] || '').trim().toLowerCase()];
@@ -5506,14 +5516,19 @@ async function openMobileGraphView() {
             graphData = { nodes, links: edges, edges };
         }
 
-        if (graphData) {
-            renderMobileGraphCanvas(graphData);
+        if (graphData && graphData.nodes) {
+            // Modalın DOM'da tam açılması ve boyutlanması için kısa gecikme
+            setTimeout(() => {
+                renderMobileGraphCanvas(graphData);
+            }, 100);
         } else {
-            showMobileToast('Zihin grafiği verisi bulunamadı.');
+            setTimeout(() => {
+                renderMobileGraphCanvas({ nodes: [], links: [] });
+            }, 100);
         }
     } catch (e) {
         console.error('Graf yükleme hatası:', e);
-        showMobileToast('Graf verisi açılamadı: ' + e.message);
+        showMobileToast('Zihin grafiği açılamadı: ' + e.message);
     }
 }
 
@@ -5522,7 +5537,8 @@ function renderMobileGraphCanvas(graph) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    const pRect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : null;
+    const container = canvas.parentElement;
+    const pRect = container ? container.getBoundingClientRect() : null;
     canvas.width = (pRect && pRect.width > 50) ? Math.floor(pRect.width) : Math.floor(window.innerWidth * 0.9);
     canvas.height = (pRect && pRect.height > 50) ? Math.floor(pRect.height) : Math.floor(window.innerHeight * 0.65);
     const width = canvas.width;
@@ -5533,13 +5549,14 @@ function renderMobileGraphCanvas(graph) {
 
     if (rawNodes.length === 0) {
         ctx.clearRect(0, 0, width, height);
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#f1f5f9';
+        ctx.font = 'bold 14px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('🕸️ Henüz Zihin Ağında sayfa bulunmuyor.', width / 2, height / 2 - 10);
-        ctx.font = '11px sans-serif';
-        ctx.fillStyle = '#64748b';
-        ctx.fillText('Notlarınıza [[Sayfa Başlığı]] bağlantıları ekleyebilirsiniz.', width / 2, height / 2 + 15);
+        ctx.fillText('🕸️ Henüz sayfa veya not bulunmuyor', width / 2, height / 2 - 14);
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText('Sayfa ekledikçe burada zihin ağı oluşur.', width / 2, height / 2 + 12);
+        ctx.fillText('Notlarınıza [[Sayfa Adı]] yazarak sayfaları birbirine bağlayabilirsiniz.', width / 2, height / 2 + 32);
         return;
     }
 
