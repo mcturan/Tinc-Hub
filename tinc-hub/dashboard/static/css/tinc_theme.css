@@ -26,8 +26,8 @@
   --tinc-primary-soft: #f0f9ff;
   
   /* ── Durum Göstergeleri (Sakin, kurumsal tonlar) ── */
-  --tinc-success:      #0284c7;
-  --tinc-success-soft: #f0f9ff;
+  --tinc-success:      #10b981;
+  --tinc-success-soft: #ecfdf5;
   --tinc-warning:      #f59e0b;
   --tinc-warning-soft: #fffbeb;
   --tinc-danger:       #ef4444;

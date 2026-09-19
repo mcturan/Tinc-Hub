@@ -1051,7 +1051,7 @@ async function runSystemAudit() {
 
 // ── CasaOS Kart & Menü Yönetimi ──
 function handleCardClick(e, url, appId) {
-    if (e.target.closest('.casa-app-top') || e.target.closest('.casa-dropdown-menu')) return;
+    if (e.target.closest('.compact-app-right') || e.target.closest('.casa-dropdown-menu') || e.target.closest('.compact-menu-btn') || e.target.closest('.compact-action-btn') || e.target.closest('.casa-app-top')) return;
     if (appId === 'amfi-ses') {
         serviceAction(appId, 'toggle');
         return;

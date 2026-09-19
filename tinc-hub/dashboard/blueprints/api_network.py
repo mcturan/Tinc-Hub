@@ -309,10 +309,50 @@ def get_local_traffic():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
+def _validate_ssh_target(ip, user):
+    import ipaddress
+    ip_clean = (ip or '').strip()
+    user_clean = (user or '').strip()
+    try:
+        ipaddress.ip_address(ip_clean)
+    except ValueError:
+        if not re.match(r'^[a-zA-Z0-9.-]{1,253}$', ip_clean):
+            raise ValueError("Geçersiz IP adresi veya ana makine adı")
+    if not re.match(r'^[a-zA-Z0-9._-]{1,64}$', user_clean):
+        raise ValueError("Geçersiz kullanıcı adı formatı")
+    return ip_clean, user_clean
+
+def _run_ssh_safe(ip, user, pw, remote_cmd, output_file=None, is_async=False):
+    ip_clean, user_clean = _validate_ssh_target(ip, user)
+    env = os.environ.copy()
+    env["SSHPASS"] = pw or ""
+    cmd = [
+        "sshpass", "-e", "ssh",
+        "-o", "StrictHostKeyChecking=no",
+        "-o", "UserKnownHostsFile=/dev/null",
+        "-o", "ConnectTimeout=5",
+        f"{user_clean}@{ip_clean}",
+        remote_cmd
+    ]
+    if is_async:
+        subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True, "Reboot komutu gönderildi"
+    
+    if output_file:
+        with open(output_file, "wb") as out_f:
+            r = subprocess.run(cmd, env=env, stdout=out_f, stderr=subprocess.PIPE, timeout=10)
+    else:
+        r = subprocess.run(cmd, env=env, capture_output=True, timeout=10)
+        
+    if r.returncode == 0:
+        return True, "Başarılı"
+    err = r.stderr.decode('utf-8', errors='replace') if r.stderr else 'SSH bağlantı hatası'
+    return False, err
+
 @bp.route('/backup', methods=['POST'])
 @auth_required
 def perform_backup():
-    req = request.json
+    req = request.json or {}
     ip = req.get('ip')
     user = req.get('username') or 'root'
     pw = req.get('password') or ''
@@ -323,22 +363,19 @@ def perform_backup():
         
     backup_dir = "/opt/tinc-hub/shared/backups"
     os.makedirs(backup_dir, exist_ok=True)
-    filename = f"{backup_dir}/{ip}_{time.strftime('%Y%m%d_%H%M%S')}.cfg"
+    filename = f"{backup_dir}/{re.sub(r'[^a-zA-Z0-9._-]', '_', str(ip))}_{time.strftime('%Y%m%d_%H%M%S')}.cfg"
     
-    cmd = ""
-    if device_type == 'router' or device_type == 'switch':
-        # Simulated backup for cisco/mikrotik
-        cmd = f"sshpass -p '{pw}' ssh -o StrictHostKeyChecking=no {user}@{ip} 'show running-config' > {filename}"
+    if device_type in ('router', 'switch'):
+        remote_cmd = 'show running-config'
     else:
-        # Linux / generic
-        cmd = f"sshpass -p '{pw}' ssh -o StrictHostKeyChecking=no {user}@{ip} 'cat /etc/network/interfaces || cat /etc/netplan/*.yaml || ip a' > {filename}"
+        remote_cmd = 'cat /etc/network/interfaces || cat /etc/netplan/*.yaml || ip a'
         
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, timeout=10)
-        if r.returncode == 0:
+        ok, msg = _run_ssh_safe(ip, user, pw, remote_cmd, output_file=filename)
+        if ok:
             return jsonify({"success": True, "message": f"Backup saved to {filename}"})
         else:
-            return jsonify({"success": False, "error": r.stderr.decode('utf-8') or 'Unknown SSH error'})
+            return jsonify({"success": False, "error": msg})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
@@ -358,7 +395,7 @@ def get_wireshark_stats():
 @bp.route('/reboot', methods=['POST'])
 @auth_required
 def perform_reboot():
-    req = request.json
+    req = request.json or {}
     ip = req.get('ip')
     user = req.get('username') or 'root'
     pw = req.get('password') or ''
@@ -369,18 +406,14 @@ def perform_reboot():
     if not pw:
         return jsonify({"success": False, "error": "Cihaz şifresi girilmemiş!"})
         
-    cmd = ""
-    # Mikrotik or Cisco might need different commands, but generally 'reboot' works for Linux/OpenWrt
-    if device_type == 'router' or device_type == 'switch':
-        cmd = f"sshpass -p '{pw}' ssh -o StrictHostKeyChecking=no {user}@{ip} 'reboot || /system reboot' "
+    if device_type in ('router', 'switch'):
+        remote_cmd = 'reboot || /system reboot'
     else:
-        cmd = f"sshpass -p '{pw}' ssh -o StrictHostKeyChecking=no {user}@{ip} 'sudo reboot || reboot'"
+        remote_cmd = 'sudo reboot || reboot'
         
     try:
-        # Popen without waiting since SSH connection will drop on reboot
-        import subprocess
-        subprocess.Popen(cmd, shell=True)
-        return jsonify({"success": True, "message": "Reboot komutu gönderildi"})
+        ok, msg = _run_ssh_safe(ip, user, pw, remote_cmd, is_async=True)
+        return jsonify({"success": ok, "message": msg})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 

@@ -3,15 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giriş - Tinc Hub</title>
+    <title>Giriş — TincHub OS</title>
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg?v=5">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png?v=5">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/img/favicon-16x16.png?v=5">
+    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png?v=5">
+    <link rel="stylesheet" href="/static/css/tinc_theme.css">
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .login-wrap {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8fafc;
+            padding: 20px;
+        }
+        .login-box {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 32px 28px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        }
+        .login-brand {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .login-brand img {
+            height: 38px;
+            width: auto;
+            max-width: 180px;
+            object-fit: contain;
+            margin-bottom: 8px;
+        }
+        .login-brand-subtitle {
+            font-size: 0.8rem;
+            color: #64748b;
+            font-weight: 500;
+        }
+        .error-msg {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #ef4444;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-bottom: 18px;
+            text-align: center;
+        }
+        .form-group label {
+            display: block;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 6px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: #ffffff;
+            color: #0f172a;
+            box-sizing: border-box;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #0284c7;
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 11px;
+            background: #0284c7;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+        }
+        .btn-submit:hover {
+            background: #0369a1;
+        }
+        .btn-submit:active {
+            transform: scale(0.99);
+        }
+        .login-footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #94a3b8;
+        }
+    </style>
 </head>
 <body>
     <div class="login-wrap">
         <div class="login-box">
-            <div class="login-logo">
-                <span class="logo-icon">⚙</span>
-                <strong>TINC</strong> Hub
+            <div class="login-brand">
+                <img src="/static/img/tinchub_logo.svg?v=5" alt="TincHub">
+                <div class="login-brand-subtitle">Merkezi Sistem Yönetim Paneli</div>
             </div>
             
             {% if error %}
@@ -20,17 +117,21 @@
             
             <form method="POST" action="">
                 <div class="form-group">
-                    <label>Kullanıcı Adı</label>
-                    <input type="text" name="username" required autofocus placeholder="Kullanıcı adınız...">
+                    <label>Kullanıcı Adı, E-posta veya TincID</label>
+                    <input type="text" name="username" required autofocus placeholder="admin veya kullanıcı adınız...">
                 </div>
-                <div class="form-group" style="margin-top:15px;">
+                <div class="form-group" style="margin-top: 14px;">
                     <label>Şifre</label>
                     <input type="password" name="password" required placeholder="Şifrenizi girin...">
                 </div>
-                <div style="margin-top: 20px;">
-                    <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 0.95rem; padding: 10px;">Giriş Yap</button>
+                <div style="margin-top: 22px;">
+                    <button type="submit" class="btn-submit">Giriş Yap</button>
                 </div>
             </form>
+            
+            <div class="login-footer">
+                TincSuite Unified OS &copy; 2026
+            </div>
         </div>
     </div>
 </body>

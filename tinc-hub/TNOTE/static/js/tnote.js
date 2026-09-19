@@ -2581,7 +2581,21 @@ async function submitEditCategory() {
     const data = await res.json();
     if (data.ok) {
         closeModal('modal-edit-category');
-        window.location.reload();
+        const catHeader = document.getElementById(`cat-header-${catId}`);
+        const catGroup = document.getElementById(`cat-group-${catId}`);
+        if (catHeader) {
+            const titleText = catHeader.querySelector('.category-title-text');
+            if (titleText) {
+                titleText.textContent = name;
+                titleText.title = name;
+            }
+            const iconSpan = catHeader.querySelector('span[style*="font-size:0.95rem"]');
+            if (iconSpan) iconSpan.textContent = icon || '📁';
+        }
+        if (catGroup && color) {
+            catGroup.style.borderLeftColor = color;
+        }
+        if (typeof showToast === 'function') showToast('Dosya başarıyla güncellendi');
     }
 }
 
@@ -2590,10 +2604,18 @@ async function deleteCategory(catId, name) {
         'Bu ayracı silmek istediğinize emin misiniz?' : 
         `"${name}" dosyasını ve içindeki tüm sayfaları silmek istediğinize emin misiniz?`;
     if (!confirm(confirmMsg)) return;
-    const res = await fetch(`/notes/api/categories/${catId}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.ok) {
-        window.location.reload();
+    try {
+        const res = await fetch(`/notes/api/categories/${catId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.ok) {
+            const el = document.getElementById(`cat-group-${catId}`);
+            if (el) el.remove();
+            if (typeof showToast === 'function') showToast('Dosya başarıyla silindi');
+        } else {
+            alert(data.error || 'Silme işlemi başarısız');
+        }
+    } catch (e) {
+        console.error("deleteCategory error:", e);
     }
 }
 

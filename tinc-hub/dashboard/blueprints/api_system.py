@@ -321,7 +321,7 @@ import shutil
 from pathlib import Path
 
 @bp.route("/api/system/backup", methods=["GET"])
-@auth_required
+@admin_required
 def api_system_backup():
     """Tüm TincHub durumunu (apps.yaml, configs, DB'ler, ayarlar) .thub.tar.gz olarak paketler."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

@@ -10,6 +10,31 @@ from .config import DB_PATH, DATA_DIR, SECRET_KEY
 
 _lock = threading.Lock()
 _vault_cipher = None
+_legacy_cipher = None
+
+def _get_machine_identifier() -> str:
+    for path in ["/etc/machine-id", "/var/lib/dbus/machine-id"]:
+        if os.path.exists(path):
+            try:
+                with open(path, "r") as f:
+                    mid = f.read().strip()
+                    if mid:
+                        return mid
+            except Exception:
+                pass
+    return "tinc-unique-machine-seed-fallback"
+
+def _get_legacy_cipher():
+    global _legacy_cipher
+    if _legacy_cipher is None:
+        try:
+            from cryptography.fernet import Fernet
+            derived = hashlib.sha256((SECRET_KEY + "_tnote_vault_salt_2026").encode()).digest()
+            key = base64.urlsafe_b64encode(derived)
+            _legacy_cipher = Fernet(key)
+        except Exception:
+            _legacy_cipher = None
+    return _legacy_cipher
 
 def _get_vault_cipher():
     global _vault_cipher
@@ -17,15 +42,36 @@ def _get_vault_cipher():
         try:
             from cryptography.fernet import Fernet
             key_file = os.path.join(DATA_DIR, "vault.key")
+            salt_file = os.path.join(DATA_DIR, "vault.salt")
+            
             if os.path.exists(key_file):
                 with open(key_file, "rb") as f:
                     key = f.read().strip()
             else:
-                derived = hashlib.sha256((SECRET_KEY + "_tnote_vault_salt_2026").encode()).digest()
+                # 16-byte cryptographically secure random salt
+                if os.path.exists(salt_file):
+                    with open(salt_file, "rb") as sf:
+                        salt = sf.read().strip()
+                else:
+                    salt = os.urandom(16)
+                    try:
+                        with open(salt_file, "wb") as sf:
+                            sf.write(salt)
+                        os.chmod(salt_file, 0o600)
+                    except Exception:
+                        pass
+                
+                # Combine secret key with unique host machine id
+                machine_id = _get_machine_identifier()
+                seed = f"{SECRET_KEY}_{machine_id}_tinc_vault_v2"
+                
+                # PBKDF2-HMAC-SHA256 with 100,000 iterations
+                derived = hashlib.pbkdf2_hmac('sha256', seed.encode('utf-8'), salt, 100000, dklen=32)
                 key = base64.urlsafe_b64encode(derived)
                 try:
                     with open(key_file, "wb") as f:
                         f.write(key)
+                    os.chmod(key_file, 0o600)
                 except Exception:
                     pass
             _vault_cipher = Fernet(key)
@@ -50,14 +96,27 @@ def decrypt_vault_secret(cipher_text: str) -> str:
         return ""
     if not str(cipher_text).startswith("enc::"):
         return str(cipher_text)
+    
+    raw_token = cipher_text[5:].encode('utf-8')
     cipher = _get_vault_cipher()
-    if not cipher:
-        return str(cipher_text)
-    try:
-        raw_token = cipher_text[5:].encode('utf-8')
-        return cipher.decrypt(raw_token).decode('utf-8')
-    except Exception:
-        return "[Şifre Çözülemedi]"
+    
+    # 1. Try primary modern PBKDF2 cipher
+    if cipher:
+        try:
+            return cipher.decrypt(raw_token).decode('utf-8')
+        except Exception:
+            pass
+            
+    # 2. Try legacy single-SHA256 cipher fallback for existing encrypted items
+    legacy = _get_legacy_cipher()
+    if legacy:
+        try:
+            decrypted = legacy.decrypt(raw_token).decode('utf-8')
+            return decrypted
+        except Exception:
+            pass
+            
+    return "[Şifre Çözülemedi]"
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH, timeout=30.0, check_same_thread=False)
@@ -3193,8 +3252,7 @@ def register_user(username, password, display_name="", email="", role=None):
         },
         "token": token,
         "tinc_id": tinc_id,
-        "verification_required": (is_verified == 0),
-        "verification_code_demo": verification_code # E-posta servisi bağlı değilse kolay test için
+        "verification_required": (is_verified == 0)
     }
 
 def login_user(username_or_email, password):

@@ -1,0 +1,17 @@
+[Unit]
+Description=TincNote — Notes, Lists, Finance & Mobile Sync (port 9013)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/tinc-hub/TNOTE
+EnvironmentFile=-/etc/tinc-hub/config.env
+ExecStart=/opt/tinc-hub/venv/bin/python /opt/tinc-hub/TNOTE/app.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/tincnote.log
+StandardError=append:/var/log/tincnote.log
+
+[Install]
+WantedBy=multi-user.target
