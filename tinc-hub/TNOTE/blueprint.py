@@ -2141,26 +2141,25 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.8.7",
-        "versionCode": 187,
+        "version": "1.8.8",
+        "versionCode": 188,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.8.7:\n- Görevlere veya notlara dokunulduğunda doğrudan tam detay ve düzenleme modalı açılması sağlandı (Miktar, Fiyat, URL, Açıklama, Hatırlatıcı / Alarm).\n- Özet sayfasında görev başlığına %100 genişlik verildi; sayfa adı ve rozetler alt satıra alındı, gereksiz kalem/saat butonları temizlendi.\n- Mobil uygulamada modal açılmasını engelleyen DOM kapanış etiketi düzeltildi."
+        "notes": "v1.8.8:\n- Web arayüzünde hızlı not ve yapay zeka modallarını hapseden DOM kapanış hatası giderildi.\n- Mobilde görev güncellemelerinde miktar, fiyat, URL ve alarm senkronizasyonu tam güvenceye alındı.\n- Çift kademeli anlık hafif patch (Fast Patch) mimarisine geçildi; not yazarken tam senkronizasyon darboğazı ve veri yarışı çözüldü.\n- Mobil alt çubuk orta ekleme butonu CSS gradyanı ve üst bar başlık sığma alanı ferahlatıldı.\n- Mükerrer kategoriler ve çoklu hızlı görev sayfaları tekilleştirilerek temizlendi."
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
+        "/home/turan/Masaüstü/TincNote-v1.8.8.apk",
+        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.8.apk",
         "/home/turan/Masaüstü/TincNote-v1.8.7.apk",
-        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.7.apk",
-        "/home/turan/Masaüstü/TincNote-v1.8.6.apk",
-        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.6.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/release/app-release.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.7.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.8.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -90,7 +90,7 @@
                 <button class="btn-icon-subtle btn-danger-hover cat-divider-del-btn" onclick="deleteCategory({{ cat.id }}, 'Ayraç')" title="Ayracı Sil">✕</button>
             </div>
             {% else %}
-            <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}" draggable="true" style="border-left: 3.5px solid {{ cat.color or '#3b82f6' }};">
+            <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}" draggable="true" style="border-left: 3px solid {{ cat.color or '#3b82f6' }}; padding-left: 3px;">
                 <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" title="{{ cat.name }}" onclick="toggleCategoryGroup({{ cat.id }})">
                     <div class="category-title-area">
                         <span class="cat-chevron" id="cat-chevron-{{ cat.id }}">▾</span>
@@ -2128,6 +2128,8 @@
             {% endif %}
         </div>
     </div>
+</div>
+
 <!-- Modal: Hızlı Not Detayı -->
 <div class="tnote-modal-backdrop" id="modal-quicknote-detail">
     <div class="tnote-modal" style="max-width:480px;">

@@ -3138,9 +3138,9 @@ def add_quick_task(title: str, notebook_id: int = None):
         cur.execute("""
             SELECT id FROM categories
             WHERE notebook_id = ? AND (
-                LOWER(name) LIKE '%hızlı%' OR LOWER(name) LIKE '%hizli%'
+                name LIKE '%Hızlı%' OR name LIKE '%hızlı%' OR name LIKE '%Hizli%' OR name LIKE '%hizli%'
             )
-            LIMIT 1
+            ORDER BY id ASC LIMIT 1
         """, (nb_id,))
         cat_row = cur.fetchone()
         if cat_row:
@@ -3156,11 +3156,15 @@ def add_quick_task(title: str, notebook_id: int = None):
         cur.execute("""
             SELECT id FROM pages
             WHERE category_id = ? AND (
-                LOWER(title) LIKE '%hızlı%' OR LOWER(title) LIKE '%hizli%'
+                title LIKE '%Hızlı%' OR title LIKE '%hızlı%' OR title LIKE '%Hizli%' OR title LIKE '%hizli%'
             )
-            LIMIT 1
+            ORDER BY id ASC LIMIT 1
         """, (cat_id,))
         page_row = cur.fetchone()
+        if not page_row:
+            cur.execute("SELECT id FROM pages WHERE category_id = ? ORDER BY id ASC LIMIT 1", (cat_id,))
+            page_row = cur.fetchone()
+
         if page_row:
             page_id = page_row[0]
         else:

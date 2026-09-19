@@ -810,7 +810,11 @@ async function submitEditItem() {
     } else if (activePageId) {
         await renderChecklistItems(activePageId);
     }
-    if (window.appSync) window.appSync.syncNow();
+    if (window.appSync && item) {
+        window.appSync.fastPatchItem(item);
+    } else if (window.appSync) {
+        window.appSync.syncNow();
+    }
     showMobileToast('Görev güncellendi ✓');
 }
 
@@ -2143,7 +2147,9 @@ async function autoSaveCurrentNote(content, immediate = false) {
         if (page) {
             page.content = content;
             await window.appStorage.savePage(page);
-            window.appSync.syncNow();
+            if (window.appSync) {
+                window.appSync.fastPatchNote(activePageId, content);
+            }
         }
     };
     if (immediate) {

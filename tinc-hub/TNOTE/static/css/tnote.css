@@ -651,7 +651,7 @@ body, .tnote-container, input, textarea, select, button {
 
 .category-group {
     margin-bottom: 7px;
-    border-radius: 6px;
+    border-radius: 0 6px 6px 0;
     overflow: hidden;
     transition: background 0.15s, box-shadow 0.15s;
     background: rgba(255, 255, 255, 0.4);

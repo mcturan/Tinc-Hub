@@ -7,6 +7,7 @@ class TincNoteSync {
     constructor(storage) {
         this.storage = storage;
         this.isSyncing = false;
+        this.needsResync = false;
         this.status = 'offline'; // 'offline', 'online', 'syncing', 'error'
         this.statusListeners = [];
     }
@@ -164,7 +165,10 @@ class TincNoteSync {
     }
 
     async syncNow() {
-        if (this.isSyncing) return false;
+        if (this.isSyncing) {
+            this.needsResync = true;
+            return false;
+        }
         this.isSyncing = true;
         this.setStatus('syncing', 'Eşitleniyor...');
 
@@ -361,11 +365,19 @@ class TincNoteSync {
             if (typeof syncWidgetData === 'function') {
                 syncWidgetData();
             }
+            if (this.needsResync) {
+                this.needsResync = false;
+                setTimeout(() => this.syncNow(), 300);
+            }
             return true;
         } catch (e) {
             console.error("Senkronizasyon hatası:", e);
             this.setStatus('error', `Hata: ${e.message || 'Eşitlenemedi'}`);
             this.isSyncing = false;
+            if (this.needsResync) {
+                this.needsResync = false;
+                setTimeout(() => this.syncNow(), 500);
+            }
             return false;
         }
     }
@@ -508,15 +520,22 @@ class TincNoteSync {
                 } catch (e) {}
             } else if (it._dirty && !it._deleted) {
                 try {
+                    const itemPayload = {
+                        title: it.title,
+                        description: it.description || '',
+                        quantity: it.quantity || '',
+                        price: it.price || '',
+                        url: it.url || '',
+                        remind_at: it.remind_at || '',
+                        recurrence: it.recurrence || 'none',
+                        is_done: it.is_done ? 1 : 0,
+                        sort_order: it.sort_order || 0
+                    };
                     if (typeof it.id === 'number' && it.id >= 1000000000) {
                         const res = await this.apiFetch(`/notes/api/pages/${it.page_id}/items`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                title: it.title,
-                                description: it.description || '',
-                                is_done: it.is_done ? 1 : 0
-                            })
+                            body: JSON.stringify(itemPayload)
                         });
                         const data = await res.json();
                         if (data.ok && data.item_id) {
@@ -529,11 +548,7 @@ class TincNoteSync {
                         await this.apiFetch(`/notes/api/items/${it.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                title: it.title,
-                                description: it.description || '',
-                                is_done: it.is_done ? 1 : 0
-                            })
+                            body: JSON.stringify(itemPayload)
                         });
                         it._dirty = false;
                         await this.storage.put('items', it);
@@ -685,6 +700,71 @@ class TincNoteSync {
                 }
             }
         }
+    }
+
+    async fastPatchNote(pageId, content) {
+        if (!pageId) return false;
+        try {
+            const isAlive = await this.checkConnection();
+            if (isAlive) {
+                const res = await this.apiFetch(`/notes/api/pages/${pageId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+                if (res.ok) {
+                    const page = await this.storage.getPage(pageId);
+                    if (page) {
+                        page._dirty = false;
+                        await this.storage.put('pages', page);
+                    }
+                    const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                    this.setStatus('online', `Eşitlendi (${nowStr})`);
+                    return true;
+                }
+            }
+        } catch (e) {
+            console.warn("fastPatchNote offline:", e);
+        }
+        this.syncNow();
+        return false;
+    }
+
+    async fastPatchItem(item) {
+        if (!item || !item.id || item.id >= 1000000000) {
+            return this.syncNow();
+        }
+        try {
+            const isAlive = await this.checkConnection();
+            if (isAlive) {
+                const res = await this.apiFetch(`/notes/api/items/${item.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: item.title,
+                        description: item.description || '',
+                        quantity: item.quantity || '',
+                        price: item.price || '',
+                        url: item.url || '',
+                        remind_at: item.remind_at || '',
+                        recurrence: item.recurrence || 'none',
+                        is_done: item.is_done ? 1 : 0,
+                        sort_order: item.sort_order || 0
+                    })
+                });
+                if (res.ok) {
+                    item._dirty = false;
+                    await this.storage.put('items', item);
+                    const nowStr = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                    this.setStatus('online', `Eşitlendi (${nowStr})`);
+                    return true;
+                }
+            }
+        } catch (e) {
+            console.warn("fastPatchItem offline:", e);
+        }
+        this.syncNow();
+        return false;
     }
 }
 

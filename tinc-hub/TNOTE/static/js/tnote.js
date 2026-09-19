@@ -15,7 +15,10 @@ let sourceCatId = null;
 function enqueueOfflineAction(action) {
     try {
         const q = JSON.parse(localStorage.getItem('tnote_offline_queue') || '[]');
-        const existingIdx = q.findIndex(item => item.type === action.type && item.pageId === action.pageId);
+        const key = `${action.type}_${action.pageId || action.itemId || action.id || Date.now()}`;
+        const existingIdx = q.findIndex(item => item._key === key);
+        action._key = key;
+        action.timestamp = Date.now();
         if (existingIdx >= 0) {
             q[existingIdx] = action;
         } else {
@@ -51,19 +54,49 @@ async function syncOfflineQueue() {
                         body: JSON.stringify({concept: item.concept, specs: item.specs})
                     });
                     if (!res.ok) remaining.push(item);
+                } else if (item.type === 'update_item') {
+                    const res = await fetch(`/notes/api/items/${item.itemId}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(item.payload)
+                    });
+                    if (!res.ok) remaining.push(item);
+                } else if (item.type === 'delete_item') {
+                    const res = await fetch(`/notes/api/items/${item.itemId}`, {
+                        method: 'DELETE'
+                    });
+                    if (!res.ok) remaining.push(item);
+                } else if (item.type === 'add_item') {
+                    const res = await fetch(`/notes/api/pages/${item.pageId}/items`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(item.payload)
+                    });
+                    if (!res.ok) remaining.push(item);
                 }
             } catch(err) {
                 remaining.push(item);
             }
         }
         localStorage.setItem('tnote_offline_queue', JSON.stringify(remaining));
-        if (remaining.length === 0) {
-            showToast("Tüm çevrimdışı değişiklikler eşitlendi ✓");
+        if (remaining.length === 0 && q.length > 0) {
+            const statusEl = document.getElementById('note-save-status');
+            if (statusEl) statusEl.textContent = "Tüm çevrimdışı değişiklikler eşitlendi ✓";
         }
     } catch(e) {
         console.warn("syncOfflineQueue error:", e);
     }
 }
+
+// Periyodik çevrimdışı kuyruk kontrolü
+setInterval(() => {
+    if (navigator.onLine) {
+        const raw = localStorage.getItem('tnote_offline_queue');
+        if (raw && raw !== '[]') {
+            syncOfflineQueue();
+        }
+    }
+}, 30000);
 
 document.addEventListener('DOMContentLoaded', () => {
     // PWA Service Worker Kaydı
