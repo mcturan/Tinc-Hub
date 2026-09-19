@@ -1218,7 +1218,7 @@ def api_get_graph():
     user_id = user["id"] if user else None
     notebook_id = request.args.get("notebook_id", type=int)
     data = db.get_graph_data(notebook_id=notebook_id, user_id=user_id)
-    return jsonify({"ok": True, "graph": data, "nodes": data.get("nodes", []), "links": data.get("links", [])})
+    return jsonify({"ok": True, "graph": data, "nodes": data.get("nodes", []), "links": data.get("edges", []), "edges": data.get("edges", [])})
 
 @tnote_bp.route('/api/sync/tincsync/trigger', methods=['POST'])
 @auth_check

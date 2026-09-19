@@ -68,17 +68,17 @@ body, .tnote-container, input, textarea, select, button {
     background: var(--surface, #ffffff);
     border: 1px solid var(--border, #e2e8f0);
     border-radius: var(--radius, 10px);
-    padding: 12px 10px;
+    padding: 12px 8px 8px 10px;
     display: flex;
     flex-direction: column;
     gap: 8px;
     height: calc(100vh - 95px);
+    max-height: calc(100vh - 95px);
     position: sticky;
     top: 65px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     box-sizing: border-box;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden; /* Dış taşıyıcı taşmaz, sadece kategoriler kayar */
     width: 280px;
     max-width: 100%;
     transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s ease, padding 0.2s ease;
@@ -86,6 +86,7 @@ body, .tnote-container, input, textarea, select, button {
 }
 
 .sidebar-header {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -526,9 +527,11 @@ body, .tnote-container, input, textarea, select, button {
         top: 0 !important;
         left: 0 !important;
         bottom: 0 !important;
-        width: 260px !important;
+        width: 280px !important;
         max-width: 85vw !important;
         height: 100vh !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
         z-index: 2000 !important;
         transform: translateX(-100%) !important;
         transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -559,10 +562,18 @@ body, .tnote-container, input, textarea, select, button {
     }
 }
 
+.sidebar-nav-block {
+    flex-shrink: 0;
+}
+
 .sidebar-categories {
-    flex: 1;
+    flex: 1 1 auto;
+    min-height: 0; /* Flexbox içinde kaydırma çubuğunun devreye girmesi için zorunlu */
+    max-height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
     padding-right: 4px;
     display: flex;
     flex-direction: column;
@@ -1222,7 +1233,7 @@ body, .tnote-container, input, textarea, select, button {
 }
 
 .tnote-modal-backdrop.open {
-    display: flex;
+    display: flex !important;
 }
 
 .tnote-modal {

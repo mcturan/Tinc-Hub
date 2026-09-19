@@ -3823,7 +3823,7 @@ def get_graph_data(notebook_id: int = None, user_id: int = None):
                             "target": target_id
                         })
 
-        return {"nodes": nodes, "edges": edges, "total_nodes": len(nodes), "total_edges": len(edges)}
+        return {"nodes": nodes, "edges": edges, "links": edges, "total_nodes": len(nodes), "total_edges": len(edges)}
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DEFTER DIŞA / İÇE AKTARMA (EXPORT & BACKUP MOTORU)

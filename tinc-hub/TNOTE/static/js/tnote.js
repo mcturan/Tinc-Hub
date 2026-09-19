@@ -2339,12 +2339,18 @@ function onSearchItems() {
 
 function openModal(modalId) {
     const el = document.getElementById(modalId);
-    if (el) el.classList.add('open');
+    if (el) {
+        el.classList.add('open');
+        el.style.display = 'flex';
+    }
 }
 
 function closeModal(modalId) {
     const el = document.getElementById(modalId);
-    if (el) el.classList.remove('open');
+    if (el) {
+        el.classList.remove('open');
+        el.style.display = 'none';
+    }
 }
 
 // Kategori Ekleme
@@ -6429,30 +6435,45 @@ function initGraphRenderer(graph) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    // Canvas boyutlandırma
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    // Canvas boyutlandırma - fallback ile
+    const pRect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : null;
+    canvas.width = (pRect && pRect.width > 50) ? Math.floor(pRect.width) : Math.min(880, Math.floor(window.innerWidth * 0.9));
+    canvas.height = (pRect && pRect.height > 50) ? Math.floor(pRect.height) : Math.min(580, Math.floor(window.innerHeight * 0.75));
 
     const width = canvas.width;
     const height = canvas.height;
 
+    const rawNodes = (graph && graph.nodes) ? graph.nodes : [];
+    const rawLinks = (graph && (graph.links || graph.edges)) ? (graph.links || graph.edges) : [];
+
+    if (rawNodes.length === 0) {
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🕸️ Henüz Zihin Ağında görüntülenecek sayfa bulunmuyor.', width / 2, height / 2 - 15);
+        ctx.font = '12px sans-serif';
+        ctx.fillStyle = '#64748b';
+        ctx.fillText('Notlarınızda [[Sayfa Başlığı]] formatında çift yönlü bağlantılar kurarak interaktif ağınızı oluşturabilirsiniz.', width / 2, height / 2 + 15);
+        return;
+    }
+
     // Node konumlarını merkez etrafında başlat
-    const nodes = graph.nodes.map((n, i) => {
-        const angle = (i / graph.nodes.length) * 2 * Math.PI;
-        const radius = 100 + Math.random() * 80;
+    const nodes = rawNodes.map((n, i) => {
+        const angle = (i / rawNodes.length) * 2 * Math.PI;
+        const radius = Math.min(width, height) * 0.28 + (Math.random() * 40 - 20);
         return {
             ...n,
             x: width / 2 + Math.cos(angle) * radius,
             y: height / 2 + Math.sin(angle) * radius,
             vx: 0,
             vy: 0,
-            r: Math.max(8, Math.min(22, 6 + (n.val || 1) * 3))
+            r: Math.max(9, Math.min(22, 7 + (n.val || 1) * 3))
         };
     });
 
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
-    const links = graph.links.map(l => ({
+    const links = rawLinks.map(l => ({
         source: nodeMap.get(l.source),
         target: nodeMap.get(l.target)
     })).filter(l => l.source && l.target);
@@ -6465,47 +6486,71 @@ function initGraphRenderer(graph) {
     let lastMouseX = 0;
     let lastMouseY = 0;
 
-    canvas.onmousedown = (e) => {
+    function handlePointerDown(clientX, clientY) {
         const r = canvas.getBoundingClientRect();
-        const mx = (e.clientX - r.left - panX) / scale;
-        const my = (e.clientY - r.top - panY) / scale;
+        const mx = (clientX - r.left - panX) / scale;
+        const my = (clientY - r.top - panY) / scale;
 
-        // Tıklanan node bul
-        dragNode = nodes.find(n => Math.hypot(n.x - mx, n.y - my) <= n.r);
+        dragNode = nodes.find(n => Math.hypot(n.x - mx, n.y - my) <= n.r + 4);
         isDragging = true;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-    };
+        lastMouseX = clientX;
+        lastMouseY = clientY;
+    }
 
-    canvas.onmousemove = (e) => {
+    function handlePointerMove(clientX, clientY) {
         if (!isDragging) return;
         if (dragNode) {
             const r = canvas.getBoundingClientRect();
-            dragNode.x = (e.clientX - r.left - panX) / scale;
-            dragNode.y = (e.clientY - r.top - panY) / scale;
+            dragNode.x = (clientX - r.left - panX) / scale;
+            dragNode.y = (clientY - r.top - panY) / scale;
             dragNode.vx = 0;
             dragNode.vy = 0;
         } else {
-            panX += (e.clientX - lastMouseX);
-            panY += (e.clientY - lastMouseY);
-            lastMouseX = e.clientX;
-            lastMouseY = e.clientY;
+            panX += (clientX - lastMouseX);
+            panY += (clientY - lastMouseY);
+            lastMouseX = clientX;
+            lastMouseY = clientY;
         }
-    };
+    }
 
-    canvas.onmouseup = (e) => {
+    function handlePointerUp(clientX, clientY) {
         if (dragNode) {
             const r = canvas.getBoundingClientRect();
-            const mx = (e.clientX - r.left - panX) / scale;
-            const my = (e.clientY - r.top - panY) / scale;
-            if (Math.hypot(dragNode.x - mx, dragNode.y - my) < 5) {
-                // Tıklanan sayfaya git!
+            const mx = (clientX - r.left - panX) / scale;
+            const my = (clientY - r.top - panY) / scale;
+            if (Math.hypot(dragNode.x - mx, dragNode.y - my) < 8) {
+                // Tıklanan sayfayı yükle
                 closeModal('modal-graph-view');
-                selectPage(dragNode.id);
+                if (typeof loadPage === 'function') {
+                    loadPage(dragNode.id);
+                }
             }
         }
         isDragging = false;
         dragNode = null;
+    }
+
+    canvas.onmousedown = (e) => handlePointerDown(e.clientX, e.clientY);
+    canvas.onmousemove = (e) => handlePointerMove(e.clientX, e.clientY);
+    canvas.onmouseup = (e) => handlePointerUp(e.clientX, e.clientY);
+
+    // Dokunmatik (Touch) Desteği
+    canvas.ontouchstart = (e) => {
+        if (e.touches.length === 1) {
+            handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }
+    };
+    canvas.ontouchmove = (e) => {
+        if (e.touches.length === 1) {
+            handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }
+    };
+    canvas.ontouchend = (e) => {
+        if (e.changedTouches.length > 0) {
+            handlePointerUp(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+        }
     };
 
     canvas.onwheel = (e) => {
@@ -6517,12 +6562,12 @@ function initGraphRenderer(graph) {
     if (graphAnimationId) cancelAnimationFrame(graphAnimationId);
 
     function simulateAndDraw() {
-        // Basit Yay ve İtme Simülasyonu (Spring Force Layout)
+        // Fizik Simülasyonu (Spring Force Layout)
         for (let i = 0; i < nodes.length; i++) {
             const a = nodes[i];
             // Merkeze çekim
-            a.vx += (width / 2 - a.x) * 0.0005;
-            a.vy += (height / 2 - a.y) * 0.0005;
+            a.vx += (width / 2 - a.x) * 0.0004;
+            a.vy += (height / 2 - a.y) * 0.0004;
 
             // Düğümler arası itme (Repulsion)
             for (let j = i + 1; j < nodes.length; j++) {
@@ -6530,8 +6575,8 @@ function initGraphRenderer(graph) {
                 const dx = b.x - a.x;
                 const dy = b.y - a.y;
                 const dist = Math.hypot(dx, dy) || 1;
-                if (dist < 220) {
-                    const force = (220 - dist) / dist * 0.05;
+                if (dist < 200) {
+                    const force = (200 - dist) / dist * 0.04;
                     a.vx -= dx * force;
                     a.vy -= dy * force;
                     b.vx += dx * force;
@@ -6540,7 +6585,7 @@ function initGraphRenderer(graph) {
             }
         }
 
-        // Bağlantılar (Spring Attaction)
+        // Bağlantılar (Spring Attraction)
         for (const l of links) {
             const dx = l.target.x - l.source.x;
             const dy = l.target.y - l.source.y;
@@ -6569,7 +6614,7 @@ function initGraphRenderer(graph) {
         ctx.scale(scale, scale);
 
         // Çizgiler (Edges)
-        ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
         ctx.lineWidth = 1.5;
         for (const l of links) {
             ctx.beginPath();
@@ -6582,7 +6627,7 @@ function initGraphRenderer(graph) {
         for (const n of nodes) {
             ctx.beginPath();
             ctx.arc(n.x, n.y, n.r, 0, 2 * Math.PI);
-            ctx.fillStyle = n.id === currentPageId ? '#3b82f6' : (n.group || '#94a3b8');
+            ctx.fillStyle = (typeof currentPageId !== 'undefined' && n.id === currentPageId) ? '#3b82f6' : (n.color || '#0284c7');
             ctx.fill();
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2;
@@ -6592,7 +6637,7 @@ function initGraphRenderer(graph) {
             ctx.font = '11px sans-serif';
             ctx.fillStyle = '#f8fafc';
             ctx.textAlign = 'center';
-            ctx.fillText(n.label, n.x, n.y + n.r + 14);
+            ctx.fillText(n.label || 'Not', n.x, n.y + n.r + 14);
         }
 
         ctx.restore();

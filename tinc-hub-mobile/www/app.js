@@ -5172,13 +5172,61 @@ async function openMobileGraphView() {
     toggleSidebar(false);
     openModal('modal-mobile-graph-view');
     try {
-        const res = await window.appSync.apiFetch('/notes/api/graph');
-        const data = await res.json();
-        if (data.ok && data.graph) {
-            renderMobileGraphCanvas(data.graph);
+        let graphData = null;
+        try {
+            const res = await window.appSync.apiFetch('/notes/api/graph');
+            const data = await res.json();
+            if (data.ok && (data.graph || data.nodes)) {
+                graphData = data.graph || data;
+            }
+        } catch (netErr) {
+            console.warn('Graf API çağrısı başarısız, yerel depolamaya geçiliyor:', netErr);
+        }
+
+        // Çevrimdışı / Yerel Depolama yedeği
+        if (!graphData && window.appStorage) {
+            const pages = await window.appStorage.getAllPages();
+            const nodes = [];
+            const edges = [];
+            const titleToId = {};
+            for (const p of pages) {
+                if (p.is_archived) continue;
+                titleToId[(p.title || '').trim().toLowerCase()] = p.id;
+                nodes.push({
+                    id: p.id,
+                    label: p.title || 'İsimsiz',
+                    icon: p.icon || '📝',
+                    type: p.type || 'notes',
+                    color: p.color || '#3b82f6'
+                });
+            }
+            const linkPattern = /\[\[(.*?)\]\]/g;
+            const seen = new Set();
+            for (const p of pages) {
+                const content = p.content || '';
+                let m;
+                while ((m = linkPattern.exec(content)) !== null) {
+                    const targetId = titleToId[(m[1] || '').trim().toLowerCase()];
+                    if (targetId && targetId !== p.id) {
+                        const key = `${p.id}->${targetId}`;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            edges.push({ source: p.id, target: targetId });
+                        }
+                    }
+                }
+            }
+            graphData = { nodes, links: edges, edges };
+        }
+
+        if (graphData) {
+            renderMobileGraphCanvas(graphData);
+        } else {
+            showMobileToast('Zihin grafiği verisi bulunamadı.');
         }
     } catch (e) {
-        showMobileToast('Graf verisi alınamadı: ' + e.message);
+        console.error('Graf yükleme hatası:', e);
+        showMobileToast('Graf verisi açılamadı: ' + e.message);
     }
 }
 
@@ -5187,39 +5235,61 @@ function renderMobileGraphCanvas(graph) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    const pRect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : null;
+    canvas.width = (pRect && pRect.width > 50) ? Math.floor(pRect.width) : Math.floor(window.innerWidth * 0.9);
+    canvas.height = (pRect && pRect.height > 50) ? Math.floor(pRect.height) : Math.floor(window.innerHeight * 0.65);
     const width = canvas.width;
     const height = canvas.height;
 
-    const nodes = graph.nodes.map((n, i) => {
-        const angle = (i / graph.nodes.length) * 2 * Math.PI;
-        const radius = 60 + Math.random() * 60;
+    const rawNodes = (graph && graph.nodes) ? graph.nodes : [];
+    const rawLinks = (graph && (graph.links || graph.edges)) ? (graph.links || graph.edges) : [];
+
+    if (rawNodes.length === 0) {
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🕸️ Henüz Zihin Ağında sayfa bulunmuyor.', width / 2, height / 2 - 10);
+        ctx.font = '11px sans-serif';
+        ctx.fillStyle = '#64748b';
+        ctx.fillText('Notlarınıza [[Sayfa Başlığı]] bağlantıları ekleyebilirsiniz.', width / 2, height / 2 + 15);
+        return;
+    }
+
+    const nodes = rawNodes.map((n, i) => {
+        const angle = (i / rawNodes.length) * 2 * Math.PI;
+        const radius = Math.min(width, height) * 0.32 + Math.random() * 30;
         return {
             ...n,
             x: width / 2 + Math.cos(angle) * radius,
             y: height / 2 + Math.sin(angle) * radius,
             vx: 0,
             vy: 0,
-            r: Math.max(7, Math.min(18, 5 + (n.val || 1) * 2.5))
+            r: Math.max(8, Math.min(18, 6 + (n.val || 1) * 2.5))
         };
     });
 
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
-    const links = graph.links.map(l => ({
+    const links = rawLinks.map(l => ({
         source: nodeMap.get(l.source),
         target: nodeMap.get(l.target)
     })).filter(l => l.source && l.target);
 
-    canvas.onclick = (e) => {
+    function handleTap(clientX, clientY) {
         const r = canvas.getBoundingClientRect();
-        const mx = e.clientX - r.left;
-        const my = e.clientY - r.top;
-        const clicked = nodes.find(n => Math.hypot(n.x - mx, n.y - my) <= n.r + 5);
+        const mx = clientX - r.left;
+        const my = clientY - r.top;
+        const clicked = nodes.find(n => Math.hypot(n.x - mx, n.y - my) <= n.r + 8);
         if (clicked) {
             closeModal('modal-mobile-graph-view');
             openPage(clicked.id);
+        }
+    }
+
+    canvas.onclick = (e) => handleTap(e.clientX, e.clientY);
+    canvas.ontouchend = (e) => {
+        if (e.changedTouches.length > 0) {
+            handleTap(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
         }
     };
 
@@ -5228,8 +5298,8 @@ function renderMobileGraphCanvas(graph) {
     function step() {
         for (let i = 0; i < nodes.length; i++) {
             const a = nodes[i];
-            a.vx += (width / 2 - a.x) * 0.0008;
-            a.vy += (height / 2 - a.y) * 0.0008;
+            a.vx += (width / 2 - a.x) * 0.0007;
+            a.vy += (height / 2 - a.y) * 0.0007;
             for (let j = i + 1; j < nodes.length; j++) {
                 const b = nodes[j];
                 const dx = b.x - a.x;
@@ -5273,7 +5343,7 @@ function renderMobileGraphCanvas(graph) {
         for (const n of nodes) {
             ctx.beginPath();
             ctx.arc(n.x, n.y, n.r, 0, 2 * Math.PI);
-            ctx.fillStyle = n.id == activePageId ? '#3b82f6' : (n.group || '#94a3b8');
+            ctx.fillStyle = (typeof activePageId !== 'undefined' && n.id == activePageId) ? '#3b82f6' : (n.color || '#0284c7');
             ctx.fill();
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 1.5;
@@ -5282,7 +5352,7 @@ function renderMobileGraphCanvas(graph) {
             ctx.font = '10px sans-serif';
             ctx.fillStyle = '#f8fafc';
             ctx.textAlign = 'center';
-            ctx.fillText(n.label, n.x, n.y + n.r + 12);
+            ctx.fillText(n.label || 'Not', n.x, n.y + n.r + 12);
         }
         mGraphAnimationId = requestAnimationFrame(step);
     }
