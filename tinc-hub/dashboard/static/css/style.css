@@ -158,8 +158,21 @@ code {
 
 .sidebar-link .icon {
   font-size: 0.95rem;
-  width: 18px;
+  width: 22px;
+  min-width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+}
+
+.sidebar-app-icon {
+  height: 16px;
+  width: auto;
+  max-width: 22px;
+  object-fit: contain;
+  vertical-align: middle;
+  display: block;
 }
 
 .sidebar-link:hover {
