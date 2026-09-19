@@ -2141,26 +2141,26 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.8.6",
-        "versionCode": 186,
+        "version": "1.8.7",
+        "versionCode": 187,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.8.6:\n- Görevlere tek dokunuşla tam detay modalı açılması sağlandı (Miktar, Fiyat, URL, Açıklama, Hatırlatıcı)\n- Özet sayfasında göreve dokunulduğunda doğrudan detay modalı açılırken, sayfa butonuna dokunulduğunda o sayfaya geçiş sağlandı\n- Checklist ve Hızlı Görevlerde dokunmatik güvenilirlik ve çift tıklama engellemesi iyileştirildi"
+        "notes": "v1.8.7:\n- Görevlere veya notlara dokunulduğunda doğrudan tam detay ve düzenleme modalı açılması sağlandı (Miktar, Fiyat, URL, Açıklama, Hatırlatıcı / Alarm).\n- Özet sayfasında görev başlığına %100 genişlik verildi; sayfa adı ve rozetler alt satıra alındı, gereksiz kalem/saat butonları temizlendi.\n- Mobil uygulamada modal açılmasını engelleyen DOM kapanış etiketi düzeltildi."
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
+        "/home/turan/Masaüstü/TincNote-v1.8.7.apk",
+        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.7.apk",
         "/home/turan/Masaüstü/TincNote-v1.8.6.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.6.apk",
-        "/home/turan/Masaüstü/TincNote-v1.8.5.apk",
-        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.5.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/release/app-release.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.6.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.7.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────

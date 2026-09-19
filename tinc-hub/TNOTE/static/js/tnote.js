@@ -1197,9 +1197,6 @@ async function loadOverviewQuickNotes() {
             <div class="ov-quicknote-row" onclick="openQuickNoteDetail(${n.id})" title="Görüntülemek veya düzenlemek için tıklayın">
                 <span class="ov-quicknote-text">${escapeHtml(n.content)}</span>
                 <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-                    <button class="btn-icon-subtle" onclick="event.stopPropagation(); openQuickNoteDetail(${n.id})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);">
-                        <svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg>
-                    </button>
                     <button class="btn-icon-subtle" onclick="event.stopPropagation(); openTransferQuickNoteModal(${n.id})" title="Sayfaya Aktar" style="padding:2px 4px; color:var(--text-muted);">
                         <svg class="svg-icon svg-icon-xs"><use href="#i-folder"/></svg>
                     </button>
@@ -1378,25 +1375,30 @@ function renderOverview(ov) {
                     </button>
                 </div>`;
         } else {
-            pendingContainer.innerHTML = ov.pending_tasks.map(it => `
-                <div class="ov-item-row" id="ov-task-${it.id}" onclick="loadPage(${it.page_id})" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" title="${escapeHtml(it.page_title)} listesine git">
-                    <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
-                        <input type="checkbox" class="ov-task-checkbox" onclick="event.stopPropagation()" onchange="toggleTaskFromOverview(${it.id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;">
-                        <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</span>
+            pendingContainer.innerHTML = ov.pending_tasks.map(it => {
+                const safeTitle = JSON.stringify(it.title || '').replace(/"/g, '&quot;');
+                return `
+                <div class="ov-item-row" id="ov-task-${it.id}" onclick="openWebTaskEditModal('checklist', ${it.id}, ${safeTitle})" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 12px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:8px; margin-bottom:6px;" title="Görevi düzenlemek için tıklayın">
+                    <div class="ov-item-left" style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+                        <input type="checkbox" class="ov-task-checkbox" onclick="event.stopPropagation()" onchange="toggleTaskFromOverview(${it.id}, this)" style="cursor:pointer; width:16px; height:16px; flex-shrink:0;">
+                        <div style="overflow:hidden; display:flex; flex-direction:column; gap:2px; flex:1; min-width:0;">
+                            <span class="ov-item-text" style="font-size:0.88rem; font-weight:600; color:var(--text, #1e293b); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</span>
+                            <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                ${it.page_title ? `<span style="color:var(--primary, #0284c7); font-weight:600; cursor:pointer;" onclick="event.stopPropagation(); loadPage(${it.page_id})" title="${escapeHtml(it.page_title)} listesine git">📁 ${escapeHtml(it.page_title)}</span>` : ''}
+                                ${it.remind_at ? `<span style="color:#7c3aed; font-weight:600;">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span>` : ''}
+                                ${it.price ? `<span style="color:#059669; font-weight:600;">💰 ${escapeHtml(it.price)}</span>` : ''}
+                                ${it.quantity ? `<span>📦 ${escapeHtml(it.quantity)}</span>` : ''}
+                            </div>
+                        </div>
                     </div>
                     <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-                        <span class="ov-page-tag" onclick="event.stopPropagation(); loadPage(${it.page_id})" title="${escapeHtml(it.page_title)} listesine git">
-                            ${escapeHtml(it.page_title)}
-                        </span>
-                        <button class="btn-icon-subtle" onclick="event.stopPropagation(); editTaskFromOverview(${it.id}, ${JSON.stringify(it.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);">
-                            <svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg>
-                        </button>
-                        <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteTaskFromOverview(${it.id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);">
+                        <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteTaskFromOverview(${it.id})" title="Sil" style="padding:4px; color:var(--danger, #ef4444);">
                             <svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg>
                         </button>
+                        <span style="color:var(--muted); font-size:0.85rem; cursor:pointer; padding:2px 4px;" onclick="event.stopPropagation(); loadPage(${it.page_id})" title="${escapeHtml(it.page_title)} sayfasına git">➔</span>
                     </div>
                 </div>
-            `).join('');
+            `;}).join('');
         }
     }
 
@@ -1909,11 +1911,12 @@ function renderChecklist() {
             }
         });
 
+        const safeItemTitle = JSON.stringify(item.title || '').replace(/"/g, '&quot;');
         li.innerHTML = `
-            <div class="item-left">
+            <div class="item-left" onclick="if(window._suppressWebClickUntil && Date.now() < window._suppressWebClickUntil) return; openEditItemModal(${item.id}, ${safeItemTitle})" style="cursor:pointer; flex:1;" title="Düzenlemek için tıklayın">
                 <input type="checkbox" class="item-checkbox" ${item.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleItemDone(${item.id}, this.checked)">
                 ${thumbHtml}
-                <div class="item-content" onclick="if(window._suppressWebClickUntil && Date.now() < window._suppressWebClickUntil) return; openEditItemModal(${item.id})" style="cursor:pointer;" title="Düzenlemek için tıklayın">
+                <div class="item-content">
                     <div class="item-title">${escapeHtml(item.title)}</div>
                     ${metaHtml ? `<div class="item-meta">${metaHtml}</div>` : ''}
                 </div>
@@ -2826,8 +2829,12 @@ async function openWebTaskEditModal(taskType, rawId, initialTitle = '') {
     if (descGroup) descGroup.style.display = isChecklist ? 'block' : 'none';
     if (remindGroup) remindGroup.style.display = isChecklist ? 'block' : 'none';
 
+    // Hemen modalı aç (0ms gecikme)
+    openModal('modal-edit-item');
+    if (titleInput) setTimeout(() => titleInput.focus(), 80);
+
     if (isChecklist) {
-        let itemData = (typeof currentItems !== 'undefined' && Array.isArray(currentItems)) ? currentItems.find(i => i.id === rawId) : null;
+        let itemData = (typeof currentItems !== 'undefined' && Array.isArray(currentItems)) ? currentItems.find(i => i.id == rawId) : null;
         if (!itemData || itemData.remind_at === undefined) {
             try {
                 const res = await fetch(`/notes/api/items/${rawId}`);
@@ -2840,7 +2847,7 @@ async function openWebTaskEditModal(taskType, rawId, initialTitle = '') {
             }
         }
         if (itemData) {
-            if (titleInput) titleInput.value = itemData.title || '';
+            if (titleInput && !titleInput.value) titleInput.value = itemData.title || '';
             if (qtyInput) qtyInput.value = itemData.quantity || '';
             if (priceInput) priceInput.value = itemData.price || '';
             if (urlInput) urlInput.value = itemData.url || '';
@@ -2856,13 +2863,10 @@ async function openWebTaskEditModal(taskType, rawId, initialTitle = '') {
             }
         }
     }
-
-    openModal('modal-edit-item');
-    setTimeout(() => { if (titleInput) titleInput.focus(); }, 120);
 }
 
-function openEditItemModal(itemId) {
-    openWebTaskEditModal('checklist', itemId);
+function openEditItemModal(itemId, initialTitle = '') {
+    openWebTaskEditModal('checklist', itemId, initialTitle);
 }
 
 function setWebEditItemPreset(daysAhead, hour, minute) {
