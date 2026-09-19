@@ -2141,26 +2141,26 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.8.5",
-        "versionCode": 185,
+        "version": "1.8.6",
+        "versionCode": 186,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.8.5:\n- Taşıma için basılı tutma süresi Android masaüstü standardı olan 500 ms'ye düşürüldü\n- Zihin Ağı Grafiği (Knowledge Graph) çevrimdışı önbellek ve canvas çizim hataları giderildi\n- Özet sayfasındaki bekleyen görevlere tıklandığında doğrudan ait oldukları sayfanın açılması sağlandı"
+        "notes": "v1.8.6:\n- Görevlere tek dokunuşla tam detay modalı açılması sağlandı (Miktar, Fiyat, URL, Açıklama, Hatırlatıcı)\n- Özet sayfasında göreve dokunulduğunda doğrudan detay modalı açılırken, sayfa butonuna dokunulduğunda o sayfaya geçiş sağlandı\n- Checklist ve Hızlı Görevlerde dokunmatik güvenilirlik ve çift tıklama engellemesi iyileştirildi"
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
+        "/home/turan/Masaüstü/TincNote-v1.8.6.apk",
+        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.6.apk",
         "/home/turan/Masaüstü/TincNote-v1.8.5.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.5.apk",
-        "/home/turan/Masaüstü/TincNote-v1.8.4.apk",
-        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.4.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/release/app-release.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.5.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.6.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────

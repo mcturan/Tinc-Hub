@@ -506,7 +506,7 @@ function renderQuickTaskCardHtml(it) {
             <div class="checkbox-custom ${it.is_done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleQuickDirectItem(${it.id})" title="${it.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                 ${it.is_done ? '✓' : ''}
             </div>
-            <div class="checklist-item-body">
+            <div class="checklist-item-body" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, true)">
                 <div class="checklist-item-title" style="${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(it.title)}</div>
                 ${it.remind_at ? `<div class="checklist-item-meta"><span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe;">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span></div>` : ''}
             </div>
@@ -564,6 +564,14 @@ async function submitEditQuickNote() {
         note._dirty = true;
         note.updated_at = new Date().toISOString();
         await window.appStorage.put('quick_notes', note);
+
+        if (note.remind_at && window.AndroidWidgetBridge && window.AndroidWidgetBridge.scheduleTaskAlarm) {
+            try {
+                window.AndroidWidgetBridge.scheduleTaskAlarm(note.id, note.content.substring(0, 35), note.remind_at, 'none', 0);
+            } catch(e) {}
+        } else if (!note.remind_at && window.AndroidWidgetBridge && window.AndroidWidgetBridge.cancelTaskAlarm) {
+            try { window.AndroidWidgetBridge.cancelTaskAlarm(note.id); } catch(e) {}
+        }
     }
     closeModal('modal-edit-quick-note');
     await renderQuickNotesView();
@@ -607,30 +615,58 @@ function clearEditItemReminder() {
 
 async function openEditItemModal(id, title = null, isQuick = false) {
     if (window._suppressClickUntil && Date.now() < window._suppressClickUntil) return;
-    currentEditingItemId = id;
-    currentEditingItemIsQuick = isQuick;
-    document.getElementById('edit-item-id').value = id;
-    document.getElementById('edit-item-is-quick').value = isQuick ? '1' : '0';
-    const titleInput = document.getElementById('edit-item-title');
-    const dtInput = document.getElementById('edit-item-remind-at');
-    const recSelect = document.getElementById('edit-item-recurrence');
+    try {
+        currentEditingItemId = id;
+        currentEditingItemIsQuick = isQuick;
+        const idInput = document.getElementById('edit-item-id');
+        const quickInput = document.getElementById('edit-item-is-quick');
+        const titleInput = document.getElementById('edit-item-title');
+        const qtyInput = document.getElementById('edit-item-qty');
+        const priceInput = document.getElementById('edit-item-price');
+        const urlInput = document.getElementById('edit-item-url');
+        const descInput = document.getElementById('edit-item-desc');
+        const dtInput = document.getElementById('edit-item-remind-at');
+        const recSelect = document.getElementById('edit-item-recurrence');
 
-    const item = await window.appStorage.get('items', id);
-    if (title !== null && title !== undefined && title !== '') {
-        titleInput.value = title;
-    } else {
-        titleInput.value = item ? item.title : '';
-    }
+        if (idInput) idInput.value = id;
+        if (quickInput) quickInput.value = isQuick ? '1' : '0';
 
-    if (dtInput) {
-        dtInput.value = (item && item.remind_at) ? item.remind_at.substring(0, 16).replace(' ', 'T') : '';
-    }
-    if (recSelect) {
-        recSelect.value = (item && item.recurrence) ? item.recurrence : 'none';
-    }
+        let item = null;
+        if (window.appStorage) {
+            try {
+                item = await window.appStorage.get('items', Number(id));
+                if (!item) item = await window.appStorage.get('items', String(id));
+                if (!item) item = await window.appStorage.get('items', id);
+            } catch (err) {
+                console.warn('Item storage fetch warning:', err);
+            }
+        }
 
-    openModal('modal-edit-item');
-    setTimeout(() => { titleInput.focus(); }, 150);
+        if (titleInput) {
+            if (title !== null && title !== undefined && title !== '') {
+                titleInput.value = title;
+            } else {
+                titleInput.value = item ? (item.title || '') : '';
+            }
+        }
+        if (qtyInput) qtyInput.value = (item && item.quantity) ? item.quantity : '';
+        if (priceInput) priceInput.value = (item && item.price) ? item.price : '';
+        if (urlInput) urlInput.value = (item && item.url) ? item.url : '';
+        if (descInput) descInput.value = (item && item.description) ? item.description : '';
+
+        if (dtInput) {
+            dtInput.value = (item && item.remind_at) ? item.remind_at.substring(0, 16).replace(' ', 'T') : '';
+        }
+        if (recSelect) {
+            recSelect.value = (item && item.recurrence) ? item.recurrence : 'none';
+        }
+
+        openModal('modal-edit-item');
+        setTimeout(() => { if (titleInput) titleInput.focus(); }, 120);
+    } catch (e) {
+        console.error('openEditItemModal error:', e);
+        openModal('modal-edit-item');
+    }
 }
 
 async function openEditUnifiedTaskModal(taskType, rawId, pageId) {
@@ -660,6 +696,10 @@ async function submitEditItem() {
     const id = Number(document.getElementById('edit-item-id').value);
     const isQuick = document.getElementById('edit-item-is-quick').value === '1';
     const title = document.getElementById('edit-item-title').value.trim();
+    const qty = document.getElementById('edit-item-qty')?.value.trim() || '';
+    const price = document.getElementById('edit-item-price')?.value.trim() || '';
+    const url = document.getElementById('edit-item-url')?.value.trim() || '';
+    const desc = document.getElementById('edit-item-desc')?.value.trim() || '';
     const dtInput = document.getElementById('edit-item-remind-at');
     const recSelect = document.getElementById('edit-item-recurrence');
     const remindAtRaw = dtInput ? dtInput.value : '';
@@ -667,9 +707,14 @@ async function submitEditItem() {
 
     if (!id || !title) return;
 
-    const item = await window.appStorage.get('items', id);
+    let item = await window.appStorage.get('items', id);
+    if (!item) item = await window.appStorage.get('items', String(id));
     if (item) {
         item.title = title;
+        item.quantity = qty;
+        item.price = price;
+        item.url = url;
+        item.description = desc;
         if (remindAtRaw) {
             const remindAtStr = remindAtRaw.replace('T', ' ') + (remindAtRaw.length === 16 ? ':00' : '');
             item.remind_at = remindAtStr;
@@ -684,14 +729,22 @@ async function submitEditItem() {
                 window.appSync.getServerUrl().then(sUrl => {
                     if (sUrl) {
                         window.appStorage.getSetting('auth_token', '').then(tok => {
-                            fetch(`${sUrl}/notes/api/items/${item.id}/reminder`, {
-                                method: 'POST',
+                            fetch(`${sUrl}/notes/api/items/${item.id}`, {
+                                method: 'PUT',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'Authorization': tok ? `Bearer ${tok}` : '',
                                     'X-Auth-Token': tok || ''
                                 },
-                                body: JSON.stringify({ remind_at: remindAtStr, recurrence: recurrence })
+                                body: JSON.stringify({
+                                    title: item.title,
+                                    quantity: qty,
+                                    price: price,
+                                    url: url,
+                                    description: desc,
+                                    remind_at: remindAtStr,
+                                    recurrence: recurrence
+                                })
                             }).catch(() => {});
                         });
                     }
@@ -707,12 +760,22 @@ async function submitEditItem() {
                 window.appSync.getServerUrl().then(sUrl => {
                     if (sUrl) {
                         window.appStorage.getSetting('auth_token', '').then(tok => {
-                            fetch(`${sUrl}/notes/api/items/${item.id}/reminder`, {
-                                method: 'DELETE',
+                            fetch(`${sUrl}/notes/api/items/${item.id}`, {
+                                method: 'PUT',
                                 headers: {
+                                    'Content-Type': 'application/json',
                                     'Authorization': tok ? `Bearer ${tok}` : '',
                                     'X-Auth-Token': tok || ''
-                                }
+                                },
+                                body: JSON.stringify({
+                                    title: item.title,
+                                    quantity: qty,
+                                    price: price,
+                                    url: url,
+                                    description: desc,
+                                    remind_at: '',
+                                    recurrence: 'none'
+                                })
                             }).catch(() => {});
                         });
                     }
@@ -1922,20 +1985,18 @@ function renderChecklistItemHtml(it) {
             const dt = new Date(it.remind_at.replace(' ', 'T'));
             displayRemind = `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
         } catch(e) {}
-        metaBadges += `<span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; cursor:pointer;" onclick="event.stopPropagation(); openItemReminderModal(${it.id})" title="Alarmı Düzenle">⏰ ${displayRemind}</span>`;
+        metaBadges += `<span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; cursor:pointer;" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)" title="Alarm ve Detayları Düzenle">⏰ ${displayRemind}</span>`;
     }
     if (it.price) metaBadges += `<span class="meta-badge price">💰 ${escapeHtml(it.price)}</span>`;
     if (it.quantity) metaBadges += `<span class="meta-badge" style="background:var(--surface2); color:var(--text-secondary);">${escapeHtml(it.quantity)}</span>`;
     if (it.url) metaBadges += `<a href="${escapeHtml(it.url)}" target="_system" class="meta-badge url" onclick="event.stopPropagation()">🔗 Link</a>`;
-
-    const alarmIconColor = it.remind_at ? '#7c3aed' : 'var(--muted)';
 
     return `
         <div class="checklist-item-card ${it.is_done ? 'done' : ''}" id="item-card-${it.id}" style="cursor:pointer;" onclick="openEditItemModal(${it.id}, null, false)" data-item-id="${it.id}">
             <div class="checkbox-custom ${it.is_done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleItemDone(${it.id})" title="${it.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                 ${it.is_done ? '✓' : ''}
             </div>
-            <div class="checklist-item-body">
+            <div class="checklist-item-body" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)">
                 <div class="checklist-item-title" style="${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(it.title)}</div>
                 ${metaBadges ? `<div class="checklist-item-meta">${metaBadges}</div>` : ''}
             </div>
@@ -3101,24 +3162,25 @@ async function renderOverview() {
 
                 return `
                 <div class="overview-item" style="cursor:pointer;" onclick="${clickAction}" title="${pageTitle ? escapeHtml(pageTitle) + ' listesine git' : 'Listeye git'}">
-                    <div style="display:flex; align-items:center; gap:10px; overflow:hidden; flex:1;">
-                        <div class="checkbox-custom ${it.is_done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleOverviewItemDone(${it.id})">
-                            ${it.is_done ? '✓' : ''}
-                        </div>
-                        <div style="overflow:hidden; display:flex; flex-direction:column; gap:2px;">
-                            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; font-size:0.9rem; ${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
-                                ${escapeHtml(it.title)}
-                            </span>
-                            <div style="display:flex; align-items:center; gap:6px; font-size:0.72rem;">
-                                ${pageTitle ? `<span style="color:var(--primary); font-weight:600;">📁 ${escapeHtml(pageTitle)}</span>` : ''}
-                                ${it.remind_at ? `<span style="color:#7c3aed; font-weight:600;">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:6px;">
-                        <span style="color:var(--muted); font-size:0.75rem;">➔</span>
-                    </div>
-                </div>
+                     <div style="display:flex; align-items:center; gap:10px; overflow:hidden; flex:1;">
+                         <div class="checkbox-custom ${it.is_done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleOverviewItemDone(${it.id})" title="${it.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
+                             ${it.is_done ? '✓' : ''}
+                         </div>
+                         <div style="overflow:hidden; display:flex; flex-direction:column; gap:2px; flex:1;">
+                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; font-size:0.9rem; ${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
+                                 ${escapeHtml(it.title)}
+                             </span>
+                             <div style="display:flex; align-items:center; gap:6px; font-size:0.72rem;">
+                                 ${it.remind_at ? `<span style="color:#7c3aed; font-weight:600;" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span>` : ''}
+                                 ${it.price ? `<span style="color:#059669; font-weight:600;">💰 ${escapeHtml(it.price)}</span>` : ''}
+                             </div>
+                         </div>
+                     </div>
+                     <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                         <button class="btn btn-ghost btn-xs" style="padding:3px 6px; font-size:0.8rem; color:var(--muted);" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)" title="Detayları Düzenle">✏️</button>
+                         ${pageTitle ? `<span class="meta-badge" onclick="event.stopPropagation(); openPage(${it.page_id})" title="${escapeHtml(pageTitle)} listesine git" style="background:var(--surface2); color:var(--primary); font-weight:600; cursor:pointer; padding:3px 8px; border-radius:6px; border:1px solid var(--border);">📁 ${escapeHtml(pageTitle)} ➔</span>` : '<span style="color:var(--muted); font-size:0.75rem;">➔</span>'}
+                     </div>
+                 </div>
             `}).join('');
         }
     }
