@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TincSync — P2P Bulut &amp; Dağıtık Dosya Eşitleme</title>
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg?v=5">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png?v=5">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/img/favicon-16x16.png?v=5">
+    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png?v=5">
     <link rel="stylesheet" href="/static/css/tinc_theme.css">
     <style>
         :root {
@@ -276,16 +280,13 @@
     <!-- Header -->
     <header class="header">
         <div class="brand">
-            <div class="brand-icon">🔄</div>
-            <div>
-                <div class="brand-title">
-                    TincSync
-                    <span style="font-size:0.75rem; background:#eff6ff; color:#0284c7; border:1px solid #bae6fd; padding:2px 8px; border-radius:12px; font-weight:600;">P2P Cloud &amp; Drive</span>
-                </div>
-                <div class="brand-subtitle">Özel Donanımlar Arası Dağıtık Bulut &amp; Dosya Ağı</div>
-            </div>
+            <a href="/" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit;">
+                <img src="/static/img/tincsync_logo.svg?v=5" alt="TincSync" style="height:34px; width:auto; max-width:180px; object-fit:contain; display:block;">
+                <span style="font-size:0.75rem; background:#eff6ff; color:#0284c7; border:1px solid #bae6fd; padding:2px 8px; border-radius:12px; font-weight:600;">P2P Cloud &amp; Drive</span>
+            </a>
         </div>
         <div class="header-right">
+            <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9010';" class="btn" title="TincHub Ana Sayfasına Dön">🏠 Hub'a Dön</a>
             <button class="btn btn-primary" onclick="openFolderModal()">📁 Yeni Klasör Paylaş</button>
             <button class="btn" onclick="openDeviceModal()">💻 Cihaz Eşle</button>
             <button class="btn" onclick="loadSyncData(true)">⚡ Yenile</button>

@@ -54,6 +54,10 @@ def create_app():
     def root_redirect():
         return redirect("/notes")
 
+    @app.route("/download/apk")
+    def root_download_apk():
+        return redirect("/notes/download/apk")
+
     return app
 
 if __name__ == "__main__":

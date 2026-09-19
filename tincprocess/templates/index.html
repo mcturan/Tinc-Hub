@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TincProcess — Process Explorer & Görev Yöneticisi</title>
+    <title>TincProcess — Process Explorer &amp; Görev Yöneticisi</title>
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg?v=5">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png?v=5">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/img/favicon-16x16.png?v=5">
+    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png?v=5">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -11,14 +15,10 @@
     <!-- Header -->
     <header class="header">
         <div class="brand">
-            <span class="brand-icon">🔬</span>
-            <div>
-                <div class="brand-title">
-                    TincProcess
-                    <span style="font-size:0.75rem; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; padding:2px 8px; border-radius:12px; font-weight:600;">Process Explorer</span>
-                </div>
-                <div class="brand-subtitle">Linux Hiyerarşik Süreç & Port Analizörü</div>
-            </div>
+            <a href="/" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit;">
+                <img src="/static/img/tincprocess_logo.svg?v=5" alt="TincProcess" style="height:34px; width:auto; max-width:180px; object-fit:contain; display:block;">
+                <span style="font-size:0.75rem; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; padding:2px 8px; border-radius:12px; font-weight:600;">Process Explorer</span>
+            </a>
         </div>
         <div class="header-right">
             <a href="javascript:void(0)" onclick="window.location.href='http://'+window.location.hostname+':9010';" class="btn" title="TincHub Ana Sayfasına Dön">🏠 Hub'a Dön</a>

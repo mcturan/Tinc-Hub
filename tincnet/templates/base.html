@@ -7,6 +7,10 @@
     <meta http-equiv="refresh" content="{{ refresh }}">
     {% endif %}
     <title>TincNet — Ağ Topolojisi &amp; Analizör</title>
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg?v=5">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png?v=5">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/img/favicon-16x16.png?v=5">
+    <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png?v=5">
     <link rel="stylesheet" href="/static/css/style.css">
     {% block head %}{% endblock %}
     <style>
@@ -69,9 +73,9 @@
 <body>
     <header>
         <div class="header-inner">
-            <a href="/" class="logo">
-                <span class="logo-icon" style="animation:none;">🌐</span>
-                <span class="logo-text">Tinc<strong>Net</strong> <span style="font-size:0.75rem; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; padding:2px 8px; border-radius:12px; font-weight:600; margin-left:4px;">Ağ Topolojisi</span></span>
+            <a href="/" class="logo" style="display:flex; align-items:center; gap:8px; text-decoration:none;">
+                <img src="/static/img/tincnet_logo.svg?v=5" alt="TincNet" style="height:32px; width:auto; max-width:160px; object-fit:contain; display:block;">
+                <span style="font-size:0.75rem; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; padding:2px 8px; border-radius:12px; font-weight:600;">Ağ Topolojisi</span>
             </a>
             <nav>
                 <a href="/" class="active">🌐 Ağ Haritası &amp; Analizör</a>
