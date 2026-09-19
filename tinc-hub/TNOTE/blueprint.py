@@ -2141,25 +2141,25 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.8.2",
-        "versionCode": 182,
+        "version": "1.8.3",
+        "versionCode": 183,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.8.2:\n- TincID Merkezi Ekosistem Kimliği ve Google / Apple ile Giriş (SSO)\n- Notları En Üste Sabitleme (📌) ve Akordiyon / Katlanabilir Başlıklar (▶)\n- Biyometrik / PIN Sayfa Kilidi (🔒) ve Güvenli Maskeleme\n- PDF ve Belge Ekleri Tepsisi (📎)\n- Hedef Kelime Sayacı ve Canlı İlerleme Çubuğu (🎯)\n- Obsidian Tarzı İnteraktif Zihin Haritası (Graph View 🕸️)\n- Sürüm Geçmişi ve Geri Yükleme Zaman Makinesi (⏳)\n- Akıllı Web & X/Twitter Tweet Kart Kırpıcı (🔗)\n- E-posta Kod Doğrulama, Hesap Dondurma ve Kalıcı Silme (GDPR Takeout ZIP)"
+        "notes": "v1.8.3:\n- Hızlı Görev ve Maddelerde doğrudan düzenleme (✏️) desteği\n- Not kartlarının üzerine tıklayarak anında düzenleme modalı açılması\n- Zihin Ağı (Graph View) ve Sol Menü kaydırma optimizasyonları\n- Tek dokunuşla not ve görev yönetimi"
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
-        "/home/turan/Masaüstü/TincNote-v1.8.2.apk",
-        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.2.apk",
+        "/home/turan/Masaüstü/TincNote-v1.8.3.apk",
+        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.3.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/release/app-release.apk",
-        "/home/turan/Masaüstü/TincNote-v1.8.0.apk",
+        "/home/turan/Masaüstü/TincNote-v1.8.2.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.2.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.3.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────
