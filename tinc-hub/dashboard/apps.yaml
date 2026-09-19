@@ -7,7 +7,7 @@ apps:
   service: tinc-hub
   port: 9010
   category: Sistem
-  icon: ⚙️
+  icon: /static/img/tinchub_logo.svg
   health_check: systemd
   pinned: true
 - id: tincnet
@@ -19,7 +19,7 @@ apps:
   service: tincnet
   port: 9011
   category: Ağ
-  icon: 🌐
+  icon: /static/img/tincnet_logo.svg
   health_check: http
   pinned: true
 - id: terminal
@@ -42,7 +42,7 @@ apps:
   service: tincnote
   port: 9013
   category: Üretkenlik
-  icon: 📝
+  icon: /static/img/tincnote_logo.svg
   health_check: http
   pinned: true
 - id: tincprocess
@@ -54,7 +54,7 @@ apps:
   service: tincprocess
   port: 9014
   category: Sistem
-  icon: 🔬
+  icon: /static/img/tincprocess_logo.svg
   health_check: http
   pinned: true
 - id: tincsync
@@ -66,7 +66,7 @@ apps:
   service: tincsync
   port: 9015
   category: Depolama
-  icon: 🔄
+  icon: /static/img/tincsync_logo.svg
   health_check: http
   pinned: true
 - id: aprs-beacon

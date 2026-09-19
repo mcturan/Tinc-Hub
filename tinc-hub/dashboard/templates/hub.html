@@ -2,10 +2,23 @@
 {% set refresh = 60 %}
 
 {% macro render_app_card(app) %}
+{% set logo_map = {
+    'tinc-hub': '/static/img/tinchub_logo.svg',
+    'tincnet': '/static/img/tincnet_logo.svg',
+    'tnote': '/static/img/tincnote_logo.svg',
+    'tincprocess': '/static/img/tincprocess_logo.svg',
+    'tincsync': '/static/img/tincsync_logo.svg'
+} %}
 <div class="compact-app-item {{ app.status_class }}" onclick="handleCardClick(event, '{{ app.url or '' }}', '{{ app.id }}')">
     <div class="compact-app-left">
         <span class="compact-status-dot {{ app.status_class }}" title="Durum: {{ 'Çalışıyor' if app.status_class == 'healthy' else ('Durdu' if app.status_class == 'dead' else 'Bilinmiyor') }}"></span>
+        {% if app.id in logo_map %}
+        <span class="compact-app-icon has-svg"><img src="{{ logo_map[app.id] }}?v=5" alt="{{ app.name }}"></span>
+        {% elif app.icon and (app.icon.endswith('.svg') or app.icon.endswith('.png') or app.icon.startswith('/')) %}
+        <span class="compact-app-icon has-svg"><img src="{{ app.icon }}?v=5" alt="{{ app.name }}"></span>
+        {% else %}
         <span class="compact-app-icon">{{ app.icon or '📦' }}</span>
+        {% endif %}
         <div class="compact-app-details">
             <div class="compact-app-name-row">
                 <span class="compact-app-name" title="{{ app.name }}">{{ app.name }}</span>
@@ -638,7 +651,7 @@ async function openStoreModal() {
             html += `
             <div class="app-card">
                 <div class="card-header">
-                    <div class="app-icon">${app.icon || '📦'}</div>
+                    <div class="app-icon">${(app.icon && (app.icon.includes('.svg') || app.icon.includes('.png') || app.icon.startsWith('/'))) ? `<img src="${app.icon}" style="height:26px; width:auto; max-width:50px; object-fit:contain;">` : (app.icon || '📦')}</div>
                     <div class="app-title">
                         <span class="app-name">${app.name}</span>
                         <span class="app-category">${app.category || 'App'}</span>
