@@ -356,6 +356,19 @@ class TincNoteStorage {
         }
     }
 
+    async reorderItems(pageId, itemIds) {
+        for (let idx = 0; idx < itemIds.length; idx++) {
+            const item = await this.get('items', itemIds[idx]);
+            if (item) {
+                if (pageId) item.page_id = pageId;
+                item.sort_order = idx + 1;
+                item._dirty = true;
+                item.updated_at = new Date().toISOString();
+                await this.put('items', item);
+            }
+        }
+    }
+
     // Items
     async getItems(pageId) {
         const items = await this.getAll('items');
@@ -513,10 +526,28 @@ class TincNoteStorage {
     async getQuickNotesList(notebookId = null) {
         const all = await this.getAll('quick_notes');
         const active = all.filter(n => !n._deleted);
+        const sortFn = (a, b) => {
+            if (a.sort_order && b.sort_order) return a.sort_order - b.sort_order;
+            if (a.sort_order) return -1;
+            if (b.sort_order) return 1;
+            return b.id - a.id;
+        };
         if (notebookId) {
-            return active.filter(n => Number(n.notebook_id) === Number(notebookId)).sort((a, b) => b.id - a.id);
+            return active.filter(n => Number(n.notebook_id) === Number(notebookId)).sort(sortFn);
         }
-        return active.sort((a, b) => b.id - a.id);
+        return active.sort(sortFn);
+    }
+
+    async reorderQuickNotes(noteIds) {
+        for (let idx = 0; idx < noteIds.length; idx++) {
+            const note = await this.get('quick_notes', noteIds[idx]);
+            if (note) {
+                note.sort_order = idx + 1;
+                note._dirty = true;
+                note.updated_at = new Date().toISOString();
+                await this.put('quick_notes', note);
+            }
+        }
     }
 
     async addQuickNote(content, notebookId = 1) {

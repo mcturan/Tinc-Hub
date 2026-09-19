@@ -82,7 +82,6 @@
             {% for cat in categories %}
             {% if cat.is_divider or cat.icon == '―' or cat.name == '---' or (cat.name and cat.name.startswith('---')) %}
             <div class="category-divider-item" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}" draggable="true">
-                <span class="cat-drag-handle" title="Ayracı taşımak için sürükleyin" style="cursor:grab; opacity:0.4; font-size:0.8rem; user-select:none; margin-right:3px;">⠿</span>
                 <div class="cat-divider-line"></div>
                 {% if cat.name and cat.name != '---' and cat.name != 'Ayraç' %}
                     <span class="cat-divider-label">{{ cat.name }}</span>
@@ -94,7 +93,6 @@
             <div class="category-group" id="cat-group-{{ cat.id }}" data-category-id="{{ cat.id }}" draggable="true" style="border-left: 3.5px solid {{ cat.color or '#3b82f6' }};">
                 <div class="category-header" id="cat-header-{{ cat.id }}" data-category-id="{{ cat.id }}" title="{{ cat.name }}" onclick="toggleCategoryGroup({{ cat.id }})">
                     <div class="category-title-area">
-                        <span class="cat-drag-handle" onclick="event.stopPropagation()" title="Dosyayı taşımak için sürükleyin" style="cursor:grab; opacity:0.4; font-size:0.85rem; user-select:none; margin-right:3px;">⠿</span>
                         <span class="cat-chevron" id="cat-chevron-{{ cat.id }}">▾</span>
                         <span style="font-size:0.95rem; margin-right:3px; flex-shrink:0;">{{ cat.icon or '📁' }}</span>
                         <span class="category-title-text" title="{{ cat.name }}">{{ cat.name }}</span>
@@ -111,7 +109,6 @@
                         {% if p.category_id == cat.id %}
                         <li class="page-item" id="page-item-{{ p.id }}" data-page-id="{{ p.id }}" data-category-id="{{ cat.id }}" draggable="true" onclick="loadPage({{ p.id }})">
                             <div class="page-item-info">
-                                <span class="page-drag-handle" onclick="event.stopPropagation()" title="Sayfayı taşımak için sürükleyin" style="cursor:grab; opacity:0.35; font-size:0.75rem; user-select:none; margin-right:4px;">⠿</span>
                                 <span class="page-title-text" title="{{ p.title }}">{{ p.title }}</span>
                             </div>
                             <div class="page-item-actions">
@@ -1454,6 +1451,28 @@
             <div class="form-group" id="edit-item-desc-group">
                 <label>Açıklama / Not</label>
                 <input type="text" id="edit-item-desc" class="form-control" placeholder="Açıklama">
+            </div>
+            <!-- Entegre Hatırlatıcı / Alarm Alanı -->
+            <div class="form-group" id="edit-item-remind-group" style="background:var(--surface2, #f8fafc); padding:10px; border-radius:8px; border:1px solid var(--border, #e2e8f0); margin-top:8px;">
+                <label style="font-size:0.82rem; font-weight:700; display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+                    <span>⏰</span> Hatırlatıcı / Alarm
+                </label>
+                <input type="datetime-local" id="edit-item-remind-at" class="form-control" style="font-size:0.85rem; margin-bottom:6px;">
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+                    <label style="font-size:0.75rem; color:var(--muted); flex-shrink:0;">Tekrar:</label>
+                    <select id="edit-item-recurrence" class="form-control" style="font-size:0.8rem; padding:3px 6px;">
+                        <option value="none">Tek Seferlik</option>
+                        <option value="daily">Her Gün</option>
+                        <option value="weekly">Her Hafta</option>
+                        <option value="monthly">Her Ay</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button type="button" class="btn btn-xs" onclick="setWebEditItemPreset(0, 18, 0)">Bugün 18:00</button>
+                    <button type="button" class="btn btn-xs" onclick="setWebEditItemPreset(1, 9, 0)">Yarın 09:00</button>
+                    <button type="button" class="btn btn-xs" onclick="setWebEditItemPreset(7, 9, 0)">1 Hafta</button>
+                    <button type="button" class="btn btn-xs" style="color:var(--danger);" onclick="document.getElementById('edit-item-remind-at').value=''">Temizle</button>
+                </div>
             </div>
         </div>
         <div class="modal-footer">

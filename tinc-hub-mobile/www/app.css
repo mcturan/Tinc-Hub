@@ -575,46 +575,52 @@ body {
     gap: 6px;
 }
 
-/* Sürükle-Bırak (Drag & Drop) Stilleri - Mobil Çekmece */
-.drawer-drag-handle {
-    cursor: grab;
-    opacity: 0.35;
-    font-size: 0.9rem;
-    user-select: none;
-    touch-action: none;
-    padding: 3px 6px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 2px;
-    flex-shrink: 0;
+/* Sürükle-Bırak (Drag & Drop) Stilleri - Android Tarzı 1.5s Basılı Tutma */
+.drawer-drag-handle,
+.cat-drag-handle,
+.page-drag-handle,
+.item-drag-handle {
+    display: none !important;
 }
-.drawer-drag-handle:active {
-    cursor: grabbing;
-    opacity: 0.85;
+
+/* Android Launcher Tarzı Ayrılma ve Taşıma Efekti (1.5s Basılı Tutma) */
+.android-lifted-item {
+    transform: scale(1.04) rotate(1deg) translateY(-5px) !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.32), 0 0 0 2.5px var(--accent) !important;
+    z-index: 99999 !important;
+    position: relative !important;
+    opacity: 0.96 !important;
+    transition: transform 0.18s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.18s ease !important;
+    border-radius: 10px !important;
+    background: var(--surface) !important;
+    touch-action: none !important;
+    user-select: none !important;
 }
-.drawer-cat-header .drawer-drag-handle {
-    font-size: 0.95rem;
-    padding: 2px 5px;
-}
-.drawer-page-item .drawer-drag-handle {
-    font-size: 0.82rem;
-    padding: 1px 4px;
+
+.android-drop-placeholder {
+    height: 48px;
+    margin: 4px 0;
+    border: 2px dashed var(--accent);
+    border-radius: 8px;
+    background: rgba(2, 132, 199, 0.08);
+    transition: all 0.15s ease;
 }
 
 .is-dragging {
-    opacity: 0.35 !important;
-    background: rgba(2, 132, 199, 0.12) !important;
+    opacity: 0.25 !important;
+    transform: scale(0.98) !important;
+    background: rgba(2, 132, 199, 0.08) !important;
+    transition: opacity 0.2s ease !important;
 }
 
 .drop-target-above {
     border-top: 2.5px solid var(--accent) !important;
-    box-shadow: 0 -2px 6px rgba(2, 132, 199, 0.25) !important;
+    box-shadow: 0 -3px 8px rgba(2, 132, 199, 0.35) !important;
 }
 
 .drop-target-below {
     border-bottom: 2.5px solid var(--accent) !important;
-    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25) !important;
+    box-shadow: 0 3px 8px rgba(2, 132, 199, 0.35) !important;
 }
 
 .cat-drop-hover {

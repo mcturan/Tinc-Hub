@@ -151,12 +151,71 @@ window.addEventListener('beforeunload', () => {
 // ─────────────────────────────────────────────────────────────
 
 function initSidebarDragAndDrop() {
-    // 1. Sayfa Sürükleme (Yukarı/Aşağı ve Dosyalar Arası)
+    // Global click suppressor when drag finishes
+    if (!window._webClickSuppressorAttached) {
+        window._webClickSuppressorAttached = true;
+        window.addEventListener('click', (e) => {
+            if (window._suppressWebClickUntil && Date.now() < window._suppressWebClickUntil) {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        }, true);
+    }
+
+    // 1. Sayfa Sürükleme (Yukarı/Aşağı ve Dosyalar Arası) - 1.5s Basılı Tutma ile
     const pageItems = document.querySelectorAll('.page-item');
     pageItems.forEach(item => {
-        item.setAttribute('draggable', 'true');
+        item.removeAttribute('draggable');
+
+        let holdTimer = null;
+        let startX = 0, startY = 0;
+        let isLongPress = false;
+
+        const onHoldStart = (e) => {
+            if (e.target.closest('.page-item-actions') || e.target.closest('button, a, input')) return;
+            const pt = e.touches ? e.touches[0] : e;
+            startX = pt.clientX;
+            startY = pt.clientY;
+            isLongPress = false;
+
+            holdTimer = setTimeout(() => {
+                isLongPress = true;
+                window._suppressWebClickUntil = Date.now() + 600;
+                if (navigator.vibrate) try { navigator.vibrate([50, 40, 50]); } catch(err) {}
+                item.classList.add('android-lifted-item');
+                item.setAttribute('draggable', 'true');
+            }, 1500);
+        };
+
+        const onHoldMove = (e) => {
+            if (isLongPress) return;
+            const pt = e.touches ? e.touches[0] : e;
+            if (Math.hypot(pt.clientX - startX, pt.clientY - startY) > 8) {
+                clearTimeout(holdTimer);
+            }
+        };
+
+        const onHoldEnd = () => {
+            clearTimeout(holdTimer);
+            if (!isDraggingAny) {
+                item.classList.remove('android-lifted-item');
+            }
+        };
+
+        item.addEventListener('touchstart', onHoldStart, { passive: true });
+        item.addEventListener('touchmove', onHoldMove, { passive: true });
+        item.addEventListener('touchend', onHoldEnd, { passive: true });
+        item.addEventListener('touchcancel', onHoldEnd, { passive: true });
+        item.addEventListener('mousedown', onHoldStart);
+        item.addEventListener('mousemove', onHoldMove);
+        item.addEventListener('mouseup', onHoldEnd);
+        item.addEventListener('mouseleave', onHoldEnd);
 
         item.addEventListener('dragstart', (e) => {
+            if (!isLongPress && !item.classList.contains('android-lifted-item')) {
+                e.preventDefault();
+                return;
+            }
             if (e.target.closest('.page-item-actions')) {
                 e.preventDefault();
                 return;
@@ -171,11 +230,13 @@ function initSidebarDragAndDrop() {
         });
 
         item.addEventListener('dragend', () => {
-            item.classList.remove('is-dragging');
+            item.classList.remove('is-dragging', 'android-lifted-item');
+            item.removeAttribute('draggable');
             clearDropIndicators();
             draggedPage = null;
             draggedCat = null;
             sourceCatId = null;
+            window._suppressWebClickUntil = Date.now() + 600;
             setTimeout(() => { isDraggingAny = false; }, 150);
         });
 
@@ -310,18 +371,61 @@ function initSidebarDragAndDrop() {
         });
     });
 
-    // 3. Dosya & Ayraç Sıralama (Dosyaları ve ayraçları yukarı/aşağı taşıma)
+    // 3. Dosya & Ayraç Sıralama - 1.5s Basılı Tutma ile
     const catGroups = document.querySelectorAll('.category-group, .category-divider-item');
     catGroups.forEach(group => {
-        const handle = group.querySelector('.cat-drag-handle');
-        if (handle) {
-            handle.addEventListener('mousedown', () => {
+        group.removeAttribute('draggable');
+
+        let holdTimer = null;
+        let startX = 0, startY = 0;
+        let isLongPress = false;
+
+        const onHoldStart = (e) => {
+            if (e.target.closest('.page-list') || e.target.closest('.category-actions') || e.target.closest('button, a, input')) return;
+            const pt = e.touches ? e.touches[0] : e;
+            startX = pt.clientX;
+            startY = pt.clientY;
+            isLongPress = false;
+
+            holdTimer = setTimeout(() => {
+                isLongPress = true;
+                window._suppressWebClickUntil = Date.now() + 600;
+                if (navigator.vibrate) try { navigator.vibrate([50, 40, 50]); } catch(err) {}
+                group.classList.add('android-lifted-item');
                 group.setAttribute('draggable', 'true');
-            });
-        }
+            }, 1500);
+        };
+
+        const onHoldMove = (e) => {
+            if (isLongPress) return;
+            const pt = e.touches ? e.touches[0] : e;
+            if (Math.hypot(pt.clientX - startX, pt.clientY - startY) > 8) {
+                clearTimeout(holdTimer);
+            }
+        };
+
+        const onHoldEnd = () => {
+            clearTimeout(holdTimer);
+            if (!isDraggingAny) {
+                group.classList.remove('android-lifted-item');
+            }
+        };
+
+        group.addEventListener('touchstart', onHoldStart, { passive: true });
+        group.addEventListener('touchmove', onHoldMove, { passive: true });
+        group.addEventListener('touchend', onHoldEnd, { passive: true });
+        group.addEventListener('touchcancel', onHoldEnd, { passive: true });
+        group.addEventListener('mousedown', onHoldStart);
+        group.addEventListener('mousemove', onHoldMove);
+        group.addEventListener('mouseup', onHoldEnd);
+        group.addEventListener('mouseleave', onHoldEnd);
 
         group.addEventListener('dragstart', (e) => {
             if (draggedPage) return;
+            if (!isLongPress && !group.classList.contains('android-lifted-item')) {
+                e.preventDefault();
+                return;
+            }
             if (e.target.closest('.page-list') || e.target.closest('.category-actions')) {
                 e.preventDefault();
                 return;
@@ -334,9 +438,11 @@ function initSidebarDragAndDrop() {
         });
 
         group.addEventListener('dragend', () => {
-            group.classList.remove('is-dragging');
+            group.classList.remove('is-dragging', 'android-lifted-item');
+            group.removeAttribute('draggable');
             clearDropIndicators();
             draggedCat = null;
+            window._suppressWebClickUntil = Date.now() + 600;
             setTimeout(() => { isDraggingAny = false; }, 150);
         });
 
@@ -727,7 +833,7 @@ async function renderWebQuickTasks() {
                     }
 
                     return `
-                        <div class="ov-item-row" id="web-unified-task-${t.id}" onclick="loadPage(${t.page_id})" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" title="${escapeHtml(t.page_title)} sayfasına git">
+                        <div class="ov-item-row" id="web-unified-task-${t.id}" onclick="openWebTaskEditModal('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" title="Düzenlemek için tıklayın">
                             <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
                                 <input type="checkbox" ${t.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;" title="${t.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                                 <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
@@ -735,7 +841,6 @@ async function renderWebQuickTasks() {
                             <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                                 ${t.due_badge ? `<span style="background:${badgeBg}; color:${badgeColor}; font-size:0.70rem; font-weight:600; padding:2px 6px; border-radius:4px;">${escapeHtml(t.due_badge)}</span>` : ''}
                                 <span class="ov-page-tag" onclick="event.stopPropagation(); loadPage(${t.page_id})" title="${escapeHtml(t.page_title)} sayfasına git">${escapeHtml(t.page_title)}</span>
-                                <button class="btn-icon-subtle" onclick="event.stopPropagation(); openWebTaskEditModal('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
                                 <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteUnifiedTask('${t.type}', ${t.raw_id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                             </div>
                         </div>
@@ -766,13 +871,12 @@ function toggleWebCompletedTasks() {
 function renderWebDirectTaskRow(t) {
     return `
         <div class="ov-item-row" id="web-unified-task-${t.id}" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" onclick="openWebTaskEditModal('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenlemek için tıklayın">
-            <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;" onclick="event.stopPropagation(); openWebTaskEditModal('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})">
+            <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
                 <input type="checkbox" ${t.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;" title="${t.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                 <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
             </div>
             <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                 <span style="background:#e0f2fe; color:#0284c7; font-size:0.70rem; font-weight:600; padding:2px 6px; border-radius:4px;">Hızlı</span>
-                <button class="btn-icon-subtle" onclick="event.stopPropagation(); openWebTaskEditModal('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
                 <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteUnifiedTask('${t.type}', ${t.raw_id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
             </div>
         </div>
@@ -1683,9 +1787,7 @@ function renderChecklist() {
             metaHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="tag-link" onclick="event.stopPropagation()">Link</a>`;
         }
 
-        let actionsHtml = `
-            <button class="btn-icon-subtle" title="Hatırlatıcı Kur" onclick="event.stopPropagation(); openReminderModalById(${item.id})"><svg class="svg-icon svg-icon-xs"><use href="#i-clock"/></svg></button>
-        `;
+        let actionsHtml = '';
         if (item.url) {
             actionsHtml += `<a href="${sanitizeUrl(item.url)}" target="_blank" rel="noopener noreferrer" class="btn-icon-subtle" title="Web Linkini Aç" onclick="event.stopPropagation()"><svg class="svg-icon svg-icon-xs"><use href="#i-file-text"/></svg></a>`;
         }
@@ -1693,9 +1795,56 @@ function renderChecklist() {
 
         const thumbHtml = item.image_url ? `<img src="${sanitizeUrl(item.image_url)}" class="item-thumb" alt="thumb">` : '';
 
-        li.setAttribute('draggable', 'true');
+        // 1.5 Saniye basılı tutarak taşıma (Android launcher tarzı)
+        let holdTimer = null;
+        let startX = 0, startY = 0;
+        let isLongPress = false;
+
+        const onHoldStart = (e) => {
+            if (e.target.closest('button, input, a, .item-checkbox')) return;
+            const pt = e.touches ? e.touches[0] : e;
+            startX = pt.clientX;
+            startY = pt.clientY;
+            isLongPress = false;
+
+            holdTimer = setTimeout(() => {
+                isLongPress = true;
+                window._suppressWebClickUntil = Date.now() + 600;
+                if (navigator.vibrate) try { navigator.vibrate([50, 40, 50]); } catch(err) {}
+                li.classList.add('android-lifted-item');
+                li.setAttribute('draggable', 'true');
+            }, 1500);
+        };
+
+        const onHoldMove = (e) => {
+            if (isLongPress) return;
+            const pt = e.touches ? e.touches[0] : e;
+            if (Math.hypot(pt.clientX - startX, pt.clientY - startY) > 8) {
+                clearTimeout(holdTimer);
+            }
+        };
+
+        const onHoldEnd = () => {
+            clearTimeout(holdTimer);
+            if (!isDraggingAny) {
+                li.classList.remove('android-lifted-item');
+            }
+        };
+
+        li.addEventListener('touchstart', onHoldStart, { passive: true });
+        li.addEventListener('touchmove', onHoldMove, { passive: true });
+        li.addEventListener('touchend', onHoldEnd, { passive: true });
+        li.addEventListener('touchcancel', onHoldEnd, { passive: true });
+        li.addEventListener('mousedown', onHoldStart);
+        li.addEventListener('mousemove', onHoldMove);
+        li.addEventListener('mouseup', onHoldEnd);
+        li.addEventListener('mouseleave', onHoldEnd);
 
         li.addEventListener('dragstart', (e) => {
+            if (!isLongPress && !li.classList.contains('android-lifted-item')) {
+                e.preventDefault();
+                return;
+            }
             window.draggedChecklistItem = li;
             isDraggingAny = true;
             li.classList.add('is-dragging');
@@ -1704,7 +1853,8 @@ function renderChecklist() {
         });
 
         li.addEventListener('dragend', () => {
-            li.classList.remove('is-dragging');
+            li.classList.remove('is-dragging', 'android-lifted-item');
+            li.removeAttribute('draggable');
             clearDropIndicators();
             window.draggedChecklistItem = null;
             setTimeout(() => { isDraggingAny = false; }, 150);
@@ -1761,10 +1911,9 @@ function renderChecklist() {
 
         li.innerHTML = `
             <div class="item-left">
-                <span class="drag-handle item-drag-handle" title="Maddeyi taşımak için sürükleyin" onclick="event.stopPropagation()">⋮⋮</span>
                 <input type="checkbox" class="item-checkbox" ${item.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleItemDone(${item.id}, this.checked)">
                 ${thumbHtml}
-                <div class="item-content" onclick="openEditItemModal(${item.id})" style="cursor:pointer;" title="Düzenlemek için tıklayın">
+                <div class="item-content" onclick="if(window._suppressWebClickUntil && Date.now() < window._suppressWebClickUntil) return; openEditItemModal(${item.id})" style="cursor:pointer;" title="Düzenlemek için tıklayın">
                     <div class="item-title">${escapeHtml(item.title)}</div>
                     ${metaHtml ? `<div class="item-meta">${metaHtml}</div>` : ''}
                 </div>
@@ -2654,11 +2803,16 @@ async function openWebTaskEditModal(taskType, rawId, initialTitle = '') {
     const priceInput = document.getElementById('edit-item-price');
     const urlInput = document.getElementById('edit-item-url');
     const descInput = document.getElementById('edit-item-desc');
+    const remindInput = document.getElementById('edit-item-remind-at');
+    const recurInput = document.getElementById('edit-item-recurrence');
+    const remindGroup = document.getElementById('edit-item-remind-group');
     const headerSpan = document.getElementById('modal-edit-item-header');
 
     if (idInput) idInput.value = rawId;
     if (typeInput) typeInput.value = taskType || 'checklist';
     if (titleInput) titleInput.value = initialTitle || '';
+    if (remindInput) remindInput.value = '';
+    if (recurInput) recurInput.value = 'none';
     if (headerSpan) headerSpan.textContent = taskType === 'finance' ? 'Ödemeyi Düzenle' : 'Görevi / Maddeyi Düzenle';
 
     const isChecklist = (taskType !== 'finance');
@@ -2670,28 +2824,35 @@ async function openWebTaskEditModal(taskType, rawId, initialTitle = '') {
     if (priceGroup) priceGroup.style.display = isChecklist ? 'block' : 'none';
     if (urlGroup) urlGroup.style.display = isChecklist ? 'block' : 'none';
     if (descGroup) descGroup.style.display = isChecklist ? 'block' : 'none';
+    if (remindGroup) remindGroup.style.display = isChecklist ? 'block' : 'none';
 
     if (isChecklist) {
-        const localItem = (typeof currentItems !== 'undefined' && Array.isArray(currentItems)) ? currentItems.find(i => i.id === rawId) : null;
-        if (localItem) {
-            if (titleInput) titleInput.value = localItem.title || '';
-            if (qtyInput) qtyInput.value = localItem.quantity || '';
-            if (priceInput) priceInput.value = localItem.price || '';
-            if (urlInput) urlInput.value = localItem.url || '';
-            if (descInput) descInput.value = localItem.description || '';
-        } else {
+        let itemData = (typeof currentItems !== 'undefined' && Array.isArray(currentItems)) ? currentItems.find(i => i.id === rawId) : null;
+        if (!itemData || itemData.remind_at === undefined) {
             try {
                 const res = await fetch(`/notes/api/items/${rawId}`);
                 const data = await res.json();
                 if (data.ok && data.item) {
-                    if (titleInput) titleInput.value = data.item.title || '';
-                    if (qtyInput) qtyInput.value = data.item.quantity || '';
-                    if (priceInput) priceInput.value = data.item.price || '';
-                    if (urlInput) urlInput.value = data.item.url || '';
-                    if (descInput) descInput.value = data.item.description || '';
+                    itemData = data.item;
                 }
             } catch (e) {
                 console.warn("fetch item error:", e);
+            }
+        }
+        if (itemData) {
+            if (titleInput) titleInput.value = itemData.title || '';
+            if (qtyInput) qtyInput.value = itemData.quantity || '';
+            if (priceInput) priceInput.value = itemData.price || '';
+            if (urlInput) urlInput.value = itemData.url || '';
+            if (descInput) descInput.value = itemData.description || '';
+            if (remindInput && itemData.remind_at) {
+                let dt = itemData.remind_at;
+                if (dt.length >= 16) {
+                    remindInput.value = dt.slice(0, 16).replace(' ', 'T');
+                }
+            }
+            if (recurInput && itemData.recurrence) {
+                recurInput.value = itemData.recurrence;
             }
         }
     }
@@ -2704,6 +2865,16 @@ function openEditItemModal(itemId) {
     openWebTaskEditModal('checklist', itemId);
 }
 
+function setWebEditItemPreset(daysAhead, hour, minute) {
+    const d = new Date();
+    d.setDate(d.getDate() + daysAhead);
+    d.setHours(hour, minute, 0, 0);
+    const pad = (n) => String(n).padStart(2, '0');
+    const val = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const inp = document.getElementById('edit-item-remind-at');
+    if (inp) inp.value = val;
+}
+
 async function submitEditItem() {
     const itemId = document.getElementById('edit-item-id').value;
     const itemType = document.getElementById('edit-item-type')?.value || 'checklist';
@@ -2712,6 +2883,8 @@ async function submitEditItem() {
     const price = document.getElementById('edit-item-price')?.value.trim() || '';
     const url = document.getElementById('edit-item-url')?.value.trim() || '';
     const desc = document.getElementById('edit-item-desc')?.value.trim() || '';
+    const remindAt = document.getElementById('edit-item-remind-at')?.value || '';
+    const recurrence = document.getElementById('edit-item-recurrence')?.value || 'none';
 
     if (!title || !itemId) return;
 
@@ -2731,7 +2904,9 @@ async function submitEditItem() {
                     quantity: qty,
                     price: price,
                     url: url,
-                    description: desc
+                    description: desc,
+                    remind_at: remindAt ? remindAt.replace('T', ' ') : '',
+                    recurrence: recurrence
                 })
             });
         }

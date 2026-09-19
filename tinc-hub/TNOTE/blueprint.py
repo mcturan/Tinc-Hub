@@ -2141,25 +2141,26 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.8.3",
-        "versionCode": 183,
+        "version": "1.8.4",
+        "versionCode": 184,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.8.3:\n- Hızlı Görev ve Maddelerde doğrudan düzenleme (✏️) desteği\n- Not kartlarının üzerine tıklayarak anında düzenleme modalı açılması\n- Zihin Ağı (Graph View) ve Sol Menü kaydırma optimizasyonları\n- Tek dokunuşla not ve görev yönetimi"
+        "notes": "v1.8.4:\n- Kalem ve saat ikonları satırlardan kaldırılarak tek tıkla entegre düzenleme modalına geçildi\n- Düzenleme modalı içinde anında hatırlatıcı ve alarm belirleme desteği\n- Taşıma noktaları kaldırıldı; 1.5 saniye basılı tutma (Android Launcher tarzı) ile havalanıp taşıma özelliği getirildi\n- Sol menüdeki sayfa ve dosyalar 1.5s basılı tutularak kolayca yeniden sıralanabilir"
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
+        "/home/turan/Masaüstü/TincNote-v1.8.4.apk",
+        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.4.apk",
         "/home/turan/Masaüstü/TincNote-v1.8.3.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.3.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/release/app-release.apk",
-        "/home/turan/Masaüstü/TincNote-v1.8.2.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.3.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.4.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────
