@@ -1380,6 +1380,22 @@ def purge_expired_trash(days: int = 30) -> int:
 # Items
 # ─────────────────────────────────────────────────────────────────────────────
 
+def get_item(item_id: int):
+    with _lock:
+        conn = get_conn()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT i.*,
+                   r.id as reminder_id, r.remind_at, r.recurrence, r.is_sent as reminder_sent
+            FROM items i
+            LEFT JOIN reminders r ON r.target_type = 'item' AND r.target_id = i.id
+            WHERE i.id = ?
+            LIMIT 1
+        """, (item_id,))
+        row = cur.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
 def get_items(page_id: int):
     with _lock:
         conn = get_conn()

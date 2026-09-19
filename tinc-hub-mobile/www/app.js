@@ -381,8 +381,8 @@ async function renderQuickNotesView() {
             notesListEl.innerHTML = quickNotes.map(n => {
                 const timeStr = n.created_at ? new Date(n.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
                 return `
-                    <div class="overview-item" style="padding:10px 12px; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; border-radius:10px; margin-bottom:6px; cursor:pointer;" onclick="openEditQuickNoteModal(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')})">
-                        <div style="flex:1; min-width:0;">
+                    <div class="overview-item" style="padding:10px 12px; display:flex; align-items:flex-start; justify-content:space-between; gap:10px; border-radius:10px; margin-bottom:6px; cursor:pointer;" onclick="openEditQuickNoteModal(${n.id})">
+                        <div style="flex:1; min-width:0;" onclick="event.stopPropagation(); openEditQuickNoteModal(${n.id})">
                             <div style="font-size:0.9rem; color:var(--text); white-space:pre-wrap; word-break:break-word; line-height:1.4;">
                                 ${escapeHtml(n.content)}
                             </div>
@@ -391,6 +391,7 @@ async function renderQuickNotesView() {
                             </div>
                         </div>
                         <div style="display:flex; gap:6px; flex-shrink:0;">
+                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openEditQuickNoteModal(${n.id})" title="Düzenle" style="padding:4px 8px; font-size:0.78rem;">✏️ Düzenle</button>
                             <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openTransferQuickNoteModal(${n.id})" title="Sayfaya Aktar" style="padding:4px 8px; font-size:0.78rem;">📁 Aktar</button>
                             <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteQuickNoteFromUI(${n.id})" title="Sil" style="padding:4px 8px; color:var(--danger);">🗑️</button>
                         </div>
@@ -475,6 +476,7 @@ async function renderQuickNotesView() {
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:6px;">
+                            <button class="item-action-btn" onclick="event.stopPropagation(); openEditUnifiedTaskModal('${t.type}', ${t.raw_id}, ${t.page_id})" title="Görevi Düzenle" style="color:var(--accent); font-size:0.85rem;">✏️</button>
                             ${alarmBtn}
                             <span style="color:var(--muted); font-size:0.8rem;">➔</span>
                         </div>
@@ -505,15 +507,16 @@ function toggleCompletedQuickTasks() {
 function renderQuickTaskCardHtml(it) {
     const alarmColor = it.remind_at ? '#7c3aed' : 'var(--muted)';
     return `
-        <div class="checklist-item-card ${it.is_done ? 'done' : ''}" style="margin-bottom:6px; cursor:pointer;" onclick="openEditItemModal(${it.id}, ${JSON.stringify(it.title).replace(/"/g, '&quot;')}, true)">
+        <div class="checklist-item-card ${it.is_done ? 'done' : ''}" style="margin-bottom:6px; cursor:pointer;" onclick="openEditItemModal(${it.id}, null, true)">
             <div class="checkbox-custom" onclick="event.stopPropagation(); toggleQuickDirectItem(${it.id})" title="${it.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                 ${it.is_done ? '✓' : ''}
             </div>
-            <div class="checklist-item-body">
+            <div class="checklist-item-body" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, true)">
                 <div class="checklist-item-title">${escapeHtml(it.title)}</div>
                 ${it.remind_at ? `<div class="checklist-item-meta"><span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; cursor:pointer;" onclick="event.stopPropagation(); openItemReminderModal(${it.id})">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span></div>` : ''}
             </div>
             <div class="checklist-item-actions" style="display:flex; align-items:center; gap:4px;">
+                <button class="item-action-btn" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, true)" title="Görevi Düzenle" style="color:var(--accent); font-size:0.9rem;">✏️</button>
                 <button class="item-action-btn" style="color:${alarmColor}; font-size:0.9rem;" onclick="event.stopPropagation(); openItemReminderModal(${it.id})" title="Alarm & Hatırlatıcı Ayarla">⏰</button>
                 <button class="item-action-btn" onclick="event.stopPropagation(); deleteQuickDirectItem(${it.id})" title="Sil">🗑️</button>
             </div>
@@ -522,10 +525,15 @@ function renderQuickTaskCardHtml(it) {
 }
 
 // Hızlı Not Düzenleme
-function openEditQuickNoteModal(id, content) {
+async function openEditQuickNoteModal(id, content = null) {
     document.getElementById('edit-quick-note-id').value = id;
     const txt = document.getElementById('edit-quick-note-content');
-    txt.value = content || '';
+    if (content !== null && content !== undefined && content !== '') {
+        txt.value = content;
+    } else {
+        const note = await window.appStorage.get('quick_notes', id);
+        txt.value = note ? note.content : '';
+    }
     openModal('modal-edit-quick-note');
     setTimeout(() => { txt.focus(); }, 150);
 }
@@ -563,15 +571,42 @@ async function deleteQuickNoteFromModal() {
 let currentEditingItemId = null;
 let currentEditingItemIsQuick = false;
 
-function openEditItemModal(id, title, isQuick = false) {
+async function openEditItemModal(id, title = null, isQuick = false) {
     currentEditingItemId = id;
     currentEditingItemIsQuick = isQuick;
     document.getElementById('edit-item-id').value = id;
     document.getElementById('edit-item-is-quick').value = isQuick ? '1' : '0';
     const titleInput = document.getElementById('edit-item-title');
-    titleInput.value = title || '';
+    if (title !== null && title !== undefined && title !== '') {
+        titleInput.value = title;
+    } else {
+        const item = await window.appStorage.get('items', id);
+        titleInput.value = item ? item.title : '';
+    }
     openModal('modal-edit-item');
     setTimeout(() => { titleInput.focus(); }, 150);
+}
+
+async function openEditUnifiedTaskModal(taskType, rawId, pageId) {
+    if (taskType === 'checklist') {
+        await openEditItemModal(rawId, null, (activeView === 'quick'));
+    } else if (taskType === 'finance') {
+        const item = await window.appStorage.get('finance', rawId);
+        const currentTitle = item ? item.title : '';
+        const newTitle = prompt('Ödeme başlığını düzenle:', currentTitle);
+        if (newTitle && newTitle.trim() && newTitle.trim() !== currentTitle) {
+            if (item) {
+                item.title = newTitle.trim();
+                item._dirty = true;
+                item.updated_at = new Date().toISOString();
+                await window.appStorage.put('finance', item);
+                if (activeView === 'quick') await renderQuickNotesView();
+                else if (activeView === 'ozet') await renderOverview();
+                if (window.appSync) window.appSync.syncNow();
+                showMobileToast('Ödeme güncellendi ✓');
+            }
+        }
+    }
 }
 
 function openReminderFromEditModal() {
@@ -594,13 +629,15 @@ async function submitEditItem() {
         await window.appStorage.put('items', item);
     }
     closeModal('modal-edit-item');
-    if (isQuick) {
+    if (isQuick || activeView === 'quick') {
         await renderQuickNotesView();
+    } else if (activeView === 'ozet') {
+        await renderOverview();
     } else if (activePageId) {
         await renderChecklistItems(activePageId);
     }
     if (window.appSync) window.appSync.syncNow();
-    showMobileToast('Görev güncellendi');
+    showMobileToast('Görev güncellendi ✓');
 }
 
 async function deleteItemFromEditModal() {
@@ -610,8 +647,10 @@ async function deleteItemFromEditModal() {
     const item = await window.appStorage.get('items', id);
     await window.appStorage.deleteItem(id);
     closeModal('modal-edit-item');
-    if (isQuick) {
+    if (isQuick || activeView === 'quick') {
         await renderQuickNotesView();
+    } else if (activeView === 'ozet') {
+        await renderOverview();
     } else if (activePageId) {
         await renderChecklistItems(activePageId);
     }
@@ -619,7 +658,8 @@ async function deleteItemFromEditModal() {
     if (item) {
         pushDeletedHistory('item', item, async () => {
             await window.appStorage.saveItem(item);
-            if (isQuick) await renderQuickNotesView();
+            if (isQuick || activeView === 'quick') await renderQuickNotesView();
+            else if (activeView === 'ozet') await renderOverview();
             else if (activePageId) await renderChecklistItems(activePageId);
             if (window.appSync) window.appSync.syncNow();
         });
@@ -1641,15 +1681,16 @@ function renderChecklistItemHtml(it) {
     const alarmIconColor = it.remind_at ? '#7c3aed' : 'var(--muted)';
 
     return `
-        <div class="checklist-item-card ${it.is_done ? 'done' : ''}" id="item-card-${it.id}" style="cursor:pointer;" onclick="openEditItemModal(${it.id}, ${JSON.stringify(it.title).replace(/"/g, '&quot;')}, false)">
+        <div class="checklist-item-card ${it.is_done ? 'done' : ''}" id="item-card-${it.id}" style="cursor:pointer;" onclick="openEditItemModal(${it.id}, null, false)">
             <div class="checkbox-custom" onclick="event.stopPropagation(); toggleItemDone(${it.id})" title="${it.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                 ${it.is_done ? '✓' : ''}
             </div>
-            <div class="checklist-item-body">
+            <div class="checklist-item-body" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)">
                 <div class="checklist-item-title">${escapeHtml(it.title)}</div>
                 ${metaBadges ? `<div class="checklist-item-meta">${metaBadges}</div>` : ''}
             </div>
             <div class="checklist-item-actions" style="display:flex; align-items:center; gap:4px;">
+                <button class="item-action-btn" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)" title="Düzenle" style="color:var(--accent); font-size:0.9rem;">✏️</button>
                 <button class="item-action-btn" style="color:${alarmIconColor}; font-size:0.9rem;" onclick="event.stopPropagation(); openItemReminderModal(${it.id})" title="Alarm & Hatırlatıcı Ayarla">⏰</button>
                 <button class="item-action-btn" onclick="event.stopPropagation(); deletePageItem(${it.id})" title="Sil">🗑️</button>
             </div>
@@ -2818,6 +2859,7 @@ async function renderOverview() {
                         </div>
                     </div>
                     <div style="display:flex; align-items:center; gap:6px;">
+                        <button class="item-action-btn" style="color:var(--accent); font-size:0.85rem; padding:4px;" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)" title="Görevi Düzenle">✏️</button>
                         ${alarmBtn}
                         <span style="color:var(--muted); font-size:0.75rem;">➔</span>
                     </div>

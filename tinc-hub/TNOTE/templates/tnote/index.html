@@ -1425,39 +1425,40 @@
     </div>
 </div>
 
-<!-- Modal: Madde / Öğe Düzenle -->
+<!-- Modal: Madde / Görev Düzenle -->
 <div class="tnote-modal-backdrop" id="modal-edit-item">
     <div class="tnote-modal">
         <div class="modal-header">
-            <span>Maddeyi Düzenle</span>
+            <span id="modal-edit-item-header">Görevi / Maddeyi Düzenle</span>
             <button class="btn-icon" onclick="closeModal('modal-edit-item')">✕</button>
         </div>
         <div class="modal-body">
             <input type="hidden" id="edit-item-id">
+            <input type="hidden" id="edit-item-type" value="checklist">
             <div class="form-group">
-                <label>Madde Başlığı</label>
-                <input type="text" id="edit-item-title" class="form-control">
+                <label>Başlık</label>
+                <input type="text" id="edit-item-title" class="form-control" onkeydown="if(event.key==='Enter') submitEditItem()">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="edit-item-qty-group">
                 <label>Miktar / Adet</label>
                 <input type="text" id="edit-item-qty" class="form-control" placeholder="Miktar">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="edit-item-price-group">
                 <label>Fiyat</label>
                 <input type="text" id="edit-item-price" class="form-control" placeholder="Fiyat">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="edit-item-url-group">
                 <label>Ürün / Web Linki</label>
                 <input type="text" id="edit-item-url" class="form-control" placeholder="Link">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="edit-item-desc-group">
                 <label>Açıklama / Not</label>
                 <input type="text" id="edit-item-desc" class="form-control" placeholder="Açıklama">
             </div>
         </div>
         <div class="modal-footer">
             <button class="btn" onclick="closeModal('modal-edit-item')">İptal</button>
-            <button class="btn btn-primary" onclick="submitEditItem()">Güncelle</button>
+            <button class="btn btn-primary" onclick="submitEditItem()">Kaydet</button>
         </div>
     </div>
 </div>

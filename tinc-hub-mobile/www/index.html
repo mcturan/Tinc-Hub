@@ -1574,7 +1574,7 @@
             <input type="hidden" id="edit-item-is-quick" value="0">
             <div class="form-group" style="margin-bottom:12px;">
                 <label class="form-label" style="font-size:0.8rem; color:var(--muted);">Görev / Madde Başlığı:</label>
-                <input type="text" id="edit-item-title" class="input-text" style="font-size:0.92rem; font-weight:600;" placeholder="Görev başlığı...">
+                <input type="text" id="edit-item-title" class="input-text" style="font-size:0.92rem; font-weight:600;" placeholder="Görev başlığı..." onkeydown="if(event.key==='Enter') submitEditItem()">
             </div>
             <div class="form-group" style="margin-bottom:14px;">
                 <button type="button" class="btn btn-secondary btn-sm" id="edit-item-reminder-btn" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.82rem; padding:8px;" onclick="openReminderFromEditModal()">

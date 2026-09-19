@@ -633,15 +633,18 @@ async function renderWebQuickTasks() {
                     notesListEl.innerHTML = notes.map(n => {
                         const dateStr = n.created_at ? n.created_at.slice(5, 16) : '';
                         return `
-                            <div class="ov-item-row" style="background:var(--surface, #fff); border:1px solid var(--border); border-radius:6px; padding:6px 10px; display:flex; flex-direction:column; gap:4px; margin-bottom:4px;">
-                                <div style="font-size:0.83rem; color:var(--text); white-space:pre-wrap; word-break:break-word; line-height:1.35; cursor:pointer;" onclick="openQuickNoteDetail(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')}, '${dateStr}')">${escapeHtml(n.content)}</div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:4px; margin-top:2px;">
-                                    <span style="font-size:0.68rem; color:var(--muted); opacity:0.85;">${escapeHtml(dateStr)}</span>
+                            <div class="ov-item-row" style="background:var(--surface, #fff); border:1px solid var(--border); border-radius:6px; padding:8px 10px; display:flex; flex-direction:column; gap:6px; margin-bottom:6px; cursor:pointer;" onclick="openQuickNoteDetail(${n.id})">
+                                <div style="font-size:0.85rem; color:var(--text); white-space:pre-wrap; word-break:break-word; line-height:1.4;">${escapeHtml(n.content)}</div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #f1f5f9; padding-top:6px; margin-top:2px;">
+                                    <span style="font-size:0.70rem; color:var(--muted); opacity:0.85;">🕒 ${escapeHtml(dateStr)} • <span style="color:var(--accent);">Düzenlemek için tıkla</span></span>
                                     <div style="display:flex; gap:4px;">
-                                        <button class="btn-icon-subtle" onclick="openTransferQuickNoteModal(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')})" title="Sayfaya Aktar" style="padding:2px 4px;">
+                                        <button class="btn-icon-subtle" onclick="event.stopPropagation(); openQuickNoteDetail(${n.id})" title="Düzenle" style="padding:2px 6px;">
+                                            <svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg>
+                                        </button>
+                                        <button class="btn-icon-subtle" onclick="event.stopPropagation(); openTransferQuickNoteModal(${n.id})" title="Sayfaya Aktar" style="padding:2px 6px;">
                                             <svg class="svg-icon svg-icon-xs"><use href="#i-folder"/></svg>
                                         </button>
-                                        <button class="btn-icon-subtle btn-danger-hover" onclick="deleteWebQuickNote(${n.id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);">
+                                        <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteWebQuickNote(${n.id})" title="Sil" style="padding:2px 6px; color:var(--danger, #ef4444);">
                                             <svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg>
                                         </button>
                                     </div>
@@ -732,6 +735,7 @@ async function renderWebQuickTasks() {
                             <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                                 ${t.due_badge ? `<span style="background:${badgeBg}; color:${badgeColor}; font-size:0.70rem; font-weight:600; padding:2px 6px; border-radius:4px;">${escapeHtml(t.due_badge)}</span>` : ''}
                                 <span class="ov-page-tag" onclick="event.stopPropagation(); loadPage(${t.page_id})" title="${escapeHtml(t.page_title)} sayfasına git">${escapeHtml(t.page_title)}</span>
+                                <button class="btn-icon-subtle" onclick="event.stopPropagation(); openWebTaskEditModal('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
                                 <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteUnifiedTask('${t.type}', ${t.raw_id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
                             </div>
                         </div>
@@ -761,13 +765,14 @@ function toggleWebCompletedTasks() {
 
 function renderWebDirectTaskRow(t) {
     return `
-        <div class="ov-item-row" id="web-unified-task-${t.id}" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" onclick="editUnifiedTask('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenlemek için tıklayın">
-            <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+        <div class="ov-item-row" id="web-unified-task-${t.id}" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; background:var(--surface, #fff); border:1px solid var(--border, #e2e8f0); border-radius:6px; margin-bottom:4px;" onclick="openWebTaskEditModal('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenlemek için tıklayın">
+            <div class="ov-item-left" style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;" onclick="event.stopPropagation(); openWebTaskEditModal('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})">
                 <input type="checkbox" ${t.is_done ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleWebUnifiedTask('${t.type}', ${t.raw_id}, this)" style="cursor:pointer; width:15px; height:15px; flex-shrink:0;" title="${t.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                 <span class="ov-item-text" style="font-size:0.83rem; font-weight:500; color:var(--text, #1e293b); ${t.is_done ? 'text-decoration:line-through; opacity:0.5;' : ''}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
             </div>
             <div class="ov-item-meta" style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                 <span style="background:#e0f2fe; color:#0284c7; font-size:0.70rem; font-weight:600; padding:2px 6px; border-radius:4px;">Hızlı</span>
+                <button class="btn-icon-subtle" onclick="event.stopPropagation(); openWebTaskEditModal('${t.type}', ${t.raw_id}, ${JSON.stringify(t.title).replace(/"/g, '&quot;')})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);"><svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg></button>
                 <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteUnifiedTask('${t.type}', ${t.raw_id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);"><svg class="svg-icon svg-icon-xs"><use href="#i-trash"/></svg></button>
             </div>
         </div>
@@ -818,7 +823,18 @@ async function openTransferQuickNoteModal(noteId, content) {
     const idEl = document.getElementById('transfer-note-id');
     const prevEl = document.getElementById('transfer-note-preview');
     if (idEl) idEl.value = noteId;
-    if (prevEl) prevEl.textContent = content;
+    if (content !== undefined && content !== null && content !== '') {
+        if (prevEl) prevEl.textContent = content;
+    } else {
+        try {
+            const qnRes = await fetch('/notes/api/quick-notes');
+            const qnData = await qnRes.json();
+            if (qnData.ok && qnData.notes) {
+                const found = qnData.notes.find(n => n.id === noteId);
+                if (found && prevEl) prevEl.textContent = found.content;
+            }
+        } catch(e) {}
+    }
 
     // Hedef Sayfaları Doldur
     try {
@@ -934,27 +950,7 @@ async function addWebQuickTask() {
 }
 
 async function editUnifiedTask(taskType, rawId, currentTitle) {
-    const newTitle = prompt('Görevi düzenle:', currentTitle);
-    if (!newTitle || newTitle.trim() === '' || newTitle.trim() === currentTitle) return;
-
-    try {
-        if (taskType === 'finance') {
-            await fetch(`/notes/api/finance/${rawId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: newTitle.trim() })
-            });
-        } else {
-            await fetch(`/notes/api/items/${rawId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title: newTitle.trim() })
-            });
-        }
-        await renderWebQuickTasks();
-    } catch (e) {
-        console.error("editUnifiedTask error:", e);
-    }
+    await openWebTaskEditModal(taskType, rawId, currentTitle);
 }
 
 async function deleteUnifiedTask(taskType, rawId) {
@@ -1094,13 +1090,13 @@ async function loadOverviewQuickNotes() {
         listEl.innerHTML = data.notes.slice(0, 5).map(n => {
             const dateStr = n.created_at ? n.created_at.slice(0, 16) : '';
             return `
-            <div class="ov-quicknote-row" onclick="openQuickNoteDetail(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')}, '${dateStr}')" title="Görüntülemek veya düzenlemek için tıklayın">
+            <div class="ov-quicknote-row" onclick="openQuickNoteDetail(${n.id})" title="Görüntülemek veya düzenlemek için tıklayın">
                 <span class="ov-quicknote-text">${escapeHtml(n.content)}</span>
                 <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-                    <button class="btn-icon-subtle" onclick="event.stopPropagation(); openQuickNoteDetail(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')}, '${dateStr}')" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);">
+                    <button class="btn-icon-subtle" onclick="event.stopPropagation(); openQuickNoteDetail(${n.id})" title="Düzenle" style="padding:2px 4px; color:var(--text-muted);">
                         <svg class="svg-icon svg-icon-xs"><use href="#i-edit"/></svg>
                     </button>
-                    <button class="btn-icon-subtle" onclick="event.stopPropagation(); openTransferQuickNoteModal(${n.id}, ${JSON.stringify(n.content).replace(/"/g, '&quot;')})" title="Sayfaya Aktar" style="padding:2px 4px; color:var(--text-muted);">
+                    <button class="btn-icon-subtle" onclick="event.stopPropagation(); openTransferQuickNoteModal(${n.id})" title="Sayfaya Aktar" style="padding:2px 4px; color:var(--text-muted);">
                         <svg class="svg-icon svg-icon-xs"><use href="#i-folder"/></svg>
                     </button>
                     <button class="btn-icon-subtle btn-danger-hover" onclick="event.stopPropagation(); deleteOverviewQuickNote(${n.id})" title="Sil" style="padding:2px 4px; color:var(--danger, #ef4444);">
@@ -1397,22 +1393,7 @@ async function toggleTaskFromOverview(itemId, checkboxEl) {
 }
 
 async function editTaskFromOverview(itemId, currentTitle) {
-    const newTitle = prompt('Görevi düzenle:', currentTitle);
-    if (!newTitle || newTitle.trim() === '' || newTitle.trim() === currentTitle) return;
-    try {
-        const res = await fetch(`/notes/api/items/${itemId}`, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ title: newTitle.trim() })
-        });
-        const data = await res.json();
-        if (data.ok) {
-            loadOverviewPage();
-            if (typeof renderWebQuickTasks === 'function') renderWebQuickTasks();
-        }
-    } catch(e) {
-        console.error("editTaskFromOverview error:", e);
-    }
+    await openWebTaskEditModal('checklist', itemId, currentTitle);
 }
 
 async function deleteTaskFromOverview(itemId) {
@@ -2664,46 +2645,112 @@ async function submitEditPage() {
     }
 }
 
-// Madde / Öğe Düzenleme
-function openEditItemModal(itemId) {
-    const item = currentItems.find(i => i.id === itemId);
-    if (!item) return;
+// Madde / Görev Düzenleme
+async function openWebTaskEditModal(taskType, rawId, initialTitle = '') {
+    const idInput = document.getElementById('edit-item-id');
+    const typeInput = document.getElementById('edit-item-type');
+    const titleInput = document.getElementById('edit-item-title');
+    const qtyInput = document.getElementById('edit-item-qty');
+    const priceInput = document.getElementById('edit-item-price');
+    const urlInput = document.getElementById('edit-item-url');
+    const descInput = document.getElementById('edit-item-desc');
+    const headerSpan = document.getElementById('modal-edit-item-header');
 
-    document.getElementById('edit-item-id').value = item.id;
-    document.getElementById('edit-item-title').value = item.title || '';
-    document.getElementById('edit-item-qty').value = item.quantity || '';
-    document.getElementById('edit-item-price').value = item.price || '';
-    document.getElementById('edit-item-url').value = item.url || '';
-    document.getElementById('edit-item-desc').value = item.description || '';
+    if (idInput) idInput.value = rawId;
+    if (typeInput) typeInput.value = taskType || 'checklist';
+    if (titleInput) titleInput.value = initialTitle || '';
+    if (headerSpan) headerSpan.textContent = taskType === 'finance' ? 'Ödemeyi Düzenle' : 'Görevi / Maddeyi Düzenle';
+
+    const isChecklist = (taskType !== 'finance');
+    const qtyGroup = document.getElementById('edit-item-qty-group');
+    const priceGroup = document.getElementById('edit-item-price-group');
+    const urlGroup = document.getElementById('edit-item-url-group');
+    const descGroup = document.getElementById('edit-item-desc-group');
+    if (qtyGroup) qtyGroup.style.display = isChecklist ? 'block' : 'none';
+    if (priceGroup) priceGroup.style.display = isChecklist ? 'block' : 'none';
+    if (urlGroup) urlGroup.style.display = isChecklist ? 'block' : 'none';
+    if (descGroup) descGroup.style.display = isChecklist ? 'block' : 'none';
+
+    if (isChecklist) {
+        const localItem = (typeof currentItems !== 'undefined' && Array.isArray(currentItems)) ? currentItems.find(i => i.id === rawId) : null;
+        if (localItem) {
+            if (titleInput) titleInput.value = localItem.title || '';
+            if (qtyInput) qtyInput.value = localItem.quantity || '';
+            if (priceInput) priceInput.value = localItem.price || '';
+            if (urlInput) urlInput.value = localItem.url || '';
+            if (descInput) descInput.value = localItem.description || '';
+        } else {
+            try {
+                const res = await fetch(`/notes/api/items/${rawId}`);
+                const data = await res.json();
+                if (data.ok && data.item) {
+                    if (titleInput) titleInput.value = data.item.title || '';
+                    if (qtyInput) qtyInput.value = data.item.quantity || '';
+                    if (priceInput) priceInput.value = data.item.price || '';
+                    if (urlInput) urlInput.value = data.item.url || '';
+                    if (descInput) descInput.value = data.item.description || '';
+                }
+            } catch (e) {
+                console.warn("fetch item error:", e);
+            }
+        }
+    }
+
     openModal('modal-edit-item');
+    setTimeout(() => { if (titleInput) titleInput.focus(); }, 120);
+}
+
+function openEditItemModal(itemId) {
+    openWebTaskEditModal('checklist', itemId);
 }
 
 async function submitEditItem() {
     const itemId = document.getElementById('edit-item-id').value;
+    const itemType = document.getElementById('edit-item-type')?.value || 'checklist';
     const title = document.getElementById('edit-item-title').value.trim();
-    const qty = document.getElementById('edit-item-qty').value.trim();
-    const price = document.getElementById('edit-item-price').value.trim();
-    const url = document.getElementById('edit-item-url').value.trim();
-    const desc = document.getElementById('edit-item-desc').value.trim();
+    const qty = document.getElementById('edit-item-qty')?.value.trim() || '';
+    const price = document.getElementById('edit-item-price')?.value.trim() || '';
+    const url = document.getElementById('edit-item-url')?.value.trim() || '';
+    const desc = document.getElementById('edit-item-desc')?.value.trim() || '';
 
     if (!title || !itemId) return;
 
-    const res = await fetch(`/notes/api/items/${itemId}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            title: title,
-            quantity: qty,
-            price: price,
-            url: url,
-            description: desc
-        })
-    });
-    const data = await res.json();
-    if (data.ok) {
+    try {
+        if (itemType === 'finance') {
+            await fetch(`/notes/api/finance/${itemId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ title: title })
+            });
+        } else {
+            await fetch(`/notes/api/items/${itemId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    title: title,
+                    quantity: qty,
+                    price: price,
+                    url: url,
+                    description: desc
+                })
+            });
+        }
         closeModal('modal-edit-item');
-        showToast("Madde güncellendi!");
-        loadPage(currentPageId);
+        if (typeof showToast === 'function') showToast("Görev güncellendi ✓");
+
+        if (currentPageId) {
+            loadPage(currentPageId);
+        }
+        const quickArea = document.getElementById('quick-tasks-view');
+        if (quickArea && quickArea.style.display !== 'none') {
+            renderWebQuickTasks();
+        }
+        const ovArea = document.getElementById('overview-view');
+        if (ovArea && ovArea.style.display !== 'none') {
+            loadOverviewPage();
+        }
+    } catch (e) {
+        console.error("submitEditItem error:", e);
     }
 }
 
@@ -5704,21 +5751,34 @@ function copyAiReply() {
 // ─────────────────────────────────────────────────────────────
 let currentDetailQuickNoteId = null;
 
-function openQuickNoteDetail(id, content, dateStr) {
+async function openQuickNoteDetail(id, content, dateStr) {
     currentDetailQuickNoteId = id;
-    const modal = document.getElementById('modal-quicknote-detail');
     const idInput = document.getElementById('qn-detail-id');
     const contentInput = document.getElementById('qn-detail-content');
     const dateLabel = document.getElementById('qn-detail-date');
 
     if (idInput) idInput.value = id;
-    if (contentInput) contentInput.value = content;
+    if (content !== undefined && content !== null && content !== '') {
+        if (contentInput) contentInput.value = content;
+    } else {
+        try {
+            const res = await fetch('/notes/api/quick-notes');
+            const data = await res.json();
+            if (data.ok && data.notes) {
+                const found = data.notes.find(n => n.id === id);
+                if (found) {
+                    if (contentInput) contentInput.value = found.content;
+                    if (!dateStr && found.created_at) dateStr = found.created_at.slice(5, 16);
+                }
+            }
+        } catch (e) {
+            console.warn("fetch quick note error:", e);
+        }
+    }
     if (dateLabel) dateLabel.textContent = dateStr ? `Kayıt Tarihi: ${dateStr}` : '';
 
-    if (modal) {
-        modal.style.display = 'flex';
-        setTimeout(() => { if (contentInput) contentInput.focus(); }, 100);
-    }
+    openModal('modal-quicknote-detail');
+    setTimeout(() => { if (contentInput) contentInput.focus(); }, 120);
 }
 
 async function saveDetailQuickNote() {

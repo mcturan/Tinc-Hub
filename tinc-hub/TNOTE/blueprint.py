@@ -1295,6 +1295,14 @@ def api_add_item(page_id):
 
     return jsonify({"ok": True, "item_id": item_id, "items": db.get_items(page_id)})
 
+@tnote_bp.route('/api/items/<int:item_id>', methods=['GET'])
+@auth_check
+def api_get_item(item_id):
+    item = db.get_item(item_id)
+    if not item:
+        return jsonify({"ok": False, "error": "Madde bulunamadı"}), 404
+    return jsonify({"ok": True, "item": item})
+
 @tnote_bp.route('/api/items/<int:item_id>', methods=['PUT'])
 @auth_check
 def api_update_item(item_id):
