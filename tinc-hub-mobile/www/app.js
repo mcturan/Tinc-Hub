@@ -109,6 +109,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 5. Tarih Gösterimi
     updateDateDisplay();
 
+    // Sanal Klavye Tespiti (Alt menünün formları örtmesini engeller)
+    if (window.visualViewport) {
+        const initialH = window.visualViewport.height;
+        window.visualViewport.addEventListener('resize', () => {
+            if (window.visualViewport.height < initialH * 0.78) {
+                document.body.classList.add('keyboard-open');
+            } else {
+                document.body.classList.remove('keyboard-open');
+            }
+        });
+    }
+    document.addEventListener('focusin', (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
+            document.body.classList.add('keyboard-open');
+        }
+    });
+    document.addEventListener('focusout', (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) {
+            setTimeout(() => {
+                const active = document.activeElement;
+                if (!active || (active.tagName !== 'INPUT' && active.tagName !== 'TEXTAREA' && !active.isContentEditable)) {
+                    document.body.classList.remove('keyboard-open');
+                }
+            }, 150);
+        }
+    });
+
     // 6. Sol Çekmece Ağacını (Defterler & Kategoriler & Sayfalar) Yükle
     await reloadDrawerNavigation();
 

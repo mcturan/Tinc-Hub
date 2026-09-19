@@ -406,7 +406,7 @@ class TincNoteSync {
                             const allPages = await this.storage.getAll('pages');
                             for (const p of allPages) {
                                 if (p.category_id == oldId) {
-                                    p.category_id = data.category_id;
+                                    p.category_id = newCatId;
                                     await this.storage.put('pages', p);
                                 }
                             }
@@ -454,10 +454,11 @@ class TincNoteSync {
                             })
                         });
                         const data = await res.json();
-                        if (data.ok && data.page_id) {
+                        const newPageId = data.page_id || data.id;
+                        if (data.ok && newPageId) {
                             const oldPageId = p.id;
                             await this.storage.delete('pages', oldPageId);
-                            p.id = data.page_id;
+                            p.id = newPageId;
                             p._dirty = false;
                             await this.storage.put('pages', p);
 
@@ -465,14 +466,14 @@ class TincNoteSync {
                             const allLocalItems = await this.storage.getAll('items');
                             for (const item of allLocalItems) {
                                 if (item.page_id === oldPageId) {
-                                    item.page_id = data.page_id;
+                                    item.page_id = newPageId;
                                     await this.storage.put('items', item);
                                 }
                             }
                             const allLocalFinances = await this.storage.getAll('finances');
                             for (const fin of allLocalFinances) {
                                 if (fin.page_id === oldPageId) {
-                                    fin.page_id = data.page_id;
+                                    fin.page_id = newPageId;
                                     await this.storage.put('finances', fin);
                                 }
                             }

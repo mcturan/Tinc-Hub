@@ -140,15 +140,28 @@ body {
     background: var(--surface2);
     border: 1px solid var(--border);
     color: var(--text);
-    width: 36px;
-    height: 36px;
+    min-width: 40px;
+    min-height: 40px;
+    width: 40px;
+    height: 40px;
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1rem;
+    font-size: 1.05rem;
     cursor: pointer;
     transition: all 0.15s;
+    position: relative;
+    touch-action: manipulation;
+}
+
+.icon-btn::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    left: -4px;
+    right: -4px;
 }
 
 .icon-btn:active {
@@ -1788,6 +1801,11 @@ body {
     justify-content: space-around;
     z-index: 95;
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+body.keyboard-open .bottom-nav-bar {
+    display: none !important;
 }
 
 .bottom-nav-item {
