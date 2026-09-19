@@ -517,23 +517,34 @@ function renderQuickTaskCardHtml(it) {
     `;
 }
 
-// Hızlı Not Düzenleme
+let _lastQuickNoteModalOpenTime = 0;
 async function openEditQuickNoteModal(id, content = null) {
-    if (window._suppressClickUntil && Date.now() < window._suppressClickUntil) return;
-    document.getElementById('edit-quick-note-id').value = id;
+    if (Date.now() - _lastQuickNoteModalOpenTime < 350) return;
+    _lastQuickNoteModalOpenTime = Date.now();
+
+    const idInput = document.getElementById('edit-quick-note-id');
+    if (idInput) idInput.value = id;
     const txt = document.getElementById('edit-quick-note-content');
     const dtInput = document.getElementById('edit-quick-note-remind-at');
-    const note = await window.appStorage.get('quick_notes', id);
-    if (content !== null && content !== undefined && content !== '') {
-        txt.value = content;
-    } else {
-        txt.value = note ? note.content : '';
-    }
-    if (dtInput) {
-        dtInput.value = (note && note.remind_at) ? note.remind_at.substring(0, 16).replace(' ', 'T') : '';
-    }
+    if (txt && content) txt.value = content;
     openModal('modal-edit-quick-note');
-    setTimeout(() => { txt.focus(); }, 150);
+
+    try {
+        const note = await window.appStorage.get('quick_notes', Number(id)) || await window.appStorage.get('quick_notes', id);
+        if (txt) {
+            if (content !== null && content !== undefined && content !== '') {
+                txt.value = content;
+            } else {
+                txt.value = note ? note.content : '';
+            }
+            setTimeout(() => { txt.focus(); }, 120);
+        }
+        if (dtInput) {
+            dtInput.value = (note && note.remind_at) ? note.remind_at.substring(0, 16).replace(' ', 'T') : '';
+        }
+    } catch (e) {
+        console.warn('openEditQuickNoteModal fetch error:', e);
+    }
 }
 
 function setEditQuickNotePreset(daysAhead, hour, minute) {
@@ -613,8 +624,11 @@ function clearEditItemReminder() {
     if (dtInput) dtInput.value = '';
 }
 
+let _lastItemModalOpenTime = 0;
 async function openEditItemModal(id, title = null, isQuick = false) {
-    if (window._suppressClickUntil && Date.now() < window._suppressClickUntil) return;
+    if (Date.now() - _lastItemModalOpenTime < 350) return;
+    _lastItemModalOpenTime = Date.now();
+
     try {
         currentEditingItemId = id;
         currentEditingItemIsQuick = isQuick;
@@ -630,6 +644,11 @@ async function openEditItemModal(id, title = null, isQuick = false) {
 
         if (idInput) idInput.value = id;
         if (quickInput) quickInput.value = isQuick ? '1' : '0';
+        if (titleInput && title) titleInput.value = title;
+
+        // Hemen modalı aç (kullanıcı dokunur dokunmaz açılsın)
+        openModal('modal-edit-item');
+        if (titleInput) setTimeout(() => titleInput.focus(), 100);
 
         let item = null;
         if (window.appStorage) {
@@ -660,9 +679,6 @@ async function openEditItemModal(id, title = null, isQuick = false) {
         if (recSelect) {
             recSelect.value = (item && item.recurrence) ? item.recurrence : 'none';
         }
-
-        openModal('modal-edit-item');
-        setTimeout(() => { if (titleInput) titleInput.focus(); }, 120);
     } catch (e) {
         console.error('openEditItemModal error:', e);
         openModal('modal-edit-item');
@@ -1294,52 +1310,66 @@ function clearMobileDropIndicators() {
     });
 }
 
-// Genel 1.5s Uzun Basma Bağlayıcısı
-function attachLongPressDragHandler(element, onActivate) {
+// Genel 500ms Basılı Tutma (Drag) ve Anında Dokunma (Tap) Yöneticisi
+function attachLongPressDragHandler(element, onActivate, onTap = null) {
     let holdTimer = null;
     let startX = 0;
     let startY = 0;
+    let startTime = 0;
     let isFired = false;
+    let hasMoved = false;
 
     const onStart = (e) => {
-        if (e.target.closest('button, input, textarea, select, .checkbox-custom, a, .drawer-divider-del')) return;
+        if (e.target.closest('button, input, textarea, select, .checkbox-custom, a, .drawer-divider-del, .item-action-btn')) return;
         const pt = e.touches ? e.touches[0] : e;
         startX = pt.clientX;
         startY = pt.clientY;
+        startTime = Date.now();
         isFired = false;
+        hasMoved = false;
 
         holdTimer = setTimeout(() => {
             isFired = true;
-            window._suppressClickUntil = Date.now() + 400;
+            window._suppressClickUntil = Date.now() + 600;
             if (navigator.vibrate) {
                 try { navigator.vibrate([40, 30, 40]); } catch(err) {}
             }
             onActivate(element, pt.clientX, pt.clientY);
-        }, 500); // Android launcher tarzı hızlı basılı tutma (500ms)
+        }, 500); // 500ms Android launcher tarzı taşıma modu
     };
 
     const onMove = (e) => {
         if (isFired) return;
         const pt = e.touches ? e.touches[0] : e;
         if (Math.hypot(pt.clientX - startX, pt.clientY - startY) > 10) {
+            hasMoved = true;
             clearTimeout(holdTimer);
         }
     };
 
-    const onEnd = () => {
+    const onEnd = (e) => {
         clearTimeout(holdTimer);
+        if (isFired) return;
+
+        // Kullanıcı 500 ms'den kısa basıp bıraktıysa ve parmak kaymadıysa: BU KESİN BİR DOKUNMADIR!
+        if (!hasMoved && (Date.now() - startTime) < 500) {
+            if (typeof onTap === 'function') {
+                window._suppressClickUntil = Date.now() + 350;
+                onTap(element, e);
+            }
+        }
     };
 
     element.addEventListener('touchstart', onStart, { passive: true });
     element.addEventListener('touchmove', onMove, { passive: true });
     element.addEventListener('touchend', onEnd, { passive: true });
-    element.addEventListener('touchcancel', onEnd, { passive: true });
+    element.addEventListener('touchcancel', () => { clearTimeout(holdTimer); });
 
     // Masaüstü testleri için fare desteği
     element.addEventListener('mousedown', onStart);
     element.addEventListener('mousemove', onMove);
     element.addEventListener('mouseup', onEnd);
-    element.addEventListener('mouseleave', onEnd);
+    element.addEventListener('mouseleave', () => { clearTimeout(holdTimer); });
 }
 
 // 1. Sol Çekmece: Kategori ve Sayfalar
@@ -1364,6 +1394,11 @@ function initMobileDrawerDragAndDrop() {
                 label: isDivider ? 'Ayraç' : (groupEl.querySelector('.drawer-cat-title span:nth-child(3)')?.innerText || 'Dosya'),
                 icon: isDivider ? '―' : '📁'
             });
+        }, (el) => {
+            const groupEl = el.closest('.drawer-cat-group');
+            if (groupEl && groupEl.dataset.categoryId) {
+                toggleCategoryAccordion(groupEl.dataset.categoryId);
+            }
         });
     });
 
@@ -1382,15 +1417,17 @@ function initMobileDrawerDragAndDrop() {
                 label: titleSpan ? titleSpan.innerText : 'Sayfa',
                 icon: '📄'
             });
+        }, (el) => {
+            if (el.dataset.pageId) {
+                openPage(el.dataset.pageId);
+            }
         });
     });
 }
 
 // 2. Sayfa İçi Maddeler (Checklist)
 function initChecklistItemsLongPressDrag(pageId) {
-    const listEl = document.getElementById('page-items-list');
-    if (!listEl) return;
-    const cards = listEl.querySelectorAll('.checklist-item-card');
+    const cards = document.querySelectorAll('#page-items-list .checklist-item-card, #page-completed-list .checklist-item-card');
     cards.forEach(card => {
         attachLongPressDragHandler(card, (el, x, y) => {
             const titleEl = el.querySelector('.checklist-item-title');
@@ -1404,6 +1441,12 @@ function initChecklistItemsLongPressDrag(pageId) {
                 label: titleEl ? titleEl.innerText : 'Görev',
                 icon: '☑️'
             });
+        }, (el) => {
+            // Anında dokunma ile Görev Detay / Düzenleme Modalı
+            if (el.dataset.itemId) {
+                const titleEl = el.querySelector('.checklist-item-title');
+                openEditItemModal(el.dataset.itemId, titleEl ? titleEl.innerText.trim() : null, false);
+            }
         });
     });
 }
@@ -1426,6 +1469,10 @@ function initQuickViewLongPressDrag() {
                     label: titleEl ? titleEl.innerText : 'Hızlı Görev',
                     icon: '☑️'
                 });
+            }, (el) => {
+                if (el.dataset.itemId) {
+                    openEditItemModal(el.dataset.itemId, null, true);
+                }
             });
         });
     }
@@ -1446,6 +1493,10 @@ function initQuickViewLongPressDrag() {
                     label: noteText,
                     icon: '📝'
                 });
+            }, (el) => {
+                if (el.dataset.quickNoteId) {
+                    openEditQuickNoteModal(el.dataset.quickNoteId);
+                }
             });
         });
     }
@@ -1985,18 +2036,20 @@ function renderChecklistItemHtml(it) {
             const dt = new Date(it.remind_at.replace(' ', 'T'));
             displayRemind = `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
         } catch(e) {}
-        metaBadges += `<span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; cursor:pointer;" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)" title="Alarm ve Detayları Düzenle">⏰ ${displayRemind}</span>`;
+        metaBadges += `<span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; cursor:pointer;" onclick="event.stopPropagation(); openEditItemModal(${it.id}, ${JSON.stringify(it.title || '').replace(/"/g, '&quot;')}, false)" title="Alarm ve Detayları Düzenle">⏰ ${displayRemind}</span>`;
     }
     if (it.price) metaBadges += `<span class="meta-badge price">💰 ${escapeHtml(it.price)}</span>`;
     if (it.quantity) metaBadges += `<span class="meta-badge" style="background:var(--surface2); color:var(--text-secondary);">${escapeHtml(it.quantity)}</span>`;
     if (it.url) metaBadges += `<a href="${escapeHtml(it.url)}" target="_system" class="meta-badge url" onclick="event.stopPropagation()">🔗 Link</a>`;
 
+    const safeTitle = JSON.stringify(it.title || '').replace(/"/g, '&quot;');
+
     return `
-        <div class="checklist-item-card ${it.is_done ? 'done' : ''}" id="item-card-${it.id}" style="cursor:pointer;" onclick="openEditItemModal(${it.id}, null, false)" data-item-id="${it.id}">
+        <div class="checklist-item-card ${it.is_done ? 'done' : ''}" id="item-card-${it.id}" style="cursor:pointer;" onclick="openEditItemModal(${it.id}, ${safeTitle}, false)" data-item-id="${it.id}">
             <div class="checkbox-custom ${it.is_done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleItemDone(${it.id})" title="${it.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                 ${it.is_done ? '✓' : ''}
             </div>
-            <div class="checklist-item-body" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)">
+            <div class="checklist-item-body" onclick="event.stopPropagation(); openEditItemModal(${it.id}, ${safeTitle}, false)">
                 <div class="checklist-item-title" style="${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">${escapeHtml(it.title)}</div>
                 ${metaBadges ? `<div class="checklist-item-meta">${metaBadges}</div>` : ''}
             </div>
@@ -3159,29 +3212,31 @@ async function renderOverview() {
                 const targetPage = pageMap[it.page_id];
                 const pageTitle = targetPage ? targetPage.title : '';
                 const clickAction = it.page_id ? `openPage(${it.page_id})` : `openQuickTasksView()`;
+                const safeTitle = JSON.stringify(it.title || '').replace(/"/g, '&quot;');
 
                 return `
-                <div class="overview-item" style="cursor:pointer;" onclick="${clickAction}" title="${pageTitle ? escapeHtml(pageTitle) + ' listesine git' : 'Listeye git'}">
-                     <div style="display:flex; align-items:center; gap:10px; overflow:hidden; flex:1;">
+                <div class="overview-item" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; margin-bottom:6px; border-radius:10px; border:1px solid var(--border); background:var(--surface);" onclick="openEditItemModal(${it.id}, ${safeTitle}, false)" title="Görevi düzenlemek için dokunun">
+                     <div style="display:flex; align-items:center; gap:10px; overflow:hidden; flex:1; min-width:0;">
                          <div class="checkbox-custom ${it.is_done ? 'checked' : ''}" onclick="event.stopPropagation(); toggleOverviewItemDone(${it.id})" title="${it.is_done ? 'Tamamlanmadı yap' : 'Tamamla'}">
                              ${it.is_done ? '✓' : ''}
                          </div>
-                         <div style="overflow:hidden; display:flex; flex-direction:column; gap:2px; flex:1;">
-                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; font-size:0.9rem; ${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
+                         <div style="overflow:hidden; display:flex; flex-direction:column; gap:2px; flex:1; min-width:0;">
+                             <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; font-size:0.92rem; color:var(--text); ${it.is_done ? 'text-decoration:line-through; opacity:0.6;' : ''}">
                                  ${escapeHtml(it.title)}
                              </span>
-                             <div style="display:flex; align-items:center; gap:6px; font-size:0.72rem;">
-                                 ${it.remind_at ? `<span style="color:#7c3aed; font-weight:600;" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span>` : ''}
+                             <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                 ${pageTitle ? `<span style="color:var(--primary); font-weight:600; cursor:pointer;" onclick="event.stopPropagation(); ${clickAction}" title="${escapeHtml(pageTitle)} listesine git">📁 ${escapeHtml(pageTitle)}</span>` : ''}
+                                 ${it.remind_at ? `<span style="color:#7c3aed; font-weight:600;">⏰ ${escapeHtml(it.remind_at.substring(5, 16))}</span>` : ''}
                                  ${it.price ? `<span style="color:#059669; font-weight:600;">💰 ${escapeHtml(it.price)}</span>` : ''}
+                                 ${it.quantity ? `<span>📦 ${escapeHtml(it.quantity)}</span>` : ''}
                              </div>
                          </div>
                      </div>
-                     <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-                         <button class="btn btn-ghost btn-xs" style="padding:3px 6px; font-size:0.8rem; color:var(--muted);" onclick="event.stopPropagation(); openEditItemModal(${it.id}, null, false)" title="Detayları Düzenle">✏️</button>
-                         ${pageTitle ? `<span class="meta-badge" onclick="event.stopPropagation(); openPage(${it.page_id})" title="${escapeHtml(pageTitle)} listesine git" style="background:var(--surface2); color:var(--primary); font-weight:600; cursor:pointer; padding:3px 8px; border-radius:6px; border:1px solid var(--border);">📁 ${escapeHtml(pageTitle)} ➔</span>` : '<span style="color:var(--muted); font-size:0.75rem;">➔</span>'}
+                     <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                         <span style="color:var(--muted); font-size:0.85rem; cursor:pointer; padding:4px 6px;" onclick="event.stopPropagation(); ${clickAction}" title="${pageTitle ? escapeHtml(pageTitle) + ' listesine git' : 'Listeye git'}">➔</span>
                      </div>
                  </div>
-            `}).join('');
+            `;}).join('');
         }
     }
 
