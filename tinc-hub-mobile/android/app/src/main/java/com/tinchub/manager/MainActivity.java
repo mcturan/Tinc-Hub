@@ -203,14 +203,81 @@ public class MainActivity extends BridgeActivity {
             }
         }
         @JavascriptInterface
+        public void requestNotificationPermission() {
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= 33) {
+                    if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 101);
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        @JavascriptInterface
+        public void downloadAndInstallUpdate(String downloadUrl, String versionName) {
+            try {
+                if (downloadUrl == null || downloadUrl.trim().isEmpty()) return;
+                android.app.DownloadManager dm = (android.app.DownloadManager) mContext.getSystemService(Context.DOWNLOAD_SERVICE);
+                if (dm != null) {
+                    Uri uri = Uri.parse(downloadUrl.trim());
+                    String vClean = versionName != null ? versionName.replace("v", "") : "update";
+                    String fileName = "TincNote-v" + vClean + ".apk";
+                    android.app.DownloadManager.Request request = new android.app.DownloadManager.Request(uri);
+                    request.setTitle("TincNote v" + vClean + " İndiriliyor");
+                    request.setDescription("Yeni sürüm indiriliyor, tamamlandığında dokunarak kurabilirsiniz.");
+                    request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                    request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName);
+                    request.setMimeType("application/vnd.android.package-archive");
+                    dm.enqueue(request);
+                    android.widget.Toast.makeText(mContext, "🚀 TincNote v" + vClean + " otomatik indiriliyor...", android.widget.Toast.LENGTH_LONG).show();
+                } else {
+                    openBrowserUrl(downloadUrl);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                openBrowserUrl(downloadUrl);
+            }
+        }
+
+        @JavascriptInterface
+        public void scheduleTaskAlarm(long taskId, String title, String reminderIso, String recurrence, long pageId) {
+            scheduleAlarmInternal(taskId, title, reminderIso, recurrence, pageId);
+        }
+
+        @JavascriptInterface
         public void scheduleTaskAlarm(long taskId, String title, long pageId, String reminderIso, String recurrence) {
+            scheduleAlarmInternal(taskId, title, reminderIso, recurrence, pageId);
+        }
+
+        private void scheduleAlarmInternal(long taskId, String title, String reminderIso, String recurrence, long pageId) {
             try {
                 if (reminderIso == null || reminderIso.trim().isEmpty()) return;
-                String clean = reminderIso.replace("Z", "");
-                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm", java.util.Locale.getDefault());
-                java.util.Date date = sdf.parse(clean);
-                if (date == null) return;
-                long triggerMillis = date.getTime();
+                String clean = reminderIso.replace("Z", "").trim();
+
+                long triggerMillis = 0;
+                String[] formats = new String[] {
+                    "yyyy-MM-dd HH:mm:ss",
+                    "yyyy-MM-dd HH:mm",
+                    "yyyy-MM-dd'T'HH:mm:ss",
+                    "yyyy-MM-dd'T'HH:mm"
+                };
+                for (String fmt : formats) {
+                    try {
+                        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(fmt, java.util.Locale.getDefault());
+                        java.util.Date d = sdf.parse(clean);
+                        if (d != null) {
+                            triggerMillis = d.getTime();
+                            break;
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                if (triggerMillis == 0) {
+                    android.util.Log.e("TincNoteAlarm", "Failed to parse reminder time: " + clean);
+                    return;
+                }
 
                 if (triggerMillis <= System.currentTimeMillis()) {
                     android.util.Log.w("TincNoteAlarm", "Alarm time is in the past: " + clean);
@@ -234,7 +301,13 @@ public class MainActivity extends BridgeActivity {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                        if (am.canScheduleExactAlarms()) {
+                            am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerMillis, pi);
+                        } else {
+                            am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerMillis, pi);
+                        }
+                    } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
                         am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerMillis, pi);
                     } else {
                         am.setExact(android.app.AlarmManager.RTC_WAKEUP, triggerMillis, pi);

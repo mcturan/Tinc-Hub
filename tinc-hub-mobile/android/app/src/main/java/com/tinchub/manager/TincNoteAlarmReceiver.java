@@ -54,7 +54,7 @@ public class TincNoteAlarmReceiver extends BroadcastReceiver {
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("⏰ TincNote Görev Hatırlatması")
+            .setContentTitle("⏰ TincNote • Bildir")
             .setContentText(taskTitle)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(taskTitle))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

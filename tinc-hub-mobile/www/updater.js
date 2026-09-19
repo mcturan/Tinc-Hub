@@ -4,13 +4,14 @@
  * yeni sürüm çıktığında kullanıcıya APK indirme ve güncelleme imkanı sunar.
  */
 
-const APP_VERSION = "1.8.8";
+const APP_VERSION = "1.8.9";
 const DEFAULT_GITHUB_REPO = "mcturan/tinc-hub"; // Ayarlardan değiştirilebilir
 
 class TincNoteUpdater {
     constructor(storage) {
         this.storage = storage;
         this.currentVersion = APP_VERSION;
+        this.hasTriggeredAutoDownload = false;
     }
 
     // 3 parçalı sürüm karşılaştırma (örn: "1.0.1" > "1.0.0")
@@ -32,6 +33,32 @@ class TincNoteUpdater {
         return await this.storage.getSetting('github_repo', DEFAULT_GITHUB_REPO);
     }
 
+    autoDownloadUpdate(version, downloadUrl) {
+        if (!downloadUrl || this.hasTriggeredAutoDownload) return;
+        this.hasTriggeredAutoDownload = true;
+        console.log(`[Updater] Otomatik APK indirme başlatılıyor: v${version} -> ${downloadUrl}`);
+        try {
+            if (window.AndroidWidgetBridge && window.AndroidWidgetBridge.downloadAndInstallUpdate) {
+                window.AndroidWidgetBridge.downloadAndInstallUpdate(downloadUrl, version);
+                return;
+            }
+        } catch (e) {
+            console.warn("AndroidWidgetBridge.downloadAndInstallUpdate hatası:", e);
+        }
+
+        try {
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `TincNote-v${version}.apk`;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { if (a.parentNode) a.parentNode.removeChild(a); }, 1500);
+        } catch(err) {
+            window.location.href = downloadUrl;
+        }
+    }
+
     async checkForUpdates(silent = false) {
         try {
             // 1. Önce bağlı olunan TincNote sunucusunu kontrol et (Yerel ağ / LAN desteği)
@@ -50,11 +77,13 @@ class TincNoteUpdater {
                             if (downloadUrl.startsWith('/')) {
                                 downloadUrl = serverUrl + downloadUrl;
                             }
+                            this.autoDownloadUpdate(sVer, downloadUrl);
                             this.showUpdateModal({
                                 version: sVer,
                                 currentVersion: this.currentVersion,
                                 body: sData.notes || "Yeni özellikler ve hata düzeltmeleri.",
-                                downloadUrl: downloadUrl
+                                downloadUrl: downloadUrl,
+                                autoDownloading: true
                             });
                             return { hasUpdate: true, version: sVer, downloadUrl };
                         } else {
@@ -96,7 +125,6 @@ class TincNoteUpdater {
             
             if (this.compareVersions(remoteVersion, this.currentVersion) > 0) {
                 // Yeni sürüm bulundu!
-                // APK dosyasını bul
                 let apkUrl = null;
                 if (release.assets && release.assets.length > 0) {
                     const apkAsset = release.assets.find(a => a.name.toLowerCase().endsWith('.apk'));
@@ -108,11 +136,13 @@ class TincNoteUpdater {
                     apkUrl = release.html_url;
                 }
 
+                this.autoDownloadUpdate(remoteVersion, apkUrl);
                 this.showUpdateModal({
                     version: remoteVersion,
                     currentVersion: this.currentVersion,
                     body: release.body || "Yeni özellikler ve hata düzeltmeleri.",
-                    downloadUrl: apkUrl
+                    downloadUrl: apkUrl,
+                    autoDownloading: true
                 });
 
                 return { hasUpdate: true, version: remoteVersion, downloadUrl: apkUrl };
@@ -144,20 +174,28 @@ class TincNoteUpdater {
                 <h3 style="margin:0; text-align:center; color:var(--text); font-size:1.3rem;">
                     Yeni Güncelleme Mevcut!
                 </h3>
-                <div style="text-align:center; color:var(--accent); font-weight:700; margin:6px 0 14px;">
+                <div style="text-align:center; color:var(--accent); font-weight:700; margin:6px 0 10px;">
                     v${info.version} <span style="color:var(--muted); font-size:0.85rem; font-weight:normal;">(Sizdeki: v${info.currentVersion})</span>
                 </div>
 
-                <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px; font-size:0.85rem; max-height:150px; overflow-y:auto; color:var(--text); line-height:1.4; white-space:pre-line;">
+                <div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; border-radius:8px; padding:10px; font-size:0.82rem; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                    <span>📥</span>
+                    <div>
+                        <strong>Yeni sürüm otomatik olarak indiriliyor!</strong>
+                        <div style="color:#3b82f6; font-size:0.75rem; margin-top:2px;">İndirme tamamlandığında bildirim çubuğundan dokunarak kolayca kurabilirsiniz.</div>
+                    </div>
+                </div>
+
+                <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px; font-size:0.85rem; max-height:140px; overflow-y:auto; color:var(--text); line-height:1.4; white-space:pre-line;">
                     ${info.body}
                 </div>
 
                 <div style="display:flex; flex-direction:column; gap:10px; margin-top:16px;">
-                    <button type="button" class="btn btn-primary" onclick="window.downloadAndInstallApk('${info.downloadUrl}')" style="text-align:center; padding:12px; font-weight:bold; font-size:0.95rem; width:100%; border:none; cursor:pointer;">
-                        📥 Yeni Sürümü İndir & Kur (.APK)
+                    <button type="button" class="btn btn-primary" onclick="window.downloadAndInstallApk('${info.downloadUrl}', '${info.version}')" style="text-align:center; padding:12px; font-weight:bold; font-size:0.95rem; width:100%; border:none; cursor:pointer;">
+                        📥 Tekrar İndir / Kur (.APK)
                     </button>
                     <button type="button" class="btn btn-ghost" onclick="document.getElementById('update-modal').classList.remove('active')">
-                        Daha Sonra Hatırlat
+                        Kapat
                     </button>
                 </div>
             </div>
@@ -166,8 +204,12 @@ class TincNoteUpdater {
     }
 }
 
-window.downloadAndInstallApk = (url) => {
+window.downloadAndInstallApk = (url, version = "") => {
     try {
+        if (window.AndroidWidgetBridge && window.AndroidWidgetBridge.downloadAndInstallUpdate) {
+            window.AndroidWidgetBridge.downloadAndInstallUpdate(url, version);
+            return;
+        }
         if (window.AndroidWidgetBridge && window.AndroidWidgetBridge.openBrowserUrl) {
             window.AndroidWidgetBridge.openBrowserUrl(url);
             return;

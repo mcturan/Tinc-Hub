@@ -686,7 +686,6 @@ async function openEditItemModal(id, title = null, isQuick = false) {
 }
 
 async function openEditUnifiedTaskModal(taskType, rawId, pageId) {
-    if (window._suppressClickUntil && Date.now() < window._suppressClickUntil) return;
     if (taskType === 'checklist') {
         await openEditItemModal(rawId, null, (activeView === 'quick'));
     } else if (taskType === 'finance') {
@@ -1210,7 +1209,7 @@ async function reloadDrawerNavigation() {
 
     // İlk kategori varsayılan olarak açık olsun
     if (openCategoryIds.size === 0 && categories.length > 0) {
-        openCategoryIds.add(categories[0].id);
+        openCategoryIds.add(Number(categories[0].id));
     }
 
     catContainer.innerHTML = categories.map(cat => {
@@ -1225,7 +1224,7 @@ async function reloadDrawerNavigation() {
         }
 
         const catPages = allPages.filter(p => p.category_id == cat.id).sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-        const isOpen = openCategoryIds.has(cat.id);
+        const isOpen = openCategoryIds.has(Number(cat.id));
         const catColor = cat.color || '#3b82f6';
 
         let pagesHtml = catPages.map(page => {
@@ -1280,15 +1279,15 @@ async function reloadDrawerNavigation() {
 }
 
 function toggleCategoryAccordion(catId) {
-    if (window._suppressClickUntil && Date.now() < window._suppressClickUntil) return;
-    if (openCategoryIds.has(catId)) {
-        openCategoryIds.delete(catId);
+    const id = Number(catId);
+    if (openCategoryIds.has(id)) {
+        openCategoryIds.delete(id);
     } else {
-        openCategoryIds.add(catId);
+        openCategoryIds.add(id);
     }
     const group = document.getElementById(`cat-group-${catId}`);
     if (group) {
-        group.classList.toggle('open');
+        group.classList.toggle('open', openCategoryIds.has(id));
     }
 }
 
@@ -1358,8 +1357,11 @@ function attachLongPressDragHandler(element, onActivate, onTap = null) {
         // Kullanıcı 500 ms'den kısa basıp bıraktıysa ve parmak kaymadıysa: BU KESİN BİR DOKUNMADIR!
         if (!hasMoved && (Date.now() - startTime) < 500) {
             if (typeof onTap === 'function') {
-                window._suppressClickUntil = Date.now() + 350;
-                onTap(element, e);
+                try {
+                    onTap(element, e);
+                } finally {
+                    window._suppressClickUntil = Date.now() + 400;
+                }
             }
         }
     };
@@ -1789,7 +1791,6 @@ async function openOverviewView() {
 }
 
 async function openPage(pageId) {
-    if (window._suppressClickUntil && Date.now() < window._suppressClickUntil) return;
     activePageId = pageId;
     switchMainView('page');
     toggleSidebar(false);
@@ -2040,7 +2041,7 @@ function renderChecklistItemHtml(it) {
             const dt = new Date(it.remind_at.replace(' ', 'T'));
             displayRemind = `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
         } catch(e) {}
-        metaBadges += `<span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; cursor:pointer;" onclick="event.stopPropagation(); openEditItemModal(${it.id}, ${JSON.stringify(it.title || '').replace(/"/g, '&quot;')}, false)" title="Alarm ve Detayları Düzenle">⏰ ${displayRemind}</span>`;
+        metaBadges += `<span class="meta-badge reminder" style="background:#f5f3ff; color:#7c3aed; border:1px solid #ddd6fe; cursor:pointer;" onclick="event.stopPropagation(); openEditItemModal(${it.id}, ${JSON.stringify(it.title || '').replace(/"/g, '&quot;')}, false)" title="Bildir ve Detayları Düzenle">⏰ Bildir: ${displayRemind}</span>`;
     }
     if (it.price) metaBadges += `<span class="meta-badge price">💰 ${escapeHtml(it.price)}</span>`;
     if (it.quantity) metaBadges += `<span class="meta-badge" style="background:var(--surface2); color:var(--text-secondary);">${escapeHtml(it.quantity)}</span>`;
@@ -4458,12 +4459,20 @@ async function submitSaveItemReminder() {
     await window.appStorage.setItemReminder(item.id, remindAtStr, recurrence);
 
     // 2. Android Yerel Alarm & Bildirim Kur (AlarmManager)
-    if (window.AndroidWidgetBridge && window.AndroidWidgetBridge.scheduleTaskAlarm) {
-        try {
-            window.AndroidWidgetBridge.scheduleTaskAlarm(item.id, item.title, remindAtStr, recurrence, item.page_id || 0);
-        } catch (e) {
-            console.warn("scheduleTaskAlarm error:", e);
+    if (window.AndroidWidgetBridge) {
+        if (window.AndroidWidgetBridge.requestNotificationPermission) {
+            try { window.AndroidWidgetBridge.requestNotificationPermission(); } catch(e) {}
         }
+        if (window.AndroidWidgetBridge.scheduleTaskAlarm) {
+            try {
+                window.AndroidWidgetBridge.scheduleTaskAlarm(item.id, item.title, remindAtStr, recurrence, item.page_id || 0);
+            } catch (e) {
+                console.warn("scheduleTaskAlarm error:", e);
+            }
+        }
+    }
+    if (typeof Notification !== 'undefined' && Notification.requestPermission && Notification.permission !== 'granted') {
+        try { Notification.requestPermission(); } catch(e) {}
     }
 
     // 3. Sunucuya ilet
@@ -4486,7 +4495,7 @@ async function submitSaveItemReminder() {
     }
 
     closeModal('modal-item-reminder');
-    showMobileToast("⏰ Alarm ve hatırlatıcı başarıyla kuruldu!");
+    showMobileToast("⏰ Bildir zamanı başarıyla kuruldu!");
 
     if (activePageId) renderChecklistItems(activePageId);
     renderQuickNotesView();
@@ -4530,7 +4539,7 @@ async function submitDeleteItemReminder() {
     }
 
     closeModal('modal-item-reminder');
-    showMobileToast("Hatırlatıcı kaldırıldı.");
+    showMobileToast("Bildirim kaldırıldı.");
 
     if (activePageId) renderChecklistItems(activePageId);
     renderQuickNotesView();

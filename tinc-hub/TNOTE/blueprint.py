@@ -2141,25 +2141,26 @@ def api_add_quick_task():
 @tnote_bp.route('/api/app-version')
 def api_app_version():
     return jsonify({
-        "version": "1.8.8",
-        "versionCode": 188,
+        "version": "1.8.9",
+        "versionCode": 189,
         "download_url": url_for('tnote.download_apk'),
-        "notes": "v1.8.8:\n- Web arayüzünde hızlı not ve yapay zeka modallarını hapseden DOM kapanış hatası giderildi.\n- Mobilde görev güncellemelerinde miktar, fiyat, URL ve alarm senkronizasyonu tam güvenceye alındı.\n- Çift kademeli anlık hafif patch (Fast Patch) mimarisine geçildi; not yazarken tam senkronizasyon darboğazı ve veri yarışı çözüldü.\n- Mobil alt çubuk orta ekleme butonu CSS gradyanı ve üst bar başlık sığma alanı ferahlatıldı.\n- Mükerrer kategoriler ve çoklu hızlı görev sayfaları tekilleştirilerek temizlendi."
+        "notes": "v1.8.9:\n- Sol menü ve dosya (kategori) açılmama / kilitlenme hatası giderildi (dokunma ve akordeon yöneticisi optimize edildi).\n- Telefon alarm ve hatırlatıcı zamanında bildirim gelmeme sorunu çözüldü (Android JavascriptInterface imza ve çoklu tarih formatı desteği).\n- Android 12+ / 13+ bildirim ve tam zamanlı alarm (Exact Alarm) izin uyumluluğu eklendi.\n- 'Alarm / Hatırlatıcı' ismi kullanıcı talebi doğrultusunda 'Bildir' olarak güncellendi.\n- Bildirim zamanında Telegram üzerinden de anlık mesaj gönderimi garanti altına alındı.\n- Yeni sürüm çıktığında uygulamanın APK güncellemesini arka planda otomatik indirmesi sağlandı."
     })
 
 @tnote_bp.route('/download/apk')
 def download_apk():
     apk_paths = [
+        "/home/turan/Masaüstü/TincNote-v1.8.9.apk",
+        "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.9.apk",
         "/home/turan/Masaüstü/TincNote-v1.8.8.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-v1.8.8.apk",
-        "/home/turan/Masaüstü/TincNote-v1.8.7.apk",
         "/opt/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub/TNOTE/static/download/TincNote-latest.apk",
         "/home/turan/101/tinc-hub-mobile/android/app/build/outputs/apk/release/app-release.apk",
     ]
     for p in apk_paths:
         if os.path.exists(p):
-            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.8.apk")
+            return send_file(p, as_attachment=True, download_name="TincNote-v1.8.9.apk")
     return "APK dosyası bulunamadı", 404
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -619,8 +619,9 @@ def _telegram_polling_loop():
     offset = 0
 
     while not _stop_event.is_set():
-        token = db.get_setting("telegram_bot_token", "").strip()
-        enabled = db.get_setting("telegram_enabled", "0") == "1"
+        token = db.get_setting("telegram_bot_token", "").strip() or os.environ.get("TELEGRAM_BOT_TOKEN", "").strip() or os.environ.get("TNOTE_TELEGRAM_BOT_TOKEN", "").strip()
+        db_enabled = db.get_setting("telegram_enabled", "1" if token else "0")
+        enabled = (db_enabled == "1")
 
         if not token or not enabled:
             time.sleep(3)
@@ -673,12 +674,13 @@ def stop_telegram_bot():
 
 def send_notification_to_all_chats(text: str, reply_markup: dict = None) -> int:
     """İzin verilen tüm Telegram Chat ID'lerine bildirim iletir."""
-    token = db.get_setting("telegram_bot_token", "").strip()
-    enabled = db.get_setting("telegram_enabled", "0") == "1"
+    token = db.get_setting("telegram_bot_token", "").strip() or os.environ.get("TELEGRAM_BOT_TOKEN", "").strip() or os.environ.get("TNOTE_TELEGRAM_BOT_TOKEN", "").strip()
+    db_enabled = db.get_setting("telegram_enabled", "1" if token else "0")
+    enabled = (db_enabled == "1")
     if not token or not enabled:
         return 0
 
-    allowed_str = db.get_setting("telegram_chat_ids", "").strip()
+    allowed_str = db.get_setting("telegram_chat_ids", "").strip() or os.environ.get("TELEGRAM_CHAT_ID", "").strip() or os.environ.get("TNOTE_TELEGRAM_CHAT_ID", "").strip()
     if not allowed_str:
         return 0
 
@@ -688,4 +690,6 @@ def send_notification_to_all_chats(text: str, reply_markup: dict = None) -> int:
         res = send_telegram_message(token, chat_id, text, reply_markup=reply_markup)
         if res.get("ok"):
             sent_count += 1
+        else:
+            log.warning(f"Telegram bildirimi gönderilemedi (chat_id: {chat_id}): {res.get('description', 'Bilinmeyen hata')}")
     return sent_count

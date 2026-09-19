@@ -43,7 +43,7 @@ def _process_due_reminders():
 
         # 1. Telegram Bildirimi
         text = (
-            f"⏰ *Zamanı Geldi: Hatırlatma!*\n\n"
+            f"⏰ *Zamanı Geldi: Bildir!*\n\n"
             f"📌 *{title}*\n"
             f"📂 Liste: *{page_title}*\n"
         )

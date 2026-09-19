@@ -3026,7 +3026,7 @@ async function submitReminder() {
     const data = await res.json();
     if (data.ok) {
         closeModal('modal-reminder');
-        showToast("Hatırlatıcı kuruldu!");
+        showToast("⏰ Bildir zamanı kuruldu!");
         loadPage(currentPageId);
     }
 }
@@ -3153,7 +3153,7 @@ function renderFinanceTable(entries) {
         if (!isInc) {
             const rDays = (e.reminder_days !== undefined && e.reminder_days !== null) ? parseInt(e.reminder_days) : 0;
             if (rDays === -1) {
-                alarmHtml = '<span title="Hatırlatma Kapalı" style="opacity:0.45; cursor:help;">🔕</span>';
+                alarmHtml = '<span title="Bildirim Kapalı" style="opacity:0.45; cursor:help;">🔕</span>';
             } else if (rDays === 0) {
                 alarmHtml = '<span title="Son Gün Sabahı 09:00" style="color:#d97706; font-weight:700; font-size:0.75rem; cursor:help;">🔔 Son Gün</span>';
             } else {
