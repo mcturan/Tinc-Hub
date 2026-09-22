@@ -41,7 +41,7 @@ def manifest_json():
 def auth_check(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        # SSO Token query param
+        # 1. SSO Token (query param) ile giriş
         sso_token = request.args.get("sso_token")
         if sso_token:
             u = db.get_user_by_token(sso_token)
@@ -51,22 +51,48 @@ def auth_check(f):
                 session["username"] = u["username"]
                 session["authenticated"] = True
             else:
+                # TINC_HUB_PASSWORD ile de SSO token kabul et
                 tinc_pw = os.environ.get("TINC_HUB_PASSWORD", "").strip()
                 if tinc_pw and sso_token == tinc_pw:
                     session["authenticated"] = True
                     session["user_id"] = 1
                     session["username"] = "admin"
 
-        # Tinc-Hub şifre koruması kontrolü
-        tinc_pw = os.environ.get("TINC_HUB_PASSWORD", "").strip()
-        if tinc_pw and not session.get("authenticated"):
-            auth_header = request.headers.get("Authorization", "")
-            api_key = request.headers.get("X-API-Key", "")
-            if (auth_header and auth_header.replace("Bearer ", "").strip() == tinc_pw) or (api_key and api_key == tinc_pw):
-                return f(*args, **kwargs)
+        # 2. Bearer token veya X-Auth-Token header'ı ile giriş
+        auth_header = request.headers.get("Authorization", "")
+        x_token = request.headers.get("X-Auth-Token", "").strip()
+        bearer_token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
+        token_candidate = bearer_token or x_token
+
+        if token_candidate and not session.get("user_id"):
+            # Önce kullanıcı token'ı dene
+            u = db.get_user_by_token(token_candidate)
+            if u:
+                session["user_id"] = u["id"]
+                session["user_token"] = token_candidate
+                session["username"] = u["username"]
+                session["authenticated"] = True
+            else:
+                # TINC_HUB_PASSWORD ile de Bearer kabul et
+                tinc_pw = os.environ.get("TINC_HUB_PASSWORD", "").strip()
+                if tinc_pw and token_candidate == tinc_pw:
+                    session["authenticated"] = True
+                    session["user_id"] = 1
+                    session["username"] = "admin"
+
+        # 3. Auth gerektirmeyen endpoint'ler (login, register, ping, download)
+        public_paths = ["/notes/api/auth/", "/notes/api/ping", "/notes/api/app-version",
+                        "/notes/manifest.json", "/notes/sw.js", "/notes/static/"]
+        is_public = any(request.path.startswith(p) for p in public_paths)
+        if is_public:
+            return f(*args, **kwargs)
+
+        # 4. Kimlik doğrulama zorunluluğu — session veya token şart
+        if not session.get("user_id") and not session.get("authenticated"):
             if request.path.startswith("/notes/api/"):
-                return jsonify({"error": "Yetkisiz erişim"}), 401
-            return redirect(f"/login?next={request.path}")
+                return jsonify({"ok": False, "error": "Oturum açmanız gerekiyor", "auth_required": True}), 401
+            return redirect(f"/notes/api/auth/login?next={request.path}")
+
         return f(*args, **kwargs)
     return decorated
 
@@ -135,33 +161,39 @@ def api_ping():
 @tnote_bp.route('/api/auth/register', methods=['POST'])
 def api_register():
     data = request.get_json() or {}
-    username = data.get("username", "").strip()
+    email = data.get("email", "").strip().lower()
     password = data.get("password", "").strip()
     display_name = data.get("display_name", "").strip()
-    email = data.get("email", "").strip()
-    if not username or not password:
-        return jsonify({"ok": False, "error": "Kullanıcı adı ve şifre zorunludur"}), 400
-    res = db.register_user(username, password, display_name=display_name, email=email)
+    # username artık opsiyonel — email'den türetilir
+    username = data.get("username", "").strip() or (email.split("@")[0] if email else "")
+    if not email or not password:
+        return jsonify({"ok": False, "error": "E-posta adresi ve şifre zorunludur"}), 400
+    if "@" not in email:
+        return jsonify({"ok": False, "error": "Geçerli bir e-posta adresi giriniz"}), 400
+    res = db.register_user(username, password, display_name=display_name or username, email=email)
     if not res.get("ok"):
         return jsonify(res), 400
     session["user_id"] = res["user"]["id"]
     session["user_token"] = res["token"]
     session["username"] = res["user"]["username"]
+    session["authenticated"] = True
     return jsonify(res)
 
 @tnote_bp.route('/api/auth/login', methods=['POST'])
 def api_login():
     data = request.get_json() or {}
-    username = data.get("username", "").strip()
+    # E-posta öncelikli; eski 'username' field da destekleniyor (geriye dönük uyum)
+    email = data.get("email", "").strip() or data.get("username", "").strip()
     password = data.get("password", "").strip()
-    if not username or not password:
-        return jsonify({"ok": False, "error": "Kullanıcı adı ve şifre zorunludur"}), 400
-    res = db.login_user(username, password)
+    if not email or not password:
+        return jsonify({"ok": False, "error": "E-posta ve şifre zorunludur"}), 400
+    res = db.login_user(email, password)
     if not res.get("ok"):
         return jsonify(res), 401
     session["user_id"] = res["user"]["id"]
     session["user_token"] = res["token"]
     session["username"] = res["user"]["username"]
+    session["authenticated"] = True
     return jsonify(res)
 
 @tnote_bp.route('/api/auth/me', methods=['GET'])
@@ -938,7 +970,12 @@ def api_reorder_categories():
 @auth_check
 def api_get_pages():
     cat_id = request.args.get('category_id', type=int)
-    nb_id = request.args.get('notebook_id', type=int) or (None if cat_id else (session.get('active_notebook_id') or db.get_active_notebook_id()))
+    all_pages = request.args.get('all', '').lower() in ('1', 'true')
+    if all_pages or (not cat_id and not request.args.get('notebook_id')):
+        # Filtre yoksa tüm sayfaları döndür (sync çekme için)
+        nb_id = None
+    else:
+        nb_id = request.args.get('notebook_id', type=int) or (None if cat_id else (session.get('active_notebook_id') or db.get_active_notebook_id()))
     return jsonify({"ok": True, "pages": db.get_pages(category_id=cat_id, notebook_id=nb_id)})
 
 @tnote_bp.route('/api/pages/<int:page_id>', methods=['GET'])
@@ -973,6 +1010,7 @@ def api_get_page(page_id):
 @tnote_bp.route('/api/pages', methods=['POST'])
 @auth_check
 def api_add_page():
+    import sqlite3 as _sqlite3
     data = request.get_json() or {}
     title = data.get("title", "").strip()
     cat_id = data.get("category_id")
@@ -985,14 +1023,36 @@ def api_add_page():
         session["active_notebook_id"] = nb_id
     else:
         nb_id = data.get("notebook_id") or session.get("active_notebook_id") or db.get_active_notebook_id()
-    page_id = db.add_page(
-        category_id=cat_id,
-        title=title,
-        page_type=data.get("type", "checklist"),
-        icon=data.get("icon", "📝"),
-        content=data.get("content", "")
-    )
-    return jsonify({"ok": True, "id": page_id, "pages": db.get_pages(notebook_id=nb_id), "notebook_id": nb_id})
+        # Kategori bulunamadı — fallback: notebook'a ait ilk kategoriyi kullan
+        if not cat:
+            fallback_cats = db.get_categories(nb_id)
+            if fallback_cats:
+                cat_id = fallback_cats[0]["id"]
+            else:
+                # Hiç kategori yoksa yeni bir tane oluştur
+                cat_id = db.add_category("Genel", "📁", "#3b82f6", notebook_id=nb_id)
+    try:
+        page_id = db.add_page(
+            category_id=cat_id,
+            title=title,
+            page_type=data.get("type", "checklist"),
+            icon=data.get("icon", "📝"),
+            content=data.get("content", "")
+        )
+    except _sqlite3.IntegrityError as e:
+        # Hâlâ FOREIGN KEY hatası — son çare: ilk mevcut kategoriyi kullan
+        all_cats = db.get_categories(nb_id)
+        if not all_cats:
+            return jsonify({"ok": False, "error": f"Geçerli kategori bulunamadı: {e}"}), 400
+        cat_id = all_cats[0]["id"]
+        page_id = db.add_page(
+            category_id=cat_id,
+            title=title,
+            page_type=data.get("type", "checklist"),
+            icon=data.get("icon", "📝"),
+            content=data.get("content", "")
+        )
+    return jsonify({"ok": True, "id": page_id, "page_id": page_id, "pages": db.get_pages(notebook_id=nb_id), "notebook_id": nb_id})
 
 @tnote_bp.route('/api/pages/<int:page_id>', methods=['PUT', 'POST'])
 @auth_check
@@ -1294,6 +1354,21 @@ def api_add_item(page_id):
         db.set_reminder("item", item_id, remind_at, data.get("recurrence", "none"))
 
     return jsonify({"ok": True, "item_id": item_id, "items": db.get_items(page_id)})
+
+@tnote_bp.route('/api/all-items', methods=['GET'])
+@auth_check
+def api_get_all_items():
+    """Sync orphan detection için tüm item'ları tek seferde döndür"""
+    try:
+        import sqlite3 as _s3
+        conn = db.get_conn()
+        cur = conn.cursor()
+        cur.execute("SELECT id, page_id, title, is_done, sort_order FROM items WHERE 1=1 ORDER BY page_id, sort_order")
+        rows = [{"id": r[0], "page_id": r[1], "title": r[2], "is_done": r[3], "sort_order": r[4]} for r in cur.fetchall()]
+        conn.close()
+        return jsonify({"ok": True, "items": rows})
+    except Exception as e:
+        return jsonify({"ok": False, "items": [], "error": str(e)})
 
 @tnote_bp.route('/api/items/<int:item_id>', methods=['GET'])
 @auth_check

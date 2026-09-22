@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta
 from .config import DB_PATH, DATA_DIR, SECRET_KEY
 
-_lock = threading.Lock()
+_lock = threading.RLock()
 _vault_cipher = None
 _legacy_cipher = None
 
@@ -121,7 +121,7 @@ def decrypt_vault_secret(cipher_text: str) -> str:
 def get_conn():
     conn = sqlite3.connect(DB_PATH, timeout=30.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
@@ -129,6 +129,10 @@ def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with _lock:
         conn = get_conn()
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+        except Exception:
+            pass
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS notebooks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -3203,24 +3207,42 @@ def register_user(username, password, display_name="", email="", role=None):
     clean_email = email.strip().lower() if email else ""
     clean_username = username.strip().lower() if username else ""
 
-    if not clean_username and clean_email:
-        clean_username = clean_email.split("@")[0].strip()
+    # Email zorunlu — yoksa hata
+    if not clean_email:
+        return {"ok": False, "error": "E-posta adresi zorunludur"}
+    if "@" not in clean_email:
+        return {"ok": False, "error": "Geçerli bir e-posta adresi giriniz"}
 
-    if not clean_username or not password:
-        return {"ok": False, "error": "Kullanıcı adı veya e-posta ve şifre zorunludur"}
+    # Username email'den türet (yoksa)
+    if not clean_username:
+        base = clean_email.split("@")[0]
+        # Harf/rakam dışındaki karakterleri temizle
+        import re as _re
+        clean_username = _re.sub(r'[^a-z0-9_]', '', base.replace('.', '_').replace('-', '_'))[:30]
+        if not clean_username:
+            clean_username = f"user{secrets.randbelow(9999)}"
+
+    if not password:
+        return {"ok": False, "error": "Şifre zorunludur"}
 
     conn = get_conn()
     cur = conn.cursor()
-    cur.execute("SELECT id FROM users WHERE username = ?", (clean_username,))
+
+    # E-posta benzersizlik kontrolü (birincil)
+    cur.execute("SELECT id FROM users WHERE LOWER(email) = ?", (clean_email,))
     if cur.fetchone():
         conn.close()
-        return {"ok": False, "error": "Bu kullanıcı adı zaten kayıtlı"}
+        return {"ok": False, "error": "Bu e-posta adresi zaten kayıtlı"}
 
-    if clean_email:
-        cur.execute("SELECT id FROM users WHERE LOWER(email) = ?", (clean_email,))
-        if cur.fetchone():
-            conn.close()
-            return {"ok": False, "error": "Bu e-posta adresi zaten kayıtlı"}
+    # Username çakışması varsa rakam ekle
+    original_username = clean_username
+    counter = 1
+    while True:
+        cur.execute("SELECT id FROM users WHERE LOWER(username) = ?", (clean_username,))
+        if not cur.fetchone():
+            break
+        clean_username = f"{original_username}{counter}"
+        counter += 1
 
     cur.execute("SELECT COUNT(*) FROM users")
     is_first = (cur.fetchone()[0] == 0)

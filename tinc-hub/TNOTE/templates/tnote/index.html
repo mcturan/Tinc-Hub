@@ -2083,7 +2083,7 @@
             <div style="text-align:center; padding: 12px 0;">
                 <div style="font-size:2rem; margin-bottom:6px;">👤</div>
                 <div style="font-weight:700; font-size:1.1rem;">{{ user.display_name }}</div>
-                <div style="color:var(--text-muted, #94a3b8); font-size:0.85rem;">@{{ user.username }} ({{ user.role }})</div>
+                <div style="color:var(--text-muted, #94a3b8); font-size:0.85rem;">{{ user.email or user.username }} ({{ user.role }})</div>
                 <div style="margin-top:16px;">
                     <button class="btn btn-danger" onclick="logoutUser()" style="width:100%;">Çıkış Yap</button>
                 </div>
@@ -2097,8 +2097,8 @@
             <!-- Giriş Formu -->
             <form id="form-auth-login" onsubmit="submitLogin(event)">
                 <div class="form-group" style="margin-bottom:10px;">
-                    <label style="font-size:0.8rem; font-weight:600;">Kullanıcı Adı</label>
-                    <input type="text" id="login-username" class="form-input" style="width:100%;" required autocomplete="username">
+                    <label style="font-size:0.8rem; font-weight:600;">E-posta Adresi</label>
+                    <input type="email" id="login-username" class="form-input" style="width:100%;" required autocomplete="email" placeholder="ornek@email.com">
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
                     <label style="font-size:0.8rem; font-weight:600;">Şifre</label>
@@ -2112,11 +2112,11 @@
             <form id="form-auth-register" onsubmit="submitRegister(event)" style="display:none;">
                 <div class="form-group" style="margin-bottom:10px;">
                     <label style="font-size:0.8rem; font-weight:600;">Ad Soyad</label>
-                    <input type="text" id="reg-display-name" class="form-input" style="width:100%;" placeholder="Adınız">
+                    <input type="text" id="reg-display-name" class="form-input" style="width:100%;" placeholder="Adınız Soyadınız">
                 </div>
                 <div class="form-group" style="margin-bottom:10px;">
-                    <label style="font-size:0.8rem; font-weight:600;">Kullanıcı Adı</label>
-                    <input type="text" id="reg-username" class="form-input" style="width:100%;" required autocomplete="username">
+                    <label style="font-size:0.8rem; font-weight:600;">E-posta Adresi</label>
+                    <input type="email" id="reg-username" class="form-input" style="width:100%;" required autocomplete="email" placeholder="ornek@email.com">
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
                     <label style="font-size:0.8rem; font-weight:600;">Şifre</label>

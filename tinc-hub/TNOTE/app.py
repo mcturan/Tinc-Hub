@@ -65,7 +65,16 @@ if __name__ == "__main__":
     db.init_db()
 
     # Telegram bot ve Hatırlatıcı motorunu başlat
-    if db.get_setting("telegram_enabled", "0") == "1":
+    # Token DB'de veya env'de varsa botu başlat (enabled=1 veya token mevcutsa)
+    import os
+    tg_token = db.get_setting("telegram_bot_token", "").strip() or \
+               os.environ.get("TELEGRAM_BOT_TOKEN", "").strip() or \
+               os.environ.get("TNOTE_TELEGRAM_BOT_TOKEN", "").strip()
+    tg_enabled = db.get_setting("telegram_enabled", "0")
+    if tg_token and tg_enabled in ("1", ""):
+        db.set_setting("telegram_enabled", "1")
+        start_telegram_bot()
+    elif tg_enabled == "1":
         start_telegram_bot()
     start_reminder_engine()
 

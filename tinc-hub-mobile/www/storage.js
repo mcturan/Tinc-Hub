@@ -112,19 +112,25 @@ class TincNoteStorage {
 
         if (cats.length === 0) {
             const now = new Date().toISOString();
+            const tempCatId = Date.now(); // Büyük geçici ID — sunucuyla çakışmaz
             const defaultCat = {
-                id: 1,
+                id: tempCatId,
                 name: 'Hızlı Notlar ve Görevler',
                 icon: '⚡',
                 color: '#f59e0b',
                 sort_order: 1,
-                created_at: now
+                created_at: now,
+                _dirty: true,
+                _deleted: false
             };
             await this.put('categories', defaultCat);
 
+            const tempPageId1 = tempCatId + 1;
+            const tempPageId2 = tempCatId + 2;
+
             const welcomePage = {
-                id: 1,
-                category_id: 1,
+                id: tempPageId1,
+                category_id: tempCatId,
                 title: 'TincNote\'a Hoş Geldiniz! 👋',
                 type: 'notes',
                 icon: '📝',
@@ -132,13 +138,15 @@ class TincNoteStorage {
                 sort_order: 1,
                 is_archived: 0,
                 created_at: now,
-                updated_at: now
+                updated_at: now,
+                _dirty: true,
+                _deleted: false
             };
             await this.put('pages', welcomePage);
 
             const todoPage = {
-                id: 2,
-                category_id: 1,
+                id: tempPageId2,
+                category_id: tempCatId,
                 title: 'Yapılacaklar Listesi',
                 type: 'checklist',
                 icon: '🛒',
@@ -146,30 +154,36 @@ class TincNoteStorage {
                 sort_order: 2,
                 is_archived: 0,
                 created_at: now,
-                updated_at: now
+                updated_at: now,
+                _dirty: true,
+                _deleted: false
             };
             await this.put('pages', todoPage);
 
             await this.put('items', {
-                id: 1,
-                page_id: 2,
+                id: tempCatId + 10,
+                page_id: tempPageId2,
                 title: 'TincNote mobil uygulamasını keşfet',
                 description: '',
                 is_done: 1,
                 sort_order: 1,
                 created_at: now,
-                updated_at: now
+                updated_at: now,
+                _dirty: true,
+                _deleted: false
             });
 
             await this.put('items', {
-                id: 2,
-                page_id: 2,
+                id: tempCatId + 11,
+                page_id: tempPageId2,
                 title: 'Ayarlar kısmından TincHub sunucu IP adresini gir',
                 description: '',
                 is_done: 0,
                 sort_order: 2,
                 created_at: now,
-                updated_at: now
+                updated_at: now,
+                _dirty: true,
+                _deleted: false
             });
         }
     }

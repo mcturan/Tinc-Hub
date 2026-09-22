@@ -4174,6 +4174,183 @@ async function refreshMobileAuthUI() {
             const tincIdEl = document.getElementById('mobile-tinc-id-badge');
             const verifyBox = document.getElementById('mobile-email-verify-box');
 
+            if (nameEl) nameEl.innerText = user.display_name || user.email || user.username;
+            // E-posta göster, username ikincil
+            if (roleEl) roleEl.innerText = user.email || `@${user.username}`;
+            if (tincIdEl) tincIdEl.innerText = user.tinc_id || 'TINC-DEFAULT';
+            if (verifyBox) {
+                verifyBox.style.display = (user.is_email_verified === 0 || user.is_email_verified === false) ? 'flex' : 'none';
+            }
+
+            if (loggedInBox) loggedInBox.style.display = 'block';
+            if (formBox) formBox.style.display = 'none';
+            return;
+        } catch (e) {}
+    }
+
+    if (loggedInBox) loggedInBox.style.display = 'none';
+    if (formBox) formBox.style.display = 'block';
+}
+
+function copyMobileTincID() {
+    const badge = document.getElementById('mobile-tinc-id-badge');
+    const id = badge ? badge.innerText.trim() : '';
+    if (id) {
+        navigator.clipboard.writeText(id).then(() => {
+            showMobileToast(`TincID panoya kopyalandı: ${id}`);
+        });
+    }
+}
+
+async function downloadMobileDataTakeout() {
+    const sUrl = await window.appSync.getServerUrl();
+    const token = await window.appStorage.getSetting('auth_token', '');
+    const url = `${sUrl}/notes/api/auth/profile/export`;
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+        window.open(url, '_system');
+    } else {
+        window.open(url, '_blank');
+    }
+    showMobileToast('Veri paketi (.ZIP) indiriliyor...');
+}
+
+async function revokeMobileOtherSessions() {
+    if (!confirm('Bu cihaz hariç diğer tüm açık oturumları sonlandırmak istediğinize emin misiniz?')) return;
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/auth/sessions/revoke', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ all_other: true })
+        });
+        showMobileToast('Diğer tüm cihaz oturumları başarıyla kapatıldı! ✓');
+    } catch (e) {
+        showMobileToast('İşlem başarısız: ' + e.message);
+    }
+}
+
+async function confirmMobileDeactivateAccount() {
+    if (!confirm('Hesabınızı dondurmak (pasife almak) istediğinize emin misiniz? Giriş yaparak dilediğiniz zaman tekrar etkinleştirebilirsiniz.')) return;
+    try {
+        await window.appSync.apiFetch('/notes/api/auth/profile/deactivate', { method: 'POST' });
+        await window.appSync.logout();
+        await refreshMobileAuthUI();
+        showMobileToast('Hesabınız donduruldu. Oturum kapatıldı.');
+    } catch (e) {
+        showMobileToast('Hata: ' + e.message);
+    }
+}
+
+async function confirmMobileDeleteAccount() {
+    const check = prompt('DİKKAT: Hesabınız ve tüm notlarınız, defterleriniz, dosyalarınız kalıcı olarak silinecektir!\nOnaylamak için büyük harflerle "SİL" yazın:');
+    if (check !== 'SİL') {
+        alert('İşlem iptal edildi.');
+        return;
+    }
+    try {
+        await window.appSync.apiFetch('/notes/api/auth/profile/delete', { method: 'POST' });
+        await window.appSync.logout();
+        await refreshMobileAuthUI();
+        alert('Hesabınız ve tüm verileriniz kalıcı olarak silindi.');
+        window.location.reload();
+    } catch (e) {
+        alert('Hata: ' + e.message);
+    }
+}
+
+async function triggerMobileTincSync() {
+    const lbl = document.getElementById('tincsync-status-label');
+    if (lbl) lbl.innerText = 'Eşitleniyor...';
+    try {
+        const res = await window.appSync.apiFetch('/notes/api/sync/tincsync/trigger', { method: 'POST' });
+        const data = await res.json();
+        if (lbl) lbl.innerText = data.synced ? '🟢 P2P Eşitlendi' : '🟡 Yerel Ağda Beklemede';
+        showMobileToast(data.message || (data.synced ? 'TincSync ile başarıyla eşitlendi!' : 'TincSync hazır.'));
+    } catch (e) {
+        if (lbl) lbl.innerText = 'P2P Bağlantısı Hazır';
+        showMobileToast('TincSync port 9015 dinlemede');
+    }
+}
+
+async function handleMobileAuthSubmit() {
+    const emailInput = document.getElementById('m-auth-email');
+    const pInput = document.getElementById('m-auth-pass');
+    const dInput = document.getElementById('m-auth-display');
+    const msg = document.getElementById('m-auth-msg');
+
+    const email = emailInput ? emailInput.value.trim() : '';
+    const p = pInput ? pInput.value.trim() : '';
+    const displayName = dInput ? dInput.value.trim() : '';
+
+    if (!email || !p) {
+        if (msg) {
+            msg.innerText = 'Lütfen e-posta adresinizi ve şifrenizi girin';
+            msg.style.color = 'var(--danger)';
+            msg.style.display = 'block';
+        }
+        return;
+    }
+
+    if (msg) {
+        msg.innerText = 'İşlem yapılıyor...';
+        msg.style.color = 'var(--primary)';
+        msg.style.display = 'block';
+    }
+
+    let res;
+    if (currentMobileAuthTab === 'login') {
+        // Giriş: email = username field olarak gönder (geriye dönük uyum)
+        res = await window.appSync.login(email, p);
+    } else {
+        // Kayıt: email ayrı olarak gönder
+        res = await window.appSync.register(email, p, displayName, email);
+    }
+
+    if (res.ok) {
+        if (msg) {
+            msg.innerText = 'Başarılı! Oturum açıldı.';
+            msg.style.color = 'var(--success)';
+        }
+        if (pInput) pInput.value = '';
+        await refreshMobileAuthUI();
+        window.appSync.syncNow();
+
+        if (res.verification_required) {
+            openModal('modal-mobile-email-verify');
+            if (res.code_demo) {
+                const inp = document.getElementById('m-verify-code-input');
+                if (inp) inp.value = res.code_demo;
+                showMobileToast(`Demo Kodu: ${res.code_demo}`);
+            }
+        }
+    } else {
+        if (msg) {
+            msg.innerText = res.error || 'İşlem başarısız';
+            msg.style.color = 'var(--danger)';
+        }
+    }
+}
+
+async function handleMobileLogout() {
+    if (confirm('Oturumu kapatmak istediğinize emin misiniz?')) {
+        await window.appSync.logout();
+        await refreshMobileAuthUI();
+    }
+}
+
+async function refreshMobileAuthUI() {
+    const token = await window.appStorage.getSetting('auth_token', '');
+    const userJson = await window.appStorage.getSetting('user_profile', '');
+    const loggedInBox = document.getElementById('mobile-auth-logged-in');
+    const formBox = document.getElementById('mobile-auth-form');
+
+    if (token && userJson) {
+        try {
+            const user = JSON.parse(userJson);
+            const nameEl = document.getElementById('mobile-user-name');
+            const roleEl = document.getElementById('mobile-user-role');
+            const tincIdEl = document.getElementById('mobile-tinc-id-badge');
+            const verifyBox = document.getElementById('mobile-email-verify-box');
+
             if (nameEl) nameEl.innerText = user.display_name || user.username;
             if (roleEl) roleEl.innerText = `@${user.username} (${user.role || 'Kullanıcı'})`;
             if (tincIdEl) tincIdEl.innerText = user.tinc_id || 'TINC-DEFAULT';

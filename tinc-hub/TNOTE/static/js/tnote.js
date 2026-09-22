@@ -5719,7 +5719,8 @@ async function submitLogin(e) {
         const res = await fetch('/notes/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: u, password: p })
+            // email öncelikli; eski username field da gönderilir (geriye dönük uyum)
+            body: JSON.stringify({ email: u, username: u, password: p })
         });
         const data = await res.json();
         if (data.ok) {
@@ -5744,7 +5745,7 @@ async function submitLogin(e) {
 async function submitRegister(e) {
     if (e) e.preventDefault();
     const displayName = document.getElementById('reg-display-name').value.trim();
-    const u = document.getElementById('reg-username').value.trim();
+    const email = document.getElementById('reg-username').value.trim();
     const p = document.getElementById('reg-password').value.trim();
     const errEl = document.getElementById('auth-reg-error');
     if (errEl) errEl.style.display = 'none';
@@ -5753,7 +5754,7 @@ async function submitRegister(e) {
         const res = await fetch('/notes/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ display_name: displayName, username: u, password: p })
+            body: JSON.stringify({ display_name: displayName, email: email, password: p })
         });
         const data = await res.json();
         if (data.ok) {

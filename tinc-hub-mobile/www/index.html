@@ -756,34 +756,21 @@
                         <button class="btn btn-sm btn-secondary" id="btn-m-tab-reg" onclick="switchMobileAuthTab('reg')" style="flex:1;">Kayıt Ol</button>
                     </div>
 
-                    <!-- Hızlı SSO Giriş Butonları -->
-                    <div style="display:flex; gap:6px; margin-bottom:10px;">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="handleMobileGoogleSignIn()" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.78rem;">
-                            🌐 Google
-                        </button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="handleMobileAppleSignIn()" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; font-size:0.78rem;">
-                            🍎 Apple
-                        </button>
-                    </div>
-
+                    <!-- Kayıt için Ad Soyad -->
                     <div id="mobile-reg-group" style="display:none; margin-bottom:8px;">
                         <label class="form-label">Ad Soyad</label>
-                        <input type="text" id="m-auth-display" class="input-text" placeholder="Adınız">
+                        <input type="text" id="m-auth-display" class="input-text" placeholder="Adınız Soyadınız">
                     </div>
 
-                    <div id="mobile-reg-email-group" style="display:none; margin-bottom:8px;">
-                        <label class="form-label">E-posta Adresi</label>
-                        <input type="email" id="m-auth-email" class="input-text" placeholder="ornek@tinc.com">
-                    </div>
-
+                    <!-- E-posta — her iki formda da görünür -->
                     <div class="form-group" style="margin-bottom:8px;">
-                        <label class="form-label">Kullanıcı Adı veya E-posta</label>
-                        <input type="text" id="m-auth-user" class="input-text" placeholder="Kullanıcı Adı / E-posta">
+                        <label class="form-label">E-posta Adresi</label>
+                        <input type="email" id="m-auth-email" class="input-text" placeholder="ornek@email.com" autocomplete="email">
                     </div>
 
                     <div class="form-group" style="margin-bottom:12px;">
                         <label class="form-label">Şifre</label>
-                        <input type="password" id="m-auth-pass" class="input-text" placeholder="Şifreniz">
+                        <input type="password" id="m-auth-pass" class="input-text" placeholder="Şifreniz" autocomplete="current-password">
                     </div>
 
                     <button class="btn btn-primary" id="btn-m-auth-submit" onclick="handleMobileAuthSubmit()" style="width:100%;">

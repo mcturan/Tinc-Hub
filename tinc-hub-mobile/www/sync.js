@@ -60,12 +60,12 @@ class TincNoteSync {
         });
     }
 
-    async login(username, password) {
+    async login(emailOrUsername, password) {
         try {
             const res = await this.apiFetch('/notes/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
+                body: JSON.stringify({ email: emailOrUsername, username: emailOrUsername, password })
             });
             const data = await res.json();
             if (data.ok && data.token) {
@@ -79,12 +79,12 @@ class TincNoteSync {
         }
     }
 
-    async register(username, password, displayName, email) {
+    async register(emailOrUsername, password, displayName, email) {
         try {
             const res = await this.apiFetch('/notes/api/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, display_name: displayName, email: email || '' })
+                body: JSON.stringify({ email: email || emailOrUsername, username: emailOrUsername, password, display_name: displayName })
             });
             const data = await res.json();
             if (data.ok && data.token) {
@@ -186,6 +186,24 @@ class TincNoteSync {
                 this.isSyncing = false;
                 return false;
             }
+
+            // -1. Orphan Pre-Check: sunucuda olmayan yerel kategorileri dirty işaretle
+            // (mevcut kullanıcıların ID çakışmalarını onar)
+            try {
+                const preCheckCats = await this.apiFetch('/notes/api/categories');
+                if (preCheckCats.ok) {
+                    const preCheckData = await preCheckCats.json();
+                    const srvCatIdSet = new Set((preCheckData.categories || []).map(c => c.id));
+                    const localCats = await this.storage.getAll('categories');
+                    for (const lc of localCats) {
+                        if (!lc._deleted && !srvCatIdSet.has(lc.id) && typeof lc.id === 'number' && lc.id < 1000000000) {
+                            // Sunucuda yok ve geçici ID'den küçük — dirty yap ki push edilsin
+                            lc._dirty = true;
+                            await this.storage.put('categories', lc);
+                        }
+                    }
+                }
+            } catch(e) {}
 
             // 0. Genel Bakış (Overview) Verilerini Çek
             try {
@@ -385,15 +403,30 @@ class TincNoteSync {
     async pushDirtyDataToServer() {
         // Yerelde değişen / eklenen kategoriler
         const allCats = await this.storage.getAll('categories');
+
+        // Sunucudaki mevcut kategori ID'lerini öğren (orphan detection için)
+        let existingServerCatIds = new Set();
+        try {
+            const checkRes = await this.apiFetch('/notes/api/categories');
+            if (checkRes.ok) {
+                const checkData = await checkRes.json();
+                (checkData.categories || []).forEach(c => existingServerCatIds.add(c.id));
+            }
+        } catch(e) {}
+
         for (const cat of allCats) {
             if (cat._deleted && typeof cat.id === 'number' && cat.id < 1000000000) {
                 try {
                     await this.apiFetch(`/notes/api/categories/${cat.id}`, { method: 'DELETE' });
                     await this.storage.delete('categories', cat.id);
                 } catch (e) {}
-            } else if (cat._dirty && !cat._deleted) {
+            } else if (!cat._deleted) {
+                // Hem dirty olanları hem de sunucuda olmayan (orphan) kategorileri push et
+                const isNewLocal = typeof cat.id === 'number' && cat.id >= 1000000000;
+                const isOrphan = !isNewLocal && !existingServerCatIds.has(cat.id);
+                if (!cat._dirty && !isOrphan) continue; // Değişmemiş ve sunucuda var, geç
                 try {
-                    if (typeof cat.id === 'number' && cat.id >= 1000000000) {
+                    if (isNewLocal) {
                         const res = await this.apiFetch('/notes/api/categories', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -408,6 +441,7 @@ class TincNoteSync {
                         const data = await res.json();
                         const newCatId = data.id || data.category_id;
                         if (data.ok && newCatId) {
+                            existingServerCatIds.add(newCatId);
                             const oldId = cat.id;
                             await this.storage.delete('categories', oldId);
                             cat.id = newCatId;
@@ -423,7 +457,7 @@ class TincNoteSync {
                                 }
                             }
                         }
-                    } else {
+                    } else if (cat._dirty && !isOrphan) {
                         await this.apiFetch(`/notes/api/categories/${cat.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
@@ -435,6 +469,40 @@ class TincNoteSync {
                         });
                         cat._dirty = false;
                         await this.storage.put('categories', cat);
+                    } else if (isOrphan) {
+                        // Sunucuda olmayan kategori — yeniden oluştur
+                        const res = await this.apiFetch('/notes/api/categories', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: cat.name,
+                                icon: cat.icon || '📁',
+                                color: cat.color || '#3b82f6',
+                                notebook_id: cat.notebook_id || 1,
+                                is_divider: cat.is_divider ? 1 : 0
+                            })
+                        });
+                        const data = await res.json();
+                        const newCatId = data.id || data.category_id;
+                        if (data.ok && newCatId) {
+                            existingServerCatIds.add(newCatId);
+                            const oldId = cat.id;
+                            // ID değiştiyse eski kaydı sil, yenisini ekle
+                            if (newCatId !== oldId) {
+                                await this.storage.delete('categories', oldId);
+                                cat.id = newCatId;
+                                const allPages = await this.storage.getAll('pages');
+                                for (const p of allPages) {
+                                    if (p.category_id == oldId) {
+                                        p.category_id = newCatId;
+                                        p._dirty = true;
+                                        await this.storage.put('pages', p);
+                                    }
+                                }
+                            }
+                            cat._dirty = false;
+                            await this.storage.put('categories', cat);
+                        }
                     }
                 } catch (e) {
                     console.warn("Kategori senkronizasyon hatası:", e);
@@ -444,21 +512,60 @@ class TincNoteSync {
 
         // Yerelde silinmiş sayfalar
         const allPages = await this.storage.getAll('pages');
+
+        // Sunucu'da geçerli kategori VE sayfa ID'lerini topla (mapping ve orphan detection için)
+        let serverCatIds = new Set();
+        let firstServerCatId = null;
+        let serverPageIds = new Set();
+        try {
+            const scRes = await this.apiFetch('/notes/api/categories');
+            if (scRes.ok) {
+                const scData = await scRes.json();
+                (scData.categories || []).forEach(c => {
+                    serverCatIds.add(c.id);
+                    if (firstServerCatId === null) firstServerCatId = c.id;
+                });
+            }
+        } catch(e) {}
+        try {
+            const spRes = await this.apiFetch('/notes/api/pages');
+            if (spRes.ok) {
+                const spData = await spRes.json();
+                (spData.pages || []).forEach(p => serverPageIds.add(p.id));
+            }
+        } catch(e) {}
+
         for (const p of allPages) {
             if (p._deleted && typeof p.id === 'number' && p.id < 1000000000) {
                 try {
                     await this.apiFetch(`/notes/api/pages/${p.id}`, { method: 'DELETE' });
                     await this.storage.delete('pages', p.id);
                 } catch (e) {}
-            } else if (p._dirty && !p._deleted) {
+            } else if (!p._deleted) {
+                const isNewLocalPage = typeof p.id === 'number' && p.id >= 1000000000;
+                // Sayfa sunucuda yoksa orphan (hem category_id hem page_id bazında)
+                const isOrphanPage = !isNewLocalPage && !serverPageIds.has(p.id);
+                if (!p._dirty && !isOrphanPage && !isNewLocalPage) continue;
                 try {
-                    if (typeof p.id === 'number' && p.id >= 1000000000) {
+                    if (isNewLocalPage || isOrphanPage) {
                         // Yeni sayfa ekleme
+                        // category_id sunucuda yoksa fallback uygula
+                        let pushCatId = p.category_id;
+                        if (!serverCatIds.has(pushCatId)) {
+                            // Yerel category'yi sunucuya push etmeyi dene (zaten yukarıda yapıldı)
+                            // Hâlâ yoksa ilk server kategorisini kullan
+                            if (firstServerCatId !== null) {
+                                pushCatId = firstServerCatId;
+                            } else {
+                                console.warn(`Sayfa "${p.title}" için geçerli kategori yok, atlanıyor.`);
+                                continue;
+                            }
+                        }
                         const res = await this.apiFetch('/notes/api/pages', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                category_id: p.category_id,
+                                category_id: pushCatId,
                                 title: p.title,
                                 type: p.type,
                                 icon: p.icon || '📝',
@@ -471,6 +578,7 @@ class TincNoteSync {
                             const oldPageId = p.id;
                             await this.storage.delete('pages', oldPageId);
                             p.id = newPageId;
+                            p.category_id = pushCatId; // doğru category_id'yi güncelle
                             p._dirty = false;
                             await this.storage.put('pages', p);
 
@@ -512,13 +620,30 @@ class TincNoteSync {
 
         // Yerelde değişen / eklenen maddeler (items)
         const allItems = await this.storage.getAll('items');
+
+        // Sunucudaki mevcut item ID'lerini topla (orphan detection için)
+        let serverItemIds = new Set();
+        try {
+            // Her sayfa için değil, tüm item'ları tek seferde çek
+            const itRes = await this.apiFetch('/notes/api/all-items');
+            if (itRes.ok) {
+                const itData = await itRes.json();
+                (itData.items || []).forEach(i => serverItemIds.add(i.id));
+            }
+        } catch(e) {}
+
         for (const it of allItems) {
             if (it._deleted && typeof it.id === 'number' && it.id < 1000000000) {
                 try {
                     await this.apiFetch(`/notes/api/items/${it.id}`, { method: 'DELETE' });
                     await this.storage.delete('items', it.id);
                 } catch (e) {}
-            } else if (it._dirty && !it._deleted) {
+            } else if (!it._deleted) {
+                const isNewLocalItem = typeof it.id === 'number' && it.id >= 1000000000;
+                const isOrphanItem = !isNewLocalItem && !serverItemIds.has(it.id);
+                if (!it._dirty && !isOrphanItem && !isNewLocalItem) continue;
+                // Sayfa sunucuda yoksa item'ı push etme
+                if (typeof it.page_id === 'number' && it.page_id >= 1000000000) continue;
                 try {
                     const itemPayload = {
                         title: it.title,
@@ -531,7 +656,8 @@ class TincNoteSync {
                         is_done: it.is_done ? 1 : 0,
                         sort_order: it.sort_order || 0
                     };
-                    if (typeof it.id === 'number' && it.id >= 1000000000) {
+                    if (isNewLocalItem || isOrphanItem) {
+                        // Yeni veya orphan item — POST
                         const res = await this.apiFetch(`/notes/api/pages/${it.page_id}/items`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -545,6 +671,7 @@ class TincNoteSync {
                             await this.storage.put('items', it);
                         }
                     } else {
+                        // Var olan item — PUT
                         await this.apiFetch(`/notes/api/items/${it.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
