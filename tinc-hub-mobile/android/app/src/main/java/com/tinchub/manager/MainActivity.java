@@ -226,12 +226,72 @@ public class MainActivity extends BridgeActivity {
                     String fileName = "TincNote-v" + vClean + ".apk";
                     android.app.DownloadManager.Request request = new android.app.DownloadManager.Request(uri);
                     request.setTitle("TincNote v" + vClean + " İndiriliyor");
-                    request.setDescription("Yeni sürüm indiriliyor, tamamlandığında dokunarak kurabilirsiniz.");
+                    request.setDescription("İndirme tamamlanınca kurulum otomatik başlayacak...");
                     request.setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
                     request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, fileName);
                     request.setMimeType("application/vnd.android.package-archive");
-                    dm.enqueue(request);
-                    android.widget.Toast.makeText(mContext, "🚀 TincNote v" + vClean + " otomatik indiriliyor...", android.widget.Toast.LENGTH_LONG).show();
+                    long downloadId = dm.enqueue(request);
+
+                    // İndirme ID'sini SharedPreferences'a kaydet — BroadcastReceiver bu ID'yi kullanarak install açar
+                    android.content.SharedPreferences prefs = mContext.getSharedPreferences("tincnote_update", Context.MODE_PRIVATE);
+                    prefs.edit()
+                        .putLong("pending_download_id", downloadId)
+                        .putString("pending_apk_name", fileName)
+                        .apply();
+
+                    // DownloadManager tamamlanma broadcast'ini dinle
+                    android.content.IntentFilter filter = new android.content.IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+                    mContext.registerReceiver(new android.content.BroadcastReceiver() {
+                        @Override
+                        public void onReceive(android.content.Context ctx, Intent intent) {
+                            long completedId = intent.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                            android.content.SharedPreferences p = ctx.getSharedPreferences("tincnote_update", Context.MODE_PRIVATE);
+                            long pendingId = p.getLong("pending_download_id", -1);
+                            if (completedId == pendingId) {
+                                try {
+                                    // İndirilen APK'nın URI'sini al
+                                    android.app.DownloadManager dlm = (android.app.DownloadManager) ctx.getSystemService(Context.DOWNLOAD_SERVICE);
+                                    android.database.Cursor cursor = dlm.query(new android.app.DownloadManager.Query().setFilterById(completedId));
+                                    if (cursor != null && cursor.moveToFirst()) {
+                                        int status = cursor.getInt(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_STATUS));
+                                        if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                                            String localUri = cursor.getString(cursor.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_LOCAL_URI));
+                                            cursor.close();
+                                            // Kurulum intent'ini aç
+                                            Uri apkUri = android.net.Uri.parse(localUri);
+                                            // Android 7+ için FileProvider kullan
+                                            try {
+                                                java.io.File apkFile = new java.io.File(apkUri.getPath());
+                                                Uri installUri = androidx.core.content.FileProvider.getUriForFile(
+                                                    ctx,
+                                                    ctx.getPackageName() + ".fileprovider",
+                                                    apkFile
+                                                );
+                                                Intent installIntent = new Intent(Intent.ACTION_VIEW);
+                                                installIntent.setDataAndType(installUri, "application/vnd.android.package-archive");
+                                                installIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                                                installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                                ctx.startActivity(installIntent);
+                                            } catch (Exception fe) {
+                                                // FileProvider başarısız olursa doğrudan URI dene
+                                                Intent installIntent = new Intent(Intent.ACTION_VIEW);
+                                                installIntent.setDataAndType(apkUri, "application/vnd.android.package-archive");
+                                                installIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                                                ctx.startActivity(installIntent);
+                                            }
+                                        } else if (cursor != null) {
+                                            cursor.close();
+                                        }
+                                    }
+                                } catch (Exception ex) {
+                                    ex.printStackTrace();
+                                }
+                                ctx.unregisterReceiver(this);
+                            }
+                        }
+                    }, filter);
+
+                    android.widget.Toast.makeText(mContext, "🚀 TincNote v" + vClean + " indiriliyor, tamamlanınca kurulum başlayacak...", android.widget.Toast.LENGTH_LONG).show();
                 } else {
                     openBrowserUrl(downloadUrl);
                 }
